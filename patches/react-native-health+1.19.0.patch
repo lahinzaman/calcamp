@@ -1,5 +1,40 @@
+diff --git a/node_modules/react-native-health/RCTAppleHealthKit/RCTAppleHealthKit+Methods_Dietary.m b/node_modules/react-native-health/RCTAppleHealthKit/RCTAppleHealthKit+Methods_Dietary.m
+index 9d532ee..becbabf 100644
+--- a/node_modules/react-native-health/RCTAppleHealthKit/RCTAppleHealthKit+Methods_Dietary.m
++++ b/node_modules/react-native-health/RCTAppleHealthKit/RCTAppleHealthKit+Methods_Dietary.m
+@@ -183,13 +183,15 @@
+     double zincValue = [RCTAppleHealthKit doubleFromOptions:input key:@"zinc" withDefault:(double)0];
+ 
+     // Metadata including some new food-related keys //
+-    NSDictionary *metadata = @{
++    NSMutableDictionary *metadata = [@{
+             HKMetadataKeyFoodType:foodNameValue,
+             //@"HKFoodBrandName":@"FoodBrandName", // Restaurant name or packaged food brand name
+             //@"HKFoodTypeUUID":@"FoodTypeUUID", // Identifier for this food
+             @"HKFoodMeal":mealNameValue//, // Breakfast, Lunch, Dinner, or Snacks
+             //@"HKFoodImageName":@"FoodImageName" // Food icon name
+-    };
++    } mutableCopy];
++
++    [metadata addEntriesFromDictionary:[RCTAppleHealthKit metadataFromOptions:input withDefault:@{}]];
+ 
+     // Create nutrtional data for food //
+     NSMutableSet *mySet = [[NSMutableSet alloc] init];
+diff --git a/node_modules/react-native-health/RCTAppleHealthKit/RCTAppleHealthKit+Methods_Workout.m b/node_modules/react-native-health/RCTAppleHealthKit/RCTAppleHealthKit+Methods_Workout.m
+index c1c4f42..ef7e06b 100644
+--- a/node_modules/react-native-health/RCTAppleHealthKit/RCTAppleHealthKit+Methods_Workout.m
++++ b/node_modules/react-native-health/RCTAppleHealthKit/RCTAppleHealthKit+Methods_Workout.m
+@@ -133,7 +133,7 @@
+ 
+ 
+     HKWorkout *workout = [
+-                          HKWorkout workoutWithActivityType:type startDate:startDate endDate:endDate workoutEvents:nil totalEnergyBurned:totalEnergyBurned totalDistance:totalDistance metadata: nil
++                          HKWorkout workoutWithActivityType:type startDate:startDate endDate:endDate workoutEvents:nil totalEnergyBurned:totalEnergyBurned totalDistance:totalDistance metadata:[RCTAppleHealthKit metadataFromOptions:input withDefault:nil]
+                           ];
+ 
+     void (^completion)(BOOL success, NSError *error);
 diff --git a/node_modules/react-native-health/RCTAppleHealthKit/RCTAppleHealthKit.m b/node_modules/react-native-health/RCTAppleHealthKit/RCTAppleHealthKit.m
-index e8ddce1..7e42a41 100644
+index e8ddce1..8c0dd50 100644
 --- a/node_modules/react-native-health/RCTAppleHealthKit/RCTAppleHealthKit.m
 +++ b/node_modules/react-native-health/RCTAppleHealthKit/RCTAppleHealthKit.m
 @@ -841,7 +841,7 @@ RCT_EXPORT_METHOD(getClinicalRecords:(NSDictionary *)input callback:(RCTResponse
@@ -7,7 +42,7 @@ index e8ddce1..7e42a41 100644
    if (self.hasListeners) {
      self.callableJSModules = [RCTAppleHealthKit sharedJsModule];
 -    [self.callableJSModules setBridge:self.bridge];
-+//     [self.callableJSModules setBridge:self.bridge];
++    // Legacy bridge assignment conflicts with RCTCallableJSModules; sendEvent uses the shared module.
      [self sendEventWithName:notification.name
                     body:notification.userInfo];
    }

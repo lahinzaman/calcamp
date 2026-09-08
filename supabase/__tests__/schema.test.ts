@@ -202,6 +202,29 @@ test('fresh Supabase schema: permissions, nutrition constraints, and workout int
       await fails('select * from private.gym_vote_summary()', '42501');
     });
 
+    await t.test('Phase 5 atomic nutrition deltas deduplicate retries and isolate receipts', async () => {
+      const id = '50000000-0000-4000-8000-000000000001';
+      const id2 = '50000000-0000-4000-8000-000000000002';
+      const id3 = '50000000-0000-4000-8000-000000000003';
+      const mutate = (key: string, kcal = 100) => `select * from public.apply_nutrition_mutation('${key}', '2026-09-06',
+        '{"caloriesKcal":${kcal},"proteinG":10,"carbsG":10,"fatG":2}', '{"fiber_g":2}', '{}')`;
+      await db.exec('reset role; set role anon');
+      assert.equal((await db.query<{ service_health: boolean }>('select public.service_health()')).rows[0].service_health, true);
+      await fails(mutate(id), '42501');
+      await signIn(alice);
+      await db.exec(mutate(id)); await db.exec(mutate(id)); await db.exec(mutate(id2));
+      const total = async () => (await db.query<{ calories_kcal: string; micronutrients: { fiber_g: number } }>("select calories_kcal, micronutrients from public.daily_nutrition_logs where log_date = '2026-09-06'")).rows[0];
+      assert.equal(Number((await total()).calories_kcal), 200); assert.equal((await total()).micronutrients.fiber_g, 4);
+      await fails(mutate(id, 101), '22023'); await fails(mutate(id3, -500));
+      assert.equal(Number((await total()).calories_kcal), 200);
+      assert.equal((await db.query('select * from private.nutrition_mutation_receipts')).rows.length, 2);
+      // Failed updates did not leave a receipt behind; corrected retry can succeed.
+      await db.exec(mutate(id3)); assert.equal(Number((await total()).calories_kcal), 300);
+      await signIn(bob); assert.equal((await db.query('select * from private.nutrition_mutation_receipts')).rows.length, 0);
+      await db.exec(mutate(id)); assert.equal(Number((await total()).calories_kcal), 100);
+      await fails('delete from private.nutrition_mutation_receipts', '42501');
+    });
+
     await t.test('profile deletion cascades owned nutrition, workouts, custom lifts, and sets', async () => {
       await signIn(alice);
       await db.exec(`insert into public.sets (workout_id, exercise_id, exercise_position, set_position, weight_kg, reps, is_completed)

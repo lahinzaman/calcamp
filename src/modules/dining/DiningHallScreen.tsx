@@ -1,11 +1,13 @@
+import { safelyEdit } from '../../components/safelyEdit';
+import { LoadingCards } from '../../components/LoadingCards';
 import MacroRescue from './MacroRescue';
 import { CloudDiaryControls } from '../../components/CloudDiaryControls';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, AppState, Modal, Pressable, ScrollView, SectionList, Text, TextInput, View } from 'react-native';
+import { Linking, AppState, Modal, Pressable, ScrollView, SectionList, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { fetchDailyMenu, normalizeMenuDate } from '../../api/nutrislice';
+import { fetchDailyMenu, normalizeMenuDate, NutrisliceError } from '../../api/nutrislice';
 import { DINING_HALLS, type DiningHallSlug } from '../../types/campus';
 import { MEAL_TYPES, type DailyMenuItem } from '../../types/nutrislice';
 import type { MacroTotals } from '../../types/nutrition';
@@ -68,7 +70,7 @@ export default function DiningHallScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {
     if (nutritionStore.getState().activeDiningHall === null) nutritionStore.getState().setActiveDiningHall('busch-dining-hall');
-    const update = () => { setDate(normalizeMenuDate(new Date())); nutritionStore.getState().syncToday(); };
+    const update = () => { setDate(normalizeMenuDate(new Date())); safelyEdit(() => nutritionStore.getState().syncToday()); };
     const id = setInterval(update, 60_000);
     const listener = AppState.addEventListener('change', (state) => { if (state === 'active') update(); });
     return () => { clearInterval(id); listener.remove(); };
@@ -77,7 +79,7 @@ export default function DiningHallScreen() {
   const menu = useQuery({
     queryKey: ['nutrislice', hall, date],
     queryFn: ({ signal }) => fetchDailyMenu(hall, date, {
-      signal, fallbackBaseUrl: process.env.EXPO_PUBLIC_NUTRISLICE_PROXY_URL || undefined,
+      signal, fallbackBaseUrl: process.env.EXPO_PUBLIC_NUTRISLICE_PROXY_URL || process.env.EXPO_PUBLIC_BACKEND_URL || undefined,
     }),
   });
   const sections = MEAL_TYPES.map((meal) => ({ title: meal, data: (menu.data ?? []).filter((item) => item.meal === meal) }));
@@ -90,6 +92,8 @@ export default function DiningHallScreen() {
         initialNumToRender={8} refreshing={menu.isRefetching} onRefresh={() => { void menu.refetch(); }}
         ListFooterComponent={<MacroRescue />}
         ListHeaderComponent={<>
+          {menu.isPending && <LoadingCards label="Loading campus menus…" />}
+          {menu.data?.some(item => item.dataFreshness === 'stale') && <Text className="mb-4 rounded-xl bg-amber-50 p-3 text-amber-900">Showing a saved menu while Rutgers is unavailable. Confirm current portions and availability.</Text>}
           <View className="mb-6 flex-row items-center justify-between"><Text className="text-sm font-black tracking-widest text-scarlet">RULOCKED</Text><Text className="text-xs font-semibold text-zinc-500">NEW BRUNSWICK</Text></View>
           <Text className="text-4xl font-bold tracking-tight text-zinc-950">Campus dining</Text>
           <Text className="mt-2 text-base text-zinc-500">Your campus. Your plate. Your goals.</Text>
@@ -106,7 +110,12 @@ export default function DiningHallScreen() {
           </View>
           <Text className="mb-3 text-sm text-zinc-500">{DINING_HALLS[hall]} · Nutrition per listed serving</Text>
           {notice && <Text accessibilityRole="alert" className="mb-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</Text>}
-          {menu.isPending && <View className="items-center py-8"><ActivityIndicator color="#CC0033" /><Text className="mt-3 text-zinc-500">Loading campus menus…</Text></View>}
+
+          {menu.error instanceof NutrisliceError && !!menu.error.fallbackMeals?.length && <View className="mb-4 rounded-2xl bg-amber-50 p-4">
+            <Text className="font-bold text-amber-950">Published takeout alternatives</Text>
+            <Text className="mt-2 text-sm text-amber-900">Campus menus are unavailable. These catalog meals are reference options; opening hours, availability and current portions have not been verified.</Text>
+            {menu.error.fallbackMeals.map(meal => <View key={meal.id} className="mt-3"><Text className="font-semibold">{meal.name}</Text><Text className="mt-1 text-sm">{meal.macros.caloriesKcal} kcal · P {meal.macros.proteinG}g · C {meal.macros.carbsG}g · F {meal.macros.fatG}g</Text><Pressable accessibilityRole="link" onPress={() => { void Linking.openURL(meal.sourceUrl).catch(() => setNotice('Unable to open nutrition source. Try again when connected.')); }}><Text className="mt-2 text-sm underline">Nutrition source · reviewed {meal.reviewedAt}</Text></Pressable></View>)}
+          </View>}
           {menu.isError && <View className="rounded-2xl bg-red-50 p-4"><Text accessibilityRole="alert" className="font-semibold text-red-800">Menu unavailable</Text><Text className="mt-1 text-sm text-red-700">{menu.data ? 'Showing the last loaded menu. Pull to refresh.' : 'We could not reach campus dining. Please try again.'}</Text><Pressable accessibilityRole="button" onPress={() => { void menu.refetch(); }} className="mt-3 py-2"><Text className="font-bold text-red-800">Retry menu</Text></Pressable></View>}
         </>}
         renderSectionHeader={({ section }) => menu.isPending || (menu.isError && !menu.data) ? null : <View className="mb-3 mt-6 flex-row items-center justify-between"><Text className="text-2xl font-bold capitalize text-zinc-950">{section.title}</Text><Text className="text-xs text-zinc-500">{section.data.length} items</Text></View>}

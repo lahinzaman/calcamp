@@ -2,13 +2,14 @@ import { localDay, type HealthAdapter } from './types';
 export async function getHealthAdapter(): Promise<HealthAdapter> {
   // Import only when the user requests health access; unsupported runtimes surface an error.
   const hc = await import('react-native-health-connect');
+  if (await hc.getSdkStatus() !== hc.SdkAvailabilityStatus.SDK_AVAILABLE || !await hc.initialize()) throw new Error('Health Connect is unavailable on this device.');
   const permissions: import('react-native-health-connect').Permission[] = [
     { accessType: 'read', recordType: 'Steps' }, { accessType: 'read', recordType: 'ActiveCaloriesBurned' },
     { accessType: 'write', recordType: 'ExerciseSession' }, { accessType: 'write', recordType: 'Nutrition' },
   ];
   async function requireWrite(recordType: 'ExerciseSession' | 'Nutrition') {
     const granted = await hc.getGrantedPermissions();
-    if (!granted.some(p => 'recordType' in p && p.recordType === recordType && p.accessType === 'write')) throw new Error('Enable the requested write permission in Health Connect.');
+    if (!granted.some(p => 'recordType' in p && p.recordType === recordType && p.accessType === 'write')) throw Object.assign(new Error('Enable the requested write permission in Health Connect.'), { code: 'HEALTH_PERMISSION' });
   }
   return {
     async initialize() {

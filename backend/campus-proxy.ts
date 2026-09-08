@@ -1,7 +1,9 @@
+import { GYMS, type GymBaseline } from '../src/types/facilities';
 import { Router, json, type ErrorRequestHandler } from 'express';
 import cors from 'cors';
-import { rateLimit } from 'express-rate-limit';
+import { structuredLimit as rateLimit } from './http';
 import { createClient } from '@supabase/supabase-js';
+import { createCachedLoader, type ResponseCache } from './cache';
 import { createBestTimeService } from './besttime';
 import { findRescueMeals } from './places';
 import { rescueEligible, type Coordinates, type MacroPreference } from '../src/types/rescue';
@@ -16,9 +18,9 @@ export function validateRescueRequest(body: unknown): { location: Coordinates; r
 }
 export function createCampusProxyRouter(options: {
   authenticate?: (token: string) => Promise<string | null>; baselines?: ReturnType<typeof createBestTimeService>;
-  rescue?: typeof findRescueMeals; now?: () => Date;
+  rescue?: typeof findRescueMeals; now?: () => Date; cache?: ResponseCache;
 } = {}) {
-  const router = Router(); const baselines = options.baselines ?? createBestTimeService();
+  const router = Router(); const cached = createCachedLoader(options.cache); const baselines = options.baselines ?? createBestTimeService();
   const authenticate = options.authenticate ?? (async token => {
     const url = process.env.SUPABASE_URL; const key = process.env.SUPABASE_PUBLISHABLE_KEY;
     if (!url || !key) return null;
@@ -33,21 +35,36 @@ export function createCampusProxyRouter(options: {
   router.use(async (req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
     const token = /^Bearer (\S+)$/.exec(req.headers.authorization ?? '')?.[1];
-    if (!token) { res.status(401).json({ error: 'Sign in to use campus services.' }); return; }
-    try { const id = await authenticate(token); if (!id) { res.status(401).json({ error: 'Session expired. Sign in again.' }); return; } res.locals.userId = id; next(); }
-    catch { res.status(503).json({ error: 'Authentication unavailable.' }); }
+    if (!token) { res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Sign in to use campus services.' } }); return; }
+    try { const id = await authenticate(token); if (!id) { res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Session expired. Sign in again.' } }); return; } res.locals.userId = id; next(); }
+    catch { res.status(503).json({ error: { code: 'AUTH_UNAVAILABLE', message: 'Authentication unavailable.' } }); }
   });
   router.use(rateLimit({ windowMs: 60_000, limit: 12, keyGenerator: (_req, res) => res.locals.userId as string, standardHeaders: 'draft-8', legacyHeaders: false }));
-  router.get('/gyms', async (_req, res) => { res.json(await baselines()); });
+  router.get('/gyms', async (_req, res) => {
+    let refresh: Promise<GymBaseline[]> | undefined;
+    const gyms = await Promise.all(GYMS.map(async gym => {
+      try {
+        const result = await cached(`gym:${gym.slug}`, async () => {
+          refresh ??= baselines();
+          const value = (await refresh).find(g => g.slug === gym.slug);
+          if (!value || value.status === 'unavailable' || value.baseline === null) throw new Error('Forecast unavailable');
+          return value;
+        });
+        return { ...result.value, stale: result.stale, cachedAt: new Date(result.savedAt).toISOString() };
+      } catch { return { slug: gym.slug, baseline: null, checkedAt: new Date().toISOString(), status: 'unavailable' as const }; }
+    }));
+    if (gyms.every(g => g.status === 'unavailable')) { res.status(503).json({ error: { code: 'FORECAST_UNAVAILABLE', message: 'Gym forecasts are unavailable. Student reports can still be used.' } }); return; }
+    res.set('X-Data-Freshness', gyms.some(g => 'stale' in g && g.stale) ? 'stale' : 'fresh').json(gyms);
+  });
   router.post('/rescue', json({ limit: '4kb' }), async (req, res) => {
     let input: ReturnType<typeof validateRescueRequest>;
-    try { input = validateRescueRequest(req.body); } catch { res.status(400).json({ error: 'Provide valid coordinates, macros, and a protein or carbs preference.' }); return; }
+    try { input = validateRescueRequest(req.body); } catch { res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'Provide valid coordinates, macros, and a protein or carbs preference.' } }); return; }
     const now = options.now?.() ?? new Date();
-    if (!rescueEligible(input.remaining, now)) { res.status(409).json({ error: 'Macro rescue opens at 10 PM Eastern when more than 400 kcal remain.' }); return; }
+    if (!rescueEligible(input.remaining, now)) { res.status(409).json({ error: { code: 'NOT_ELIGIBLE', message: 'Macro rescue opens at 10 PM Eastern when more than 400 kcal remain.' } }); return; }
     try { res.json(await (options.rescue ?? findRescueMeals)(input.location, input.remaining, input.preference, { now })); }
-    catch { res.status(503).json({ error: 'Restaurant search unavailable. Try again later.' }); }
+    catch { res.status(503).json({ error: { code: 'PROVIDER_UNAVAILABLE', message: 'Restaurant search unavailable. Try again later.' } }); }
   });
-  const errorHandler: ErrorRequestHandler = (_error, _req, res, _next) => { res.status(400).json({ error: 'Invalid request.' }); };
+  const errorHandler: ErrorRequestHandler = (_error, _req, res, _next) => { res.status(_error?.type === 'entity.too.large' ? 413 : _error instanceof SyntaxError ? 400 : 503).json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Campus service unavailable. Please retry shortly.' } }); };
   router.use(errorHandler);
   return router;
 }

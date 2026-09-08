@@ -45,7 +45,7 @@
       [
         "react-native-health",
         {
-          "healthSharePermission": "Allow RULocked to read steps and active energy for daily activity tracking.",
+          "healthSharePermission": "Allow RULocked to read steps, active energy, and recent workouts for activity tracking.",
           "healthUpdatePermission": "Allow RULocked to save workouts and dietary energy you choose to share."
         }
       ],
@@ -64,7 +64,9 @@
         {
           "locationWhenInUsePermission": "Use your location to generate a campus walking loop."
         }
-      ]
+      ],
+      "expo-sqlite",
+      "expo-background-task"
     ],
     "experiments": {
       "typedRoutes": true,

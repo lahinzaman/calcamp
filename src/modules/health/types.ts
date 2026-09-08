@@ -4,6 +4,7 @@ export interface HealthMeal { id: string; name: string; date: string; caloriesKc
 export interface HealthAdapter {
   initialize(): Promise<void>;
   readToday(now: Date): Promise<HealthSummary>;
+  readWorkouts?(now: Date): Promise<HealthWorkout[]>;
   writeWorkout(workout: HealthWorkout): Promise<void>;
   writeDietaryEnergy(meal: HealthMeal): Promise<void>;
 }

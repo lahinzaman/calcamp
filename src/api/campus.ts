@@ -1,3 +1,4 @@
+import { durableStorage } from '../modules/sync/storage';
 import { getSupabase } from './supabase';
 import type { CrowdStatus, GymBaseline, GymSlug, GymSummary } from '../types/facilities';
 import type { Coordinates, MacroPreference, RescueResponse } from '../types/rescue';
@@ -20,16 +21,31 @@ async function campusRequest<T>(path: string, signal: AbortSignal, body?: unknow
     return await response.json() as T;
   } finally { clearTimeout(timer); signal.removeEventListener('abort', cancel); }
 }
-export const fetchGymBaselines = (signal: AbortSignal) => campusRequest<GymBaseline[]>('gyms', signal);
+export async function fetchGymBaselines(signal: AbortSignal): Promise<GymBaseline[]> {
+  const key = 'campus:gyms'; let cached: { data: GymBaseline[]; at: number } | null = null;
+  try { const raw = durableStorage.get(key); cached = raw ? JSON.parse(raw) : null; } catch { /* Cache failure never blocks a live read. */ }
+  if (signal.aborted) throw new Error('Request cancelled.');
+  if (cached && (!Number.isFinite(cached.at) || !Array.isArray(cached.data) || cached.data.some(g => !g || typeof g.slug !== 'string' || (g.baseline !== null && (!Number.isFinite(g.baseline) || g.baseline < 0 || g.baseline > 100))))) cached = null;
+  if (cached && Date.now() - cached.at < 300_000) return cached.data;
+  try {
+    const data = await campusRequest<GymBaseline[]>('gyms', signal);
+    if (!Array.isArray(data) || data.some(g => g.baseline !== null && (!Number.isFinite(g.baseline) || g.baseline < 0 || g.baseline > 100))) throw new Error('Invalid gym response.');
+    try { durableStorage.set(key, JSON.stringify({ data, at: Date.now() })); } catch { /* Live data remains usable. */ }
+    return data;
+  } catch (error) {
+    if (!signal.aborted && cached && Date.now() - cached.at < 3600_000) return cached.data.map(g => ({ ...g, stale: true }));
+    throw error;
+  }
+}
 export const fetchMacroRescue = (location: Coordinates, remaining: MacroTotals, preference: MacroPreference, signal: AbortSignal) => campusRequest<RescueResponse>('rescue', signal, { location, remaining, preference });
 export async function fetchGymSummary(signal: AbortSignal): Promise<GymSummary[]> {
   const { data, error } = await getSupabase().rpc('get_gym_busyness').abortSignal(signal);
-  if (error) throw new Error(error.message);
+  if (error) throw new Error('Community reports are unavailable. Please try again.');
   return (data ?? []) as GymSummary[];
 }
 export async function submitGymVote(slug: GymSlug, status: CrowdStatus) {
   const client = getSupabase(); const { data, error } = await client.auth.getUser();
   if (error || !data.user) throw new Error('Sign in to vote.');
   const { error: insertError } = await client.from('gym_busyness_votes').insert({ user_id: data.user.id, location_slug: slug, status });
-  if (insertError) throw new Error(insertError.message);
+  if (insertError) throw new Error('Your vote could not be saved. Please try again.');
 }

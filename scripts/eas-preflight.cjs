@@ -14,6 +14,6 @@ for (const key of ['EXPO_PUBLIC_SUPABASE_URL', 'EXPO_PUBLIC_BACKEND_URL', 'EXPO_
   catch { failures.push(`${key} must be a valid ${variant === 'development' ? 'HTTP(S)' : 'HTTPS'} URL.`); }
 }
 const plugins = (exp.plugins ?? []).map(p => Array.isArray(p) ? p[0] : p);
-for (const name of ['react-native-health', 'react-native-health-connect', '@rnmapbox/maps', 'expo-build-properties', 'expo-location', 'expo-secure-store']) if (!plugins.includes(name)) failures.push(`Missing native plugin: ${name}`);
+for (const name of ['react-native-health', 'react-native-health-connect', '@rnmapbox/maps', 'expo-build-properties', 'expo-location', 'expo-secure-store', 'expo-sqlite', 'expo-background-task']) if (!plugins.includes(name)) failures.push(`Missing native plugin: ${name}`);
 if (failures.length) { console.error(failures.join('\n')); process.exitCode = 1; }
 else console.log(`EAS ${variant} configuration preflight passed. Signing credentials and native compilation are checked by EAS Build.`);

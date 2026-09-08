@@ -5,5 +5,5 @@ export const GYMS = [
 ] as const;
 export type GymSlug = typeof GYMS[number]['slug'];
 export type CrowdStatus = 'Quiet' | 'Normal' | 'Packed';
-export interface GymBaseline { slug: GymSlug; baseline: number | null; checkedAt: string; status: 'available' | 'unavailable' }
+export interface GymBaseline { stale?: boolean; cachedAt?: string; slug: GymSlug; baseline: number | null; checkedAt: string; status: 'available' | 'unavailable' }
 export interface GymSummary { location_slug: GymSlug; vote_count: number; crowd_score: number | null; latest_vote_at: string | null }

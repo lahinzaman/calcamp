@@ -1,3 +1,4 @@
+import { syncBridge } from '../modules/sync/bridge';
 import type { TrackingRepository } from '../api/trackingRepository';
 import { useStore } from 'zustand';
 import { createStore } from 'zustand/vanilla';
@@ -98,12 +99,18 @@ function freshDay(now: Date) {
 }
 
 /** A separate factory instance keeps tests and future per-account hydration isolated. */
-export function createNutritionStore(options: { now?: () => Date; repository?: TrackingRepository } = {}) {
+export function createNutritionStore(options: { now?: () => Date; repository?: TrackingRepository; beforeChange?: (next: NutritionState, previous: NutritionState) => void; durable?: boolean } = {}) {
   const now = options.now ?? (() => new Date());
   let generation = 0;
   let inFlight = false;
   const repo = async () => options.repository ?? (await import('../api/trackingRepository')).getTrackingRepository();
-  return createStore<NutritionStore>()((set, get) => ({
+  return createStore<NutritionStore>()((rawSet, get) => {
+    const set = (patch: Partial<NutritionStore> | ((state: NutritionStore) => Partial<NutritionStore>)) => {
+      const previous = get(); const delta = typeof patch === 'function' ? patch(previous) : patch;
+      options.beforeChange?.({ ...previous, ...delta }, previous);
+      rawSet(delta);
+    };
+    return ({
     ...freshDay(now()),
     cloudOwnerId: null,
     dailyTargets: null,
@@ -113,6 +120,7 @@ export function createNutritionStore(options: { now?: () => Date; repository?: T
       get().syncToday(); set({ bodyWeightKg, syncStatus: 'idle' });
     },
     loadToday: async () => {
+      if (options.durable && syncBridge.refresh) return syncBridge.refresh();
       if (inFlight) return;
       get().syncToday();
       const snapshot = get();
@@ -134,6 +142,7 @@ export function createNutritionStore(options: { now?: () => Date; repository?: T
       finally { inFlight = false; }
     },
     saveToday: async () => {
+      if (options.durable && syncBridge.drain) return syncBridge.drain();
       if (inFlight) return;
       get().syncToday(); const snapshot = get(); const token = generation;
       inFlight = true; set({ syncStatus: 'saving', syncError: null });
@@ -204,10 +213,10 @@ export function createNutritionStore(options: { now?: () => Date; repository?: T
     },
     resetToday: (date = now()) => set(freshDay(date)),
     reset: () => { generation++; set({ ...freshDay(now()), cloudOwnerId: null, dailyTargets: null, activeDiningHall: null }); },
-  }));
+  }); });
 }
 
-export const nutritionStore = createNutritionStore();
+export const nutritionStore = createNutritionStore({ durable: true, beforeChange: (next, previous) => syncBridge.nutrition?.(next, previous) });
 
 export function useNutritionStore<T>(selector: (state: NutritionStore) => T): T {
   return useStore(nutritionStore, selector);

@@ -131,3 +131,14 @@ test('validates inputs before fetching and interprets Date objects in the campus
   assert.equal(normalizeMenuDate(new Date('2026-09-08T02:00:00Z')), '2026-09-07');
   assert.equal(normalizeMenuDate('2028-02-29'), '2028-02-29');
 });
+
+test('a timed-out dining proxy exposes only validated sourced alternatives, never fabricated hall items', async () => {
+  const { fetchDailyMenu, NutrisliceError } = await import('../nutrislice');
+  await assert.rejects(fetchDailyMenu('the-atrium', '2026-09-08', { fallbackBaseUrl: 'https://proxy.example', fetchImpl: async url => {
+    if (String(url).startsWith('https://rutgers.')) throw new Error('offline');
+    return Response.json({ error: { fallback: { kind: 'rescue-catalog', availabilityVerified: false, meals: [
+      { id: 'reference', name: 'Rice bowl', macros: { caloriesKcal: 300, proteinG: 10, carbsG: 50, fatG: 5 }, sourceUrl: 'https://restaurant.example/nutrition', reviewedAt: '2026-09-08' },
+      { id: 'bad', name: 'Invalid', macros: { caloriesKcal: -10 }, sourceUrl: 'javascript:bad' },
+    ] } } }, { status: 504 });
+  } }), error => { assert.ok(error instanceof NutrisliceError); assert.equal(error.fallbackMeals?.length, 1); assert.equal(error.fallbackMeals[0].id, 'reference'); return true; });
+});

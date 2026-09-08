@@ -1,3 +1,4 @@
+import { syncBridge } from '../modules/sync/bridge';
 import type { TrackingRepository } from '../api/trackingRepository';
 import { useStore } from 'zustand';
 import { createStore } from 'zustand/vanilla';
@@ -11,6 +12,8 @@ import type {
 } from '../types/workout';
 
 export interface WorkoutState {
+  /** Imported Health workouts are informational; never duplicated as manual sets or volume. */
+  importedWorkouts: import('../modules/health/types').HealthWorkout[];
   activeSession: WorkoutSession | null;
   exerciseSequence: SessionExercise[];
   activeExerciseId: string | null;
@@ -49,6 +52,7 @@ export type WorkoutStore = WorkoutState & WorkoutActions;
 
 function initialState(): WorkoutState {
   return {
+    importedWorkouts: [],
     activeSession: null,
     exerciseSequence: [],
     activeExerciseId: null,
@@ -110,12 +114,18 @@ export function getRemainingRestSeconds(timer: RestTimer | null, nowMs = Date.no
   return timer === null ? 0 : Math.min(timer.durationSeconds, Math.max(0, Math.ceil((timer.endsAtMs - nowMs) / 1000)));
 }
 
-export function createWorkoutStore(options: { now?: () => number; repository?: TrackingRepository } = {}) {
+export function createWorkoutStore(options: { now?: () => number; repository?: TrackingRepository; beforeChange?: (next: WorkoutState, previous: WorkoutState) => void; durable?: boolean } = {}) {
   const now = options.now ?? Date.now;
   let generation = 0;
   let inFlight = false;
   const repo = async () => options.repository ?? (await import('../api/trackingRepository')).getTrackingRepository();
-  return createStore<WorkoutStore>()((set, get) => ({
+  return createStore<WorkoutStore>()((rawSet, get) => {
+    const set = (patch: Partial<WorkoutStore> | ((state: WorkoutStore) => Partial<WorkoutStore>)) => {
+      const previous = get(); const delta = typeof patch === 'function' ? patch(previous) : patch;
+      options.beforeChange?.({ ...previous, ...delta }, previous);
+      rawSet(delta);
+    };
+    return ({
     ...initialState(),
     startSession: (input) => {
       if (get().activeSession) throw new Error('Finish or reset the current session before starting another.');
@@ -123,7 +133,7 @@ export function createWorkoutStore(options: { now?: () => number; repository?: T
       if (!input.name.trim()) throw new TypeError('A session name is required.');
       const startedAtMs = input.startedAtMs ?? now();
       nonnegative(startedAtMs, 'Session start');
-      set({ ...initialState(), pendingWorkouts: get().pendingWorkouts, activeSession: { id: input.id, name: input.name, startedAtMs } });
+      set({ ...initialState(), pendingWorkouts: get().pendingWorkouts, importedWorkouts: get().importedWorkouts, activeSession: { id: input.id, name: input.name, startedAtMs } });
     },
     addExercise: (input) => {
       const state = get();
@@ -245,6 +255,7 @@ export function createWorkoutStore(options: { now?: () => number; repository?: T
       return completed;
     },
     savePendingWorkouts: async () => {
+      if (options.durable && syncBridge.drain) return syncBridge.drain();
       if (inFlight || !get().pendingWorkouts.length) return;
       inFlight = true; const token = generation; set({ syncStatus: 'saving', syncError: null });
       try {
@@ -263,10 +274,10 @@ export function createWorkoutStore(options: { now?: () => number; repository?: T
       finally { inFlight = false; }
     },
     reset: () => { generation++; set(initialState()); },
-  }));
+  }); });
 }
 
-export const workoutStore = createWorkoutStore();
+export const workoutStore = createWorkoutStore({ durable: true, beforeChange: (next, previous) => syncBridge.workout?.(next, previous) });
 
 export function useWorkoutStore<T>(selector: (state: WorkoutStore) => T): T {
   return useStore(workoutStore, selector);

@@ -1,3 +1,4 @@
+import { safelyEdit } from '../safelyEdit';
 import { CloudSyncLifecycle } from './CloudSyncLifecycle';
 import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { createContext, useContext, useEffect, useState, type PropsWithChildren } from 'react';
@@ -19,8 +20,8 @@ export function TrackingProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     const foreground = () => {
-      nutritionStore.getState().syncToday();
-      workoutStore.getState().clearExpiredRestTimer();
+      safelyEdit(() => nutritionStore.getState().syncToday());
+      safelyEdit(() => workoutStore.getState().clearExpiredRestTimer());
       setNow(Date.now());
     };
     foreground();
@@ -36,7 +37,7 @@ export function TrackingProvider({ children }: PropsWithChildren) {
     const tick = () => {
       const timestamp = Date.now();
       setNow(timestamp);
-      workoutStore.getState().clearExpiredRestTimer(timestamp);
+      safelyEdit(() => workoutStore.getState().clearExpiredRestTimer(timestamp));
     };
     tick();
     return startRestTicker(tick);

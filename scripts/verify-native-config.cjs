@@ -14,6 +14,9 @@ for (const variant of ['development', 'preview', 'production']) {
   assert.ok(ios.infoPlist.NSHealthUpdateUsageDescription);
   assert.ok(ios.infoPlist.NSLocationWhenInUseUsageDescription);
   assert.equal(!!ios.infoPlist.NSAppTransportSecurity?.NSAllowsArbitraryLoads, variant === 'development');
+  assert.ok(ios.infoPlist.UIBackgroundModes?.includes('processing'));
+  assert.ok(ios.infoPlist.BGTaskSchedulerPermittedIdentifiers?.includes('com.expo.modules.backgroundtask.processing'));
+  for (const name of ['expo-sqlite', 'expo-background-task']) assert.ok(config.plugins.some(p => (Array.isArray(p) ? p[0] : p) === name));
   const manifest = android.manifest.manifest;
   const permissions = manifest['uses-permission'].map(p => p.$['android:name']);
   for (const permission of ['READ_STEPS', 'READ_ACTIVE_CALORIES_BURNED', 'WRITE_EXERCISE', 'WRITE_NUTRITION']) assert.ok(permissions.includes(`android.permission.health.${permission}`));
@@ -21,5 +24,5 @@ for (const variant of ['development', 'preview', 'production']) {
   assert.ok(manifest.application[0]['activity-alias'].some(a => a.$['android:name'] === 'ViewPermissionUsageActivity'));
   assert.ok(config.plugins.some(p => (Array.isArray(p) ? p[0] : p) === '@rnmapbox/maps'));
   assert.ok(config.ios.bundleIdentifier); assert.ok(config.android.package);
-  console.log(`${variant}: native permissions, HealthKit entitlements, Health Connect rationale, Mapbox plugin, and transport policy verified.`);
+  console.log(`${variant}: native permissions, HealthKit entitlements, Health Connect rationale, Mapbox plugin, background task scheduling, SQLite, and transport policy verified.`);
 }

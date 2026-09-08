@@ -144,3 +144,31 @@ test('vision HTTP adapter sends authenticated base64 JSON using the server contr
     await assert.rejects(createVisionProxyAnalyzer('https://api.example/api/vision', async () => null)({ base64: '/9j/4AECAwQ=', mimeType: 'image/jpeg' }, new AbortController().signal), /Sign in/);
   } finally { globalThis.fetch = originalFetch; }
 });
+
+test('late native permission results cannot initialize a reset health session', async () => {
+  const { createHealthStore } = require('../health/useHealthSync') as typeof import('../health/useHealthSync');
+  let resolve!: () => void;
+  const store = createHealthStore(async () => ({ initialize: () => new Promise<void>(r => { resolve = r; }),
+    readToday: async () => ({ date: '2026-09-08', steps: 100, activeEnergyKcal: 10 }), writeWorkout: async () => {}, writeDietaryEnergy: async () => {},
+  }));
+  const request = store.getState().initialize(); await new Promise(r => setImmediate(r));
+  store.getState().reset(); resolve(); await request; assert.equal(store.getState().initialized, false); assert.equal(store.getState().steps, null);
+});
+
+test('sync indicator renders queued, syncing and acknowledged states', async () => {
+  const { SyncIndicator } = require('../../components/SyncIndicator') as typeof import('../../components/SyncIndicator');
+  const { useSyncStatus } = require('../../store/syncStore') as typeof import('../../store/syncStore');
+  useSyncStatus.setState({ ready: true, online: false, queued: 2, blocked: 0, error: null });
+  await act(async () => { rendered = create(<SyncIndicator />); }); assert.ok(textContent().includes('Offline · 2 queued'));
+  await act(async () => useSyncStatus.setState({ online: true, syncing: true })); assert.ok(textContent().includes('Syncing…'));
+  await act(async () => useSyncStatus.setState({ syncing: false, queued: 0, lastSyncedAt: 1 })); assert.ok(textContent().includes('Synced'));
+  await act(async () => useSyncStatus.setState({ ready: false, lastSyncedAt: null }));
+});
+
+test('walk screen mounts, keeps manual steps usable and explains health sharing before requesting access', async () => {
+  const { default: StepRouterScreen } = require('../routing/StepRouterScreen') as typeof import('../routing/StepRouterScreen');
+  await act(async () => { rendered = create(<StepRouterScreen />); });
+  await act(async () => findLabel('Manual step count').props.onChangeText('10000')); assert.ok(textContent().includes('Step goal reached.'));
+  await act(async () => findLabel('Connect or refresh health').props.onPress());
+  assert.equal(rendered!.root.find(node => String(node.type) === 'Modal').props.visible, true); assert.ok(textContent().includes('exported automatically'));
+});

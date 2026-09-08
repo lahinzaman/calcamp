@@ -94,6 +94,9 @@ test('upstream errors have gateway status and are never returned as empty menus'
     assert.equal(response.headers.get('cache-control'), 'no-store');
     const body = await response.json();
     assert.equal(body.error.code, code);
+    assert.equal(body.error.fallback.kind, 'rescue-catalog');
+    assert.equal(body.error.fallback.availabilityVerified, false);
+    assert.ok(body.error.fallback.meals.every((meal: { sourceUrl: string }) => meal.sourceUrl.startsWith('https://')));
     assert.equal(body.error.message, 'Rutgers menu data is unavailable.');
   }
 });
@@ -106,7 +109,9 @@ test('unexpected errors return a sanitized server error', async (t) => {
   });
   const response = await fetch(`${url}?diningHall=the-atrium&date=2026-09-08`);
   assert.equal(response.status, 500);
-  assert.deepEqual(await response.json(), {
-    error: { code: 'INTERNAL_ERROR', message: 'Unable to load the daily menu.' },
-  });
+  const body = await response.json();
+  assert.equal(body.error.code, 'INTERNAL_ERROR');
+  assert.equal(body.error.message, 'Unable to load the daily menu.');
+  assert.equal(body.error.fallback.availabilityVerified, false);
+  assert.ok(body.error.fallback.meals.length > 0);
 });

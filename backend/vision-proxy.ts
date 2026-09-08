@@ -1,6 +1,6 @@
 import { Router, json, type ErrorRequestHandler } from 'express';
 import cors from 'cors';
-import { rateLimit } from 'express-rate-limit';
+import { structuredLimit as rateLimit } from './http';
 import { createClient } from '@supabase/supabase-js';
 
 export interface VisionResult {

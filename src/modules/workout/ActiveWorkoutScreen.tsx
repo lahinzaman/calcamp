@@ -1,3 +1,5 @@
+import { safelyEdit } from '../../components/safelyEdit';
+import { SyncIndicator } from '../../components/SyncIndicator';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -29,7 +31,7 @@ function SetRow({ entry, index, previous }: { entry: WorkoutSet; index: number; 
     setFields((current) => ({ ...current, [key]: text }));
   };
   useEffect(() => {
-    if (valid && !completed) workoutStore.getState().updateSet(entry.id, { weightKg: weight, reps, rpe, estimatedOneRepMaxKg: estimate });
+    if (valid && !completed) safelyEdit(() => workoutStore.getState().updateSet(entry.id, { weightKg: weight, reps, rpe, estimatedOneRepMaxKg: estimate }));
   }, [entry.id, weight, reps, rpe, estimate, valid, completed]);
 
   return <View className={completed ? 'mb-2 rounded-xl bg-emerald-50 px-2 py-3' : 'mb-2 rounded-xl bg-zinc-50 px-2 py-3'}>
@@ -43,10 +45,10 @@ function SetRow({ entry, index, previous }: { entry: WorkoutSet; index: number; 
         className="w-12 rounded-lg border border-zinc-200 bg-white px-1 py-2 text-center font-semibold text-zinc-950"
       />)}
       <Pressable accessibilityRole="button" accessibilityLabel={`Complete set ${index + 1}`} accessibilityState={{ disabled: completed || !valid || weight === null || reps === null, selected: completed }}
-        disabled={completed || !valid || weight === null || reps === null} onPress={() => {
+        disabled={completed || !valid || weight === null || reps === null} onPress={() => safelyEdit(() => {
           workoutStore.getState().updateSet(entry.id, { weightKg: weight, reps, rpe, estimatedOneRepMaxKg: estimate });
           workoutStore.getState().completeSet(entry.id);
-        }} className={completed ? 'h-9 w-9 items-center justify-center rounded-lg bg-emerald-600' : valid && weight !== null && reps !== null ? 'h-9 w-9 items-center justify-center rounded-lg bg-scarlet' : 'h-9 w-9 items-center justify-center rounded-lg bg-zinc-200'}>
+        })} className={completed ? 'h-9 w-9 items-center justify-center rounded-lg bg-emerald-600' : valid && weight !== null && reps !== null ? 'h-9 w-9 items-center justify-center rounded-lg bg-scarlet' : 'h-9 w-9 items-center justify-center rounded-lg bg-zinc-200'}>
         <Text className={completed || (valid && weight !== null && reps !== null) ? 'font-bold text-white' : 'font-bold text-zinc-400'}>✓</Text>
       </Pressable>
     </View>
@@ -57,6 +59,7 @@ function SetRow({ entry, index, previous }: { entry: WorkoutSet; index: number; 
 }
 
 export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSets?: PreviousSets }) {
+  const imports = useWorkoutStore(s => s.importedWorkouts);
   const session = useWorkoutStore((state) => state.activeSession);
   const sequence = useWorkoutStore((state) => state.exerciseSequence);
   const activeId = useWorkoutStore((state) => state.activeExerciseId);
@@ -89,6 +92,8 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
   return <SafeAreaView edges={['top', 'left', 'right']} className="flex-1 bg-[#F7F7F2]">
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 20, paddingBottom: 40, maxWidth: 760, width: '100%', alignSelf: 'center' }}>
       <View className="mb-6 flex-row justify-between"><Text className="text-sm font-black tracking-widest text-scarlet">RULOCKED</Text><Text className="text-xs font-semibold text-zinc-500">TRAINING</Text></View>
+      <SyncIndicator />
+      {!!imports.length && <View className="my-3 rounded-xl bg-white p-4"><Text className="font-semibold">Apple Health · recent workouts</Text>{imports.slice(0, 5).map(w => <Text key={w.id} className="mt-2 text-sm text-zinc-600">{w.name} · {new Date(w.start).toLocaleDateString()}</Text>)}<Text className="mt-2 text-xs text-zinc-500">Imported sessions are shown separately from manually logged sets and volume.</Text></View>}
       <Text className="text-4xl font-bold tracking-tight text-zinc-950">{session?.name ?? 'Make progress.'}</Text>
       <Text className="mt-2 text-base text-zinc-500">{session ? 'One focused set at a time.' : 'Show up. Log your lifts. Build on last time.'}</Text>
       {pending > 0 && <Pressable accessibilityRole="button" disabled={syncStatus === 'saving'} onPress={() => void workoutStore.getState().savePendingWorkouts()} className="mt-4 rounded-xl bg-white p-4"><Text className="font-semibold">{syncStatus === 'saving' ? 'Saving workouts…' : `Save ${pending} pending workout(s)`}</Text></Pressable>}
@@ -98,12 +103,12 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
         <Text className="text-xs font-bold uppercase tracking-widest text-zinc-400">Ready when you are</Text>
         <Text className="mt-4 text-2xl font-bold text-white">Upper-body session</Text>
         <Text className="mt-3 leading-6 text-zinc-400">Cable row + lat pulldown. Start with an empty log and enter your own working weights.</Text>
-        <Pressable accessibilityRole="button" onPress={start} className="mt-6 items-center rounded-2xl bg-scarlet p-4"><Text className="font-bold text-white">Start session</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={() => safelyEdit(start)} className="mt-6 items-center rounded-2xl bg-scarlet p-4"><Text className="font-bold text-white">Start session</Text></Pressable>
         {finished && <Text accessibilityRole="alert" className="mt-4 text-sm text-emerald-300">{finished}</Text>}
       </View> : <>
         <View className="my-6 flex-row gap-3"><View className="flex-1 rounded-2xl bg-white p-4"><Text className="text-xs text-zinc-500">Completed sets</Text><Text className="mt-2 text-2xl font-bold text-zinc-950">{sets.filter((entry) => entry.completedAtMs !== null).length}</Text></View><View className="flex-1 rounded-2xl bg-white p-4"><Text className="text-xs text-zinc-500">Volume · kg × reps</Text><Text className="mt-2 text-2xl font-bold text-zinc-950">{Number(volume.toFixed(1))}</Text></View></View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-5" contentContainerStyle={{ gap: 8 }}>
-          {sequence.map((entry, index) => <Pressable key={entry.id} accessibilityRole="tab" accessibilityLabel={entry.exercise.name} accessibilityState={{ selected: entry.id === activeId }} onPress={() => workoutStore.getState().setActiveExercise(entry.id)} className={entry.id === activeId ? 'rounded-xl bg-zinc-950 px-4 py-3' : 'rounded-xl bg-white px-4 py-3'}><Text className={entry.id === activeId ? 'text-sm font-semibold text-white' : 'text-sm font-semibold text-zinc-600'}>{index + 1}. {entry.exercise.name}</Text></Pressable>)}
+          {sequence.map((entry, index) => <Pressable key={entry.id} accessibilityRole="tab" accessibilityLabel={entry.exercise.name} accessibilityState={{ selected: entry.id === activeId }} onPress={() => safelyEdit(() => workoutStore.getState().setActiveExercise(entry.id))} className={entry.id === activeId ? 'rounded-xl bg-zinc-950 px-4 py-3' : 'rounded-xl bg-white px-4 py-3'}><Text className={entry.id === activeId ? 'text-sm font-semibold text-white' : 'text-sm font-semibold text-zinc-600'}>{index + 1}. {entry.exercise.name}</Text></Pressable>)}
         </ScrollView>
         {active ? <View className="rounded-3xl bg-white p-4">
           <Text className="text-xl font-bold text-zinc-950">{active.exercise.name}</Text>
@@ -114,13 +119,13 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
               {currentSets.map((entry, index) => <SetRow key={entry.id} entry={entry} index={index} previous={history[index]} />)}
             </View>
           </ScrollView>
-          <Pressable accessibilityRole="button" onPress={() => workoutStore.getState().addSet({ id: localId(), sessionExerciseId: active.id })} className="mt-3 items-center rounded-xl bg-zinc-100 p-4"><Text className="font-bold text-zinc-700">+ Add set</Text></Pressable>
+          <Pressable accessibilityRole="button" onPress={() => safelyEdit(() => workoutStore.getState().addSet({ id: localId(), sessionExerciseId: active.id }))} className="mt-3 items-center rounded-xl bg-zinc-100 p-4"><Text className="font-bold text-zinc-700">+ Add set</Text></Pressable>
         </View> : <Text className="rounded-2xl bg-white p-4 text-zinc-600">Add an exercise to this session to begin logging.</Text>}
         <View className="mt-5 rounded-3xl bg-zinc-950 p-5">
-          <View className="flex-row items-center justify-between"><View><Text className="text-xs font-bold uppercase tracking-widest text-zinc-400">{timer ? 'Rest remaining' : 'Between sets'}</Text><Text testID="rest-countdown" accessibilityLiveRegion="none" className="mt-2 text-4xl font-bold tabular-nums text-white">{timer ? timerText(remaining) : 'Ready'}</Text></View>{timer && <Pressable accessibilityRole="button" onPress={() => workoutStore.getState().clearRestTimer()} className="rounded-xl bg-zinc-800 px-4 py-3"><Text className="font-semibold text-white">Skip rest</Text></Pressable>}</View>
+          <View className="flex-row items-center justify-between"><View><Text className="text-xs font-bold uppercase tracking-widest text-zinc-400">{timer ? 'Rest remaining' : 'Between sets'}</Text><Text testID="rest-countdown" accessibilityLiveRegion="none" className="mt-2 text-4xl font-bold tabular-nums text-white">{timer ? timerText(remaining) : 'Ready'}</Text></View>{timer && <Pressable accessibilityRole="button" onPress={() => safelyEdit(() => workoutStore.getState().clearRestTimer())} className="rounded-xl bg-zinc-800 px-4 py-3"><Text className="font-semibold text-white">Skip rest</Text></Pressable>}</View>
           <Text className="mt-3 text-sm text-zinc-400">{timer ? 'Take a breath. Your next set is coming.' : 'Complete a set to start your rest timer.'}</Text>
         </View>
-        <Pressable accessibilityRole="button" onPress={() => {
+        <Pressable accessibilityRole="button" onPress={() => safelyEdit(() => {
           const snapshot = workoutStore.getState().finishSession();
           const next: PreviousSets = {};
           for (const exercise of snapshot.exercises) {
@@ -130,7 +135,7 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
           setLocalHistory((current) => ({ ...current, ...next }));
           setFinished('Session finished and queued for cloud save.');
           void workoutStore.getState().savePendingWorkouts();
-        }} className="mt-6 items-center rounded-2xl border border-zinc-300 p-4"><Text className="font-bold text-zinc-700">Finish session</Text></Pressable>
+        })} className="mt-6 items-center rounded-2xl border border-zinc-300 p-4"><Text className="font-bold text-zinc-700">Finish session</Text></Pressable>
       </>}
     </ScrollView>
   </SafeAreaView>;

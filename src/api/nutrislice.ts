@@ -9,6 +9,7 @@ import {
   type NutrisliceWeekResponse,
 } from '../types/nutrislice';
 
+import type { RescueMeal } from '../types/rescue';
 export type { DailyMenuItem } from '../types/nutrislice';
 
 const API_ORIGIN = 'https://rutgers.api.nutrislice.com';
@@ -30,6 +31,7 @@ export type NutrisliceErrorCode =
   | 'NETWORK';
 
 export class NutrisliceError extends Error {
+  fallbackMeals?: RescueMeal[];
   constructor(
     public readonly code: NutrisliceErrorCode,
     message: string,
@@ -194,7 +196,19 @@ async function fetchJson(url: string, options: FetchDailyMenuOptions): Promise<u
         throw new NutrisliceError('NETWORK', 'Unable to reach the menu service.', undefined, cause);
       }
       if (!response.ok) {
-        throw new NutrisliceError('UPSTREAM_HTTP', `Menu service returned HTTP ${response.status}.`, response.status);
+        const error = new NutrisliceError('UPSTREAM_HTTP', `Menu service returned HTTP ${response.status}.`, response.status);
+        // Accept only the normalized, sourced catalog contract from our configured proxy.
+        if (options.fallbackBaseUrl && new URL(url).origin === new URL(options.fallbackBaseUrl).origin) {
+          const body: unknown = await response.json().catch(() => null);
+          if (record(body) && record(body.error) && record(body.error.fallback) && body.error.fallback.kind === 'rescue-catalog'
+            && body.error.fallback.availabilityVerified === false && Array.isArray(body.error.fallback.meals)) {
+            error.fallbackMeals = body.error.fallback.meals.filter((meal): meal is RescueMeal => record(meal)
+              && typeof meal.id === 'string' && typeof meal.name === 'string' && typeof meal.reviewedAt === 'string'
+              && typeof meal.sourceUrl === 'string' && meal.sourceUrl.startsWith('https://') && record(meal.macros)
+              && ['caloriesKcal','proteinG','carbsG','fatG'].every(k => nonnegativeNumber((meal.macros as Record<string, unknown>)[k])));
+          }
+        }
+        throw error;
       }
       try {
         return await response.json();
@@ -255,6 +269,8 @@ function parseProxyMenu(value: unknown, diningHall: DiningHallSlug, date: string
     }
     // Construct the public shape only after runtime checks; ignore unknown fields.
     return {
+      ...(item.dataFreshness === 'stale' ? { dataFreshness: 'stale' as const } : {}),
+      ...(typeof item.cachedAt === 'string' ? { cachedAt: item.cachedAt } : {}),
       id: item.id, diningHall, date, meal: item.meal as MealType,
       menuItemId: item.menuItemId, foodId: item.foodId, name: item.name,
       serving: {

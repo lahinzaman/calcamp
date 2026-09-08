@@ -1,5 +1,6 @@
+import { SyncIndicator } from '../../components/SyncIndicator';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useHealthSync } from '../health/useHealthSync';
@@ -19,6 +20,7 @@ async function locate(signal: AbortSignal): Promise<Location.LocationObject> {
 
 export default function StepRouterScreen() {
   const health = useHealthSync();
+  const [healthPrompt, setHealthPrompt] = useState(false);
   const [manualSteps, setManualSteps] = useState('');
   const [route, setRoute] = useState<WalkingLoop | null>(null);
   const [start, setStart] = useState<Coordinate>(COLLEGE_AVE);
@@ -59,13 +61,20 @@ export default function StepRouterScreen() {
       <Text className="text-sm font-black tracking-widest text-scarlet">RULOCKED · CAMPUS WALKS</Text>
       <Text className="mb-2 mt-5 text-4xl font-bold text-zinc-950">Close your step gap.</Text>
       <Text className="mb-6 text-base text-zinc-500">A walk toward your 10,000-step goal.</Text>
+      <SyncIndicator />
       <View className="mb-5 rounded-3xl bg-zinc-950 p-6">
         <Text className="text-sm text-zinc-400">{health.date} · Today's steps</Text>
         <Text className="my-3 text-4xl font-bold text-white">{steps === null ? '—' : steps.toLocaleString()}</Text>
         <Text className="text-sm text-zinc-300">{deficit ? `${deficit.remainingSteps.toLocaleString()} steps remaining · ${(deficit.distanceMeters / 1000).toFixed(2)} km target` : 'Connect health or enter a step count.'}</Text>
         <Text className="mt-3 text-xs text-zinc-400">Active energy: {health.activeEnergyKcal === null ? 'unavailable' : `${Math.round(health.activeEnergyKcal)} kcal`}</Text>
       </View>
-      <Pressable accessibilityRole="button" disabled={health.status === 'initializing'} onPress={() => void health.initialize()} className="mb-3 rounded-xl bg-white p-4"><Text className="font-semibold">{health.status === 'initializing' ? 'Connecting…' : 'Connect / refresh health'}</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Connect or refresh health" disabled={health.status === 'initializing'} onPress={() => { if (health.initialized) void health.refresh(); else setHealthPrompt(true); }} className="mb-3 rounded-xl bg-white p-4"><Text className="font-semibold">{health.status === 'initializing' ? 'Connecting…' : 'Connect / refresh health'}</Text></Pressable>
+      {health.refreshedAt && <Text className="mb-3 text-xs text-zinc-500">Last health refresh: {new Date(health.refreshedAt).toLocaleTimeString()} · background updates are scheduled by the device.</Text>}
+      <Modal transparent animationType="slide" visible={healthPrompt} onRequestClose={() => setHealthPrompt(false)}><View className="flex-1 justify-end bg-black/40 p-6"><View className="rounded-3xl bg-white p-6">
+        <Text className="text-xl font-bold">Connect your health data</Text><Text className="mt-3 leading-6 text-zinc-600">RULocked reads today's steps and active energy. On iOS, recent workouts appear separately from your lifting diary. Completed RULocked workouts will be exported automatically while connected. Dietary energy is shared only when you request an export. You can change access in your device's Health settings.</Text>
+        <Pressable accessibilityRole="button" className="mt-5 rounded-xl bg-scarlet p-4" onPress={() => { setHealthPrompt(false); void health.initialize(); }}><Text className="text-center font-bold text-white">Continue to permissions</Text></Pressable>
+        <Pressable accessibilityRole="button" className="mt-2 p-4" onPress={() => setHealthPrompt(false)}><Text className="text-center">Maybe later</Text></Pressable>
+      </View></View></Modal>
       {health.error && <Text className="mb-3 text-sm text-zinc-600">{health.error}</Text>}
       <Text className="mb-2 text-sm text-zinc-600">Optional manual step count</Text>
       <TextInput accessibilityLabel="Manual step count" keyboardType="number-pad" inputMode="numeric" value={manualSteps} onChangeText={setManualSteps} placeholder="Use health steps" className="mb-4 rounded-xl border border-zinc-200 bg-white p-4" />

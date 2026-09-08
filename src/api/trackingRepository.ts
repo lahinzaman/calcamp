@@ -1,3 +1,4 @@
+import type { NutritionMutation } from '../modules/sync/engine';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { v5 as uuid } from 'uuid';
 import type { MacroTotals, MicronutrientTotals } from '../types/nutrition';
@@ -12,12 +13,13 @@ export interface DailyTotals {
 }
 export interface TrackingRepository {
   userId(): Promise<string>;
+  applyNutritionMutation?(userId: string, id: string, mutation: NutritionMutation): Promise<DailyTotals>;
   loadDay(userId: string, date: string): Promise<DailyTotals | null>;
   saveDay(userId: string, totals: DailyTotals): Promise<void>;
   saveWorkout(userId: string, workout: CompletedWorkout): Promise<string>;
 }
 function check(error: { message: string } | null) {
-  if (error) throw new Error(error.message);
+  if (error) throw Object.assign(new Error(error.message), error);
 }
 function dateKey(ms: number) {
   const date = new Date(ms);
@@ -36,6 +38,17 @@ export function createTrackingRepository(client: SupabaseClient): TrackingReposi
     check(error);
   }
   return {
+    async applyNutritionMutation(userId, id, mutation) {
+      await verify(userId);
+      const { data, error } = await client.rpc('apply_nutrition_mutation', {
+        p_id: id, p_date: mutation.date, p_macros: mutation.macros, p_micros: mutation.micros, p_patch: mutation.patch,
+      });
+      check(error);
+      if (!data || data.user_id !== userId || data.log_date !== mutation.date) throw new Error('Invalid sync response.');
+      return { date: data.log_date, consumedMacros: { caloriesKcal: Number(data.calories_kcal), proteinG: Number(data.protein_g),
+        carbsG: Number(data.carbs_g), fatG: Number(data.fat_g) }, consumedMicros: data.micronutrients,
+        isAdherent: data.is_adherent, bodyWeightKg: data.body_weight_kg === null ? null : Number(data.body_weight_kg) };
+    },
     async userId() {
       const { data, error } = await client.auth.getUser();
       check(error);

@@ -66,6 +66,8 @@ export interface NutrisliceWeekResponse {
 }
 
 export interface DailyMenuItem {
+  dataFreshness?: 'fresh' | 'stale';
+  cachedAt?: string;
   /** Includes meal and row ID: the same food can appear in several stations/meals. */
   id: string;
   diningHall: DiningHallSlug;

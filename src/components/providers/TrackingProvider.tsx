@@ -15,6 +15,9 @@ export function TrackingProvider({ children }: PropsWithChildren) {
   const [queryClient] = useState(() => new QueryClient({ defaultOptions: {
     queries: { staleTime: 5 * 60_000, retry: 1 },
   } }));
+  return <QueryClientProvider client={queryClient}><CloudSyncLifecycle /><RestTickerProvider>{children}</RestTickerProvider></QueryClientProvider>;
+}
+function RestTickerProvider({ children }: PropsWithChildren) {
   const timer = useWorkoutStore((state) => state.restTimer);
   const [now, setNow] = useState(Date.now);
 
@@ -43,10 +46,5 @@ export function TrackingProvider({ children }: PropsWithChildren) {
     return startRestTicker(tick);
   }, [timer]);
 
-  return (
-    <QueryClientProvider client={queryClient}>
-      <CloudSyncLifecycle />
-      <RestCountdownContext value={getRemainingRestSeconds(timer, now)}>{children}</RestCountdownContext>
-    </QueryClientProvider>
-  );
+  return <RestCountdownContext value={getRemainingRestSeconds(timer, now)}>{children}</RestCountdownContext>;
 }

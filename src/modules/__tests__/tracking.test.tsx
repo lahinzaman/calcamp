@@ -21,6 +21,13 @@ mock.module('react-native', { namedExports: {
     </React.Fragment>)}
   </>,
 } });
+mock.module('@shopify/flash-list', { namedExports: {
+  FlashList: (props: { data: unknown[]; renderItem: (args: { item: unknown; index: number }) => React.ReactNode; ListHeaderComponent?: React.ReactNode; ListFooterComponent?: React.ReactNode | React.ComponentType }) => <>
+    {props.ListHeaderComponent}{props.data.map((item, index) => <React.Fragment key={(item as { id: string }).id}>{props.renderItem({ item, index })}</React.Fragment>)}
+    {typeof props.ListFooterComponent === 'function' ? React.createElement(props.ListFooterComponent) : props.ListFooterComponent as React.ReactNode}
+  </>,
+  useRecyclingState: (value: unknown) => React.useState(value),
+} });
 mock.module('expo-location', { namedExports: { requestForegroundPermissionsAsync: async () => ({ granted: false }), getCurrentPositionAsync: async () => ({ coords: { latitude: 0, longitude: 0 } }), Accuracy: { Balanced: 3 } } });
 mock.module('react-native-safe-area-context', { namedExports: { SafeAreaView: 'SafeAreaView' } });
 

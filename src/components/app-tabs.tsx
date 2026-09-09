@@ -29,12 +29,13 @@ export default function AppTabs() {
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="walk">
         <NativeTabs.Trigger.Label>Walk</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="figure.walk" />
+        <NativeTabs.Trigger.Icon sf="figure.walk" md="directions_walk" />
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="campus">
         <NativeTabs.Trigger.Label>Campus</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="building.2" />
+        <NativeTabs.Trigger.Icon sf="building.2" md="domain" />
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="settings"><NativeTabs.Trigger.Label>Settings</NativeTabs.Trigger.Label><NativeTabs.Trigger.Icon sf="gearshape" md="settings" /></NativeTabs.Trigger>
     </NativeTabs>
   );
 }

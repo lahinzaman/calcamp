@@ -1,3 +1,4 @@
+import { breadcrumb } from '../modules/telemetry/events';
 import { isDiningHallSlug, type DiningHallSlug } from '../types/campus';
 import {
   MEAL_TYPES,
@@ -333,8 +334,11 @@ export async function fetchDailyMenu(
     controller.abort();
     if (options.signal?.aborted) throw abortError();
     if (!proxyOrigin) throw error;
+    breadcrumb('api.fallback', { source: 'nutrislice', outcome: 'unavailable' });
     const query = `diningHall=${encodeURIComponent(diningHall)}&date=${calendarDate}`;
-    return parseProxyMenu(await fetchJson(`${proxyOrigin}/api/nutrislice/daily-menu?${query}`, options), diningHall, calendarDate);
+    const menu = parseProxyMenu(await fetchJson(`${proxyOrigin}/api/nutrislice/daily-menu?${query}`, options), diningHall, calendarDate);
+    if (menu.some(item => item.dataFreshness === 'stale')) breadcrumb('api.fallback', { source: 'nutrislice', outcome: 'stale' });
+    return menu;
   } finally {
     options.signal?.removeEventListener('abort', onAbort);
   }

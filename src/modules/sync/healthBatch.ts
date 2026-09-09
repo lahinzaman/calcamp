@@ -1,14 +1,19 @@
+import { readPreferences } from '../notifications/preferences';
+import { breadcrumb } from '../telemetry/events';
 import type { HealthAdapter, HealthSummary, HealthWorkout } from '../health/types';
 import { syncEngine } from './runtime';
 import { workoutStore } from '../../store/workoutStore';
 const unavailable = 'Health refresh unavailable. Unlock the device and review Health permissions.';
 let pending: { owner: string; promise: Promise<HealthSummary | undefined> } | null = null;
-export function mergeHealthSnapshot(summary: HealthSummary, workouts: HealthWorkout[], owner: string, error: string | null = null) {
+export async function mergeHealthSnapshot(summary: HealthSummary, workouts: HealthWorkout[], owner: string, error: string | null = null) {
   if (owner !== syncEngine.owner) return;
   // Replace snapshots, never increment dietary calories or manually logged lifting volume.
   const unique = [...new Map(workouts.map(w => [w.id, w])).values()];
   syncEngine.commit({ ...syncEngine.data, health: { ...syncEngine.data.health, summary, workouts: unique, lastBatchAt: Date.now(), error } });
   workoutStore.setState({ importedWorkouts: unique });
+  if (unique.length < workouts.length) breadcrumb('health.conflict', { source: 'health', outcome: 'ok', count: workouts.length - unique.length });
+  breadcrumb('health.merge', { source: 'health', outcome: error ? 'unavailable' : 'ok' });
+  if (readPreferences(owner).uploadActivity) await (await import('./activityQueue')).queueActivitySnapshot(summary, owner);
 }
 export async function runHealthBatch(adapter?: HealthAdapter): Promise<HealthSummary | undefined> {
   const owner = syncEngine.owner; if (!owner || !syncEngine.data.health.enabled) return;
@@ -22,9 +27,10 @@ export async function runHealthBatch(adapter?: HealthAdapter): Promise<HealthSum
       const summary = metrics.value;
       if ([summary.steps, summary.activeEnergyKcal].some(n => n !== null && (!Number.isFinite(n) || n < 0))) throw new Error(unavailable);
       const workouts = sessions.status === 'fulfilled' ? sessions.value : syncEngine.data.health.workouts;
-      mergeHealthSnapshot(summary, workouts, owner, sessions.status === 'rejected' ? 'Steps refreshed. Recent workouts are unavailable; review Health permissions.' : null);
+      await mergeHealthSnapshot(summary, workouts, owner, sessions.status === 'rejected' ? 'Steps refreshed. Recent workouts are unavailable; review Health permissions.' : null);
       return owner === syncEngine.owner ? summary : undefined;
     } catch {
+      breadcrumb('health.unavailable', { source: 'health', outcome: 'unavailable' });
       if (owner === syncEngine.owner) syncEngine.commit({ ...syncEngine.data, health: { ...syncEngine.data.health, error: unavailable } });
       throw new Error(unavailable);
     }

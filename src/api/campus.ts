@@ -1,3 +1,4 @@
+import { breadcrumb } from '../modules/telemetry/events';
 import { durableStorage } from '../modules/sync/storage';
 import { getSupabase } from './supabase';
 import type { CrowdStatus, GymBaseline, GymSlug, GymSummary } from '../types/facilities';
@@ -30,10 +31,11 @@ export async function fetchGymBaselines(signal: AbortSignal): Promise<GymBaselin
   try {
     const data = await campusRequest<GymBaseline[]>('gyms', signal);
     if (!Array.isArray(data) || data.some(g => g.baseline !== null && (!Number.isFinite(g.baseline) || g.baseline < 0 || g.baseline > 100))) throw new Error('Invalid gym response.');
+    if (data.some(g => g.stale)) breadcrumb('api.fallback', { source: 'campus', outcome: 'stale' });
     try { durableStorage.set(key, JSON.stringify({ data, at: Date.now() })); } catch { /* Live data remains usable. */ }
     return data;
   } catch (error) {
-    if (!signal.aborted && cached && Date.now() - cached.at < 3600_000) return cached.data.map(g => ({ ...g, stale: true }));
+    if (!signal.aborted && cached && Date.now() - cached.at < 3600_000) { breadcrumb('api.fallback', { source: 'campus', outcome: 'stale' }); return cached.data.map(g => ({ ...g, stale: true })); }
     throw error;
   }
 }

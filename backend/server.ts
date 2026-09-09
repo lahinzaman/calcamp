@@ -1,3 +1,4 @@
+import { createAccountRouter } from './account';
 import { config } from 'dotenv';
 import { resolve } from 'node:path';
 import { createVisionProxyRouter } from './vision-proxy';
@@ -35,6 +36,7 @@ export function createApp(options: { pingDatabase?: () => Promise<boolean> } = {
     }, 10_000, 0)).value; } catch { /* Degraded status contains no internal diagnostics. */ }
     res.set('Cache-Control', 'no-store').status(database ? 200 : 503).json({ service: 'rulocked', status: database ? 'ok' : 'degraded', uptimeSeconds: Math.floor(process.uptime()), database: database ? 'ok' : 'unavailable' });
   });
+  app.use('/api/account', createAccountRouter());
   app.use('/api/campus', createCampusProxyRouter());
   app.use('/api/vision', createVisionProxyRouter());
   app.use('/api/nutrislice', createNutrisliceFallbackRouter());

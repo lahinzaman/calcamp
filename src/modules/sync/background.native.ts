@@ -12,9 +12,9 @@ TaskManager.defineTask(taskName, async ({ error }) => {
   try {
     const owner = durableStorage.get('active-sync-owner'); if (!owner) return BackgroundTask.BackgroundTaskResult.Success;
     const { getSupabase } = await import('../../api/supabase'); const { data } = await getSupabase().auth.getSession();
-    if (expired || data.session?.user.id !== owner) return BackgroundTask.BackgroundTaskResult.Failed;
+    if (expired || data.session?.user.id !== owner || durableStorage.get('active-sync-owner') !== owner) return BackgroundTask.BackgroundTaskResult.Failed;
     if (syncEngine.owner !== owner) activateSync(owner);
-    const network = await NetInfo.fetch(); if (expired) return BackgroundTask.BackgroundTaskResult.Failed; syncEngine.setOnline(network.isConnected !== false && network.isInternetReachable !== false);
+    const network = await NetInfo.fetch(); if (expired || syncEngine.owner !== owner) return BackgroundTask.BackgroundTaskResult.Failed; syncEngine.setOnline(network.isConnected !== false && network.isInternetReachable !== false);
     let healthFailed = false;
     try { await (await import('./healthBatch')).runHealthBatch(); } catch { healthFailed = true; }
     if (expired) return BackgroundTask.BackgroundTaskResult.Failed;

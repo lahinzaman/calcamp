@@ -22,6 +22,11 @@ export const syncEngine = new SyncEngine(durableStorage, async (owner, job) => {
     if (job.kind === 'health-workout') await adapter.writeWorkout({ ...job.data, id: job.id }); else await adapter.writeDietaryEnergy({ ...job.data, id: job.id });
     return;
   }
+  if (job.kind === 'activity') {
+    const { readPreferences } = await import('../notifications/preferences');
+    if (readPreferences(owner).uploadActivity) await (await import('../../api/activity')).saveActivitySnapshot(owner, job.data);
+    return;
+  }
   const repository = await getTrackingRepository();
   if (job.kind === 'nutrition') {
     if (!repository.applyNutritionMutation) throw new Error('Update the sync repository.');

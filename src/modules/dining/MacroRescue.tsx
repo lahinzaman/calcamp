@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppState, Linking, Text, View } from 'react-native';
 import * as Location from 'expo-location';
-import { useQuery } from '@tanstack/react-query';
+import { readRescuePrefetch } from '../background/rescuePrefetch';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Action, Choice } from '../../components/FormControls';
 import { useNutritionStore, nutritionStore } from '../../store/nutritionStore';
 import { useAuthStore } from '../../store/authStore';
 import { fetchMacroRescue } from '../../api/campus';
 import { EASTON_AVE, fitsMacros, remainingMacros, rescueEligible, type Coordinates, type MacroPreference } from '../../types/rescue';
 export default function MacroRescue() {
+  const queryClient = useQueryClient();
+  const prefetchedAt = useRef(0);
   const targets = useNutritionStore(s => s.dailyTargets); const consumed = useNutritionStore(s => s.consumedMacros);
   const user = useAuthStore(s => s.session?.user.id);
   const [now, setNow] = useState(() => new Date()); const [mode, setMode] = useState<'live' | 'easton'>('live');
@@ -23,6 +26,14 @@ export default function MacroRescue() {
     const timer = setInterval(tick, 30_000); const listener = AppState.addEventListener('change', s => { if (s === 'active') tick(); });
     return () => { clearInterval(timer); listener.remove(); };
   }, []);
+  useEffect(() => {
+    if (!user || !enabled || !remaining || requested || preference !== 'protein') return;
+    const cached = readRescuePrefetch(user, remaining);
+    if (!cached || cached.at === prefetchedAt.current) return;
+    prefetchedAt.current = cached.at;
+    queryClient.setQueryData(['macro-rescue', user, cached.location, remaining, 'protein'], cached.result, { updatedAt: cached.at });
+    setLocation(cached.location); setRequested(true);
+  }, [user, enabled, remaining, requested, preference, queryClient]);
   const search = useQuery({ queryKey: ['macro-rescue', user, location, remaining, preference],
     queryFn: ({ signal }) => fetchMacroRescue(location!, remaining!, preference, signal), enabled: enabled && requested && !!location,
     staleTime: 60_000, gcTime: 0, retry: false });
@@ -53,7 +64,7 @@ export default function MacroRescue() {
       {location && <Text className="mb-3 text-xs text-zinc-500">Searching within 2.5 km of {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}</Text>}
       {(error || search.error) && <Text accessibilityRole="alert" className="mb-3 text-red-700">{error ?? search.error?.message}</Text>}
       {requested && search.data && <>
-        <Text className="mb-3 text-xs font-semibold text-zinc-600">Google Maps · Open now · 4★+ · 20+ reviews</Text>
+        <Text className="mb-3 text-xs font-semibold text-zinc-600">Google Maps · Open when checked {new Date(search.data.checkedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · 4★+ · 20+ reviews</Text>
         {search.data.matches.filter(match => fitsMacros(match.meal.macros, remaining!, preference)).map(match => <View key={`${match.placeId}/${match.meal.id}`} className="mb-3 rounded-xl bg-zinc-50 p-4">
           <Text className="font-bold text-zinc-900">{match.restaurant} · {match.rating}★</Text><Text className="mt-1 text-sm text-zinc-600">{match.address}</Text>
           <Text className="my-2 font-semibold text-zinc-800">{match.meal.name}</Text><Text className="mb-3 text-zinc-600">{match.meal.macros.caloriesKcal} kcal · P {match.meal.macros.proteinG} · C {match.meal.macros.carbsG} · F {match.meal.macros.fatG} g</Text>

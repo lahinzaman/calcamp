@@ -1,3 +1,5 @@
+import { breadcrumb } from '../telemetry/events';
+import type { ActivitySnapshot } from '../../api/activity';
 import type { DailyTotals } from '../../api/trackingRepository';
 import { emptyMacros, type MacroTotals, type MicronutrientTotals } from '../../types/nutrition';
 import type { WorkoutState } from '../../store/workoutStore';
@@ -6,7 +8,7 @@ import type { CompletedWorkout } from '../../types/workout';
 import type { DurableStorage } from './storage';
 export interface NutritionMutation { date: string; macros: MacroTotals; micros: MicronutrientTotals; patch: { isAdherent?: boolean; bodyWeightKg?: number | null } }
 export type SyncPayload = { kind: 'nutrition'; data: NutritionMutation } | { kind: 'workout'; data: CompletedWorkout }
-  | { kind: 'health-workout'; data: HealthWorkout } | { kind: 'health-meal'; data: HealthMeal };
+  | { kind: 'health-workout'; data: HealthWorkout } | { kind: 'health-meal'; data: HealthMeal } | { kind: 'activity'; data: ActivitySnapshot };
 export type Mutation = SyncPayload & { id: string; attempts: number; nextAttemptAt: number; blocked: boolean; error: string | null };
 export interface AccountData {
   version: 1; days: Record<string, DailyTotals>; workout: WorkoutState | null; queue: Mutation[]; workoutReceipts: string[];
@@ -49,7 +51,8 @@ export class SyncEngine {
   queue(payload: SyncPayload, id: string, update: Partial<AccountData> = {}) {
     if (!this.owner) return;
     if (this.data.queue.some(q => q.id === id) || this.data.health.exported.includes(id) || this.data.workoutReceipts.includes(id)) return;
-    this.commit({ ...this.data, ...update, queue: [...this.data.queue, { ...payload, id, attempts: 0, nextAttemptAt: 0, blocked: false, error: null }] });
+    breadcrumb('sync.queued', { count: this.data.queue.length + 1 });
+    this.commit({ ...this.data, ...update, queue: [...this.data.queue.filter(q => !(payload.kind === 'activity' && q.kind === 'activity' && q.data.date === payload.data.date && q.data.source === payload.data.source)), { ...payload, id, attempts: 0, nextAttemptAt: 0, blocked: false, error: null }] });
   }
   recordNutrition(next: DailyTotals, previous: DailyTotals, id: string) {
     const old = next.date === previous.date ? previous : { ...previous, consumedMacros: emptyMacros(), consumedMicros: {}, isAdherent: false, bodyWeightKg: null };
@@ -92,7 +95,7 @@ export class SyncEngine {
   }
   private async run() {
     if (!this.owner || !this.online) return;
-    const owner = this.owner; const generation = this.generation; this.syncing = true; this.changed();
+    const owner = this.owner; const generation = this.generation; this.syncing = true; this.changed(); breadcrumb('sync.syncing', { count: this.data.queue.length });
     try {
       for (let sent = 0; sent < 30 && this.online && this.owner === owner && generation === this.generation; sent++) {
         // Nutrition for each day must stay in order; a failed edit cannot be overtaken.
@@ -111,10 +114,10 @@ export class SyncEngine {
             const merged = data.queue.filter(q => q.kind === 'nutrition' && q.data.date === result.date).reduce((day, q) => applyDelta(day, (q as Extract<Mutation, { kind: 'nutrition' }>).data), result);
             data.days = { ...data.days, [result.date]: merged };
           }
-          this.commit(data); this.lastAckAt = this.now(); this.changed();
+          this.commit(data); breadcrumb('sync.synced', { count: data.queue.length }); this.lastAckAt = this.now(); this.changed();
         } catch (error) {
           if (generation !== this.generation) return;
-          const blocked = isPermanent(error); const attempts = job.attempts + 1;
+          const blocked = isPermanent(error); breadcrumb(blocked ? 'sync.conflict' : 'sync.retry', { count: this.data.queue.length }); const attempts = job.attempts + 1;
           const message = blocked ? 'An edit needs review before it can sync.' : 'Connection interrupted. Your edits are saved on this device.';
           try { this.commit({ ...this.data, queue: this.data.queue.map(q => q.id === job.id ? { ...q, attempts, blocked, error: message, nextAttemptAt: this.now() + retryDelay(attempts, this.random) } : q) }); }
           catch { break; } // Disk failure must not spin or remove the original mutation.

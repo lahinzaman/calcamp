@@ -1,3 +1,4 @@
+import { NotificationSettings } from '../notifications/NotificationSettings';
 import { LoadingCards } from '../../components/LoadingCards';
 import { SyncIndicator } from '../../components/SyncIndicator';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -8,7 +9,7 @@ import { fetchGymBaselines, fetchGymSummary, submitGymVote } from '../../api/cam
 import { GYMS, type CrowdStatus, type GymSlug } from '../../types/facilities';
 import { useAuthStore } from '../../store/authStore';
 import { Action, Choice } from '../../components/FormControls';
-import { getSupabase } from '../../api/supabase';
+import { signOutWithDeviceCleanup } from '../notifications/logout';
 import { DEFAULT_UPPER_LOWER } from '../../types/profile';
 export default function GymStatus() {
   const user = useAuthStore(s => s.session?.user.id); const profile = useAuthStore(s => s.profile);
@@ -21,7 +22,7 @@ export default function GymStatus() {
   return <SafeAreaView edges={['top', 'left', 'right']} className="flex-1 bg-zinc-50"><ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 50, maxWidth: 760, width: '100%', alignSelf: 'center' }}>
     <Text className="text-sm font-bold uppercase tracking-widest text-red-700">Rutgers recreation</Text><Text className="mb-3 mt-2 text-3xl font-bold text-zinc-950">Find your space</Text>
     <Text className="mb-6 text-zinc-600">BestTime estimates visits relative to a venue's weekly peak. Recent student reports take priority. Neither measures physical capacity or confirms opening hours.</Text>
-    <SyncIndicator />
+    <SyncIndicator /><NotificationSettings />
     {baseline.isPending && <LoadingCards label="Checking gym activity…" />}
     {GYMS.map(gym => {
       const history = baseline.data?.find(b => b.slug === gym.slug);
@@ -42,6 +43,6 @@ export default function GymStatus() {
     {(vote.error || notice) && <Text accessibilityRole={vote.error ? 'alert' : undefined} className="mb-4 text-zinc-700">{vote.error?.message ?? notice}</Text>}
     <Action secondary label="Refresh gym status" onPress={() => { void baseline.refetch(); void crowd.refetch(); }} />
     {profile?.is_advanced_track && <View className="my-5 rounded-2xl bg-white p-5"><Text className="mb-3 text-xl font-bold text-zinc-900">Your Upper / Lower week</Text>{[...profile.training_days].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map((day, i) => <Text key={day} className="mb-2 text-zinc-700">{['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][day]} · {DEFAULT_UPPER_LOWER[i]?.name}</Text>)}{profile.preworkout_fast_carbs && <Text className="mt-2 text-zinc-600">{profile.preworkout_carbs_g} g fast-digesting carbohydrates allocated {profile.preworkout_minutes} min before training.</Text>}</View>}
-    <Action secondary label="Sign out" onPress={() => { void getSupabase().auth.signOut().then(({ error }) => { if (error) setNotice('Unable to sign out. Please try again.'); }).catch(() => setNotice('Unable to sign out. Please try again.')); }} />
+    <Action secondary label="Sign out" onPress={() => { void signOutWithDeviceCleanup().then(({ error }) => { if (error) setNotice('Unable to sign out. Please try again.'); }).catch(() => setNotice('Unable to sign out. Please try again.')); }} />
   </ScrollView></SafeAreaView>;
 }

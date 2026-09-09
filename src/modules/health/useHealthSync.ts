@@ -1,3 +1,4 @@
+import { breadcrumb } from '../telemetry/events';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 import { useStore } from 'zustand';
@@ -35,11 +36,11 @@ export function createHealthStore(loadAdapter: () => Promise<HealthAdapter> = ge
     reset: () => { generation++; adapter = undefined; written.clear(); set({ steps: null, activeEnergyKcal: null, initialized: false, status: 'idle', error: null, refreshedAt: null }); },
     initialize: async () => {
       if (initializing) return;
-      const token = generation; initializing = true; set({ status: 'initializing', error: null });
+      const token = generation; initializing = true; breadcrumb('health.permission', { outcome: 'requested' }); set({ status: 'initializing', error: null });
       try { const loaded = await loadAdapter(); if (token !== generation) return; await loaded.initialize(); if (token !== generation) return; adapter = loaded;
         if (durable) { const { syncEngine } = await import('../sync/runtime'); if (token !== generation) return; if (syncEngine.owner) syncEngine.commit({ ...syncEngine.data, health: { ...syncEngine.data.health, enabled: true } }); }
-        set({ initialized: true }); await get().refresh(); }
-      catch (error) { if (token !== generation) return; set({ status: 'error', initialized: false, error: error instanceof Error ? error.message : 'Health sync is unavailable.' }); }
+        breadcrumb('health.permission', { outcome: 'ok' }); set({ initialized: true }); await get().refresh(); }
+      catch (error) { if (token !== generation) return; breadcrumb('health.permission', { outcome: 'unavailable' }); set({ status: 'error', initialized: false, error: error instanceof Error ? error.message : 'Health sync is unavailable.' }); }
       finally { initializing = false; }
     },
     refresh: async () => {

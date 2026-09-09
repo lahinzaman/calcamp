@@ -45,3 +45,6 @@ example
 
 # Server secrets
 backend/.env
+
+# App Store Connect private keys and generated submission config
+*.p8

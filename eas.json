@@ -1,7 +1,8 @@
 {
   "cli": {
     "version": ">= 23.2.0",
-    "appVersionSource": "remote"
+    "appVersionSource": "remote",
+    "requireCommit": true
   },
   "build": {
     "development": {
@@ -16,7 +17,8 @@
       },
       "ios": {
         "simulator": false
-      }
+      },
+      "channel": "development"
     },
     "preview": {
       "distribution": "internal",
@@ -29,7 +31,8 @@
       },
       "ios": {
         "simulator": false
-      }
+      },
+      "channel": "testing"
     },
     "production": {
       "distribution": "store",
@@ -42,8 +45,17 @@
         "buildType": "app-bundle"
       },
       "ios": {
-        "simulator": false
-      }
+        "simulator": false,
+        "buildConfiguration": "Release"
+      },
+      "developmentClient": false,
+      "credentialsSource": "remote",
+      "channel": "production"
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {}
     }
   }
 }

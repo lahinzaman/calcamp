@@ -531,3 +531,174 @@ $$;
 revoke all on function public.apply_nutrition_mutation(uuid,date,jsonb,jsonb,jsonb) from public, anon;
 grant execute on function public.apply_nutrition_mutation(uuid,date,jsonb,jsonb,jsonb) to authenticated;
 commit;
+
+begin;
+-- Existing personal profile fields remain in users. This extension isolates device registrations.
+create table public.profiles (
+  id uuid primary key references public.users(id) on delete cascade,
+  push_tokens jsonb not null default '{}'::jsonb check (jsonb_typeof(push_tokens) = 'object' and pg_column_size(push_tokens) < 65536)
+);
+alter table public.profiles enable row level security;
+revoke all on public.profiles from public, anon, authenticated;
+grant select, insert, update, delete on public.profiles to authenticated;
+grant all on public.profiles to service_role;
+create policy own_notification_profile on public.profiles for all to authenticated using ((select auth.uid()) = id) with check ((select auth.uid()) = id);
+
+create or replace function public.set_push_installation(p_owner uuid, p_installation uuid, p_registration jsonb)
+returns void language plpgsql security invoker set search_path = '' as $$
+declare owner_id uuid := (select auth.uid()); current_tokens jsonb;
+begin
+  if owner_id is null or p_owner is distinct from owner_id then raise exception 'Authentication required' using errcode = '42501'; end if;
+  if p_installation is null then raise exception 'Installation required' using errcode = '22023'; end if;
+  if p_registration is not null and (
+    jsonb_typeof(p_registration) <> 'object' or
+    not (p_registration ?& array['native_token','expo_token','platform','gym_alerts','threshold','time_zone']) or
+    jsonb_typeof(p_registration->'native_token') <> 'string' or length(p_registration->>'native_token') not between 1 and 4096 or
+    jsonb_typeof(p_registration->'expo_token') <> 'string' or length(p_registration->>'expo_token') not between 1 and 512 or
+    jsonb_typeof(p_registration->'platform') <> 'string' or p_registration->>'platform' not in ('ios','android') or jsonb_typeof(p_registration->'gym_alerts') <> 'boolean' or
+    jsonb_typeof(p_registration->'threshold') <> 'number' or (p_registration->>'threshold')::numeric not between 5 and 95 or
+    jsonb_typeof(p_registration->'time_zone') <> 'string' or not exists(select 1 from pg_catalog.pg_timezone_names where name = p_registration->>'time_zone')
+  ) then raise exception 'Invalid push registration' using errcode = '22023'; end if;
+  insert into public.profiles(id) values(owner_id) on conflict(id) do nothing;
+  select push_tokens into current_tokens from public.profiles where id = owner_id for update;
+  if p_registration is null then current_tokens := current_tokens - p_installation::text;
+  else
+    if not(current_tokens ? p_installation::text) and (select count(*) from jsonb_object_keys(current_tokens)) >= 12 then raise exception 'Too many installations' using errcode = '22023'; end if;
+    current_tokens := jsonb_set(current_tokens, array[p_installation::text], jsonb_build_object(
+      'native_token',p_registration->'native_token','expo_token',p_registration->'expo_token','platform',p_registration->'platform',
+      'gym_alerts',p_registration->'gym_alerts','threshold',p_registration->'threshold','time_zone',p_registration->'time_zone',
+      'last_seen',now(),'expires_at',now() + interval '30 days'));
+  end if;
+  update public.profiles set push_tokens = current_tokens where id = owner_id;
+end $$;
+revoke all on function public.set_push_installation(uuid,uuid,jsonb) from public, anon;
+grant execute on function public.set_push_installation(uuid,uuid,jsonb) to authenticated;
+
+create table public.daily_activity_snapshots (
+  user_id uuid not null references public.users(id) on delete cascade,
+  activity_date date not null,
+  source text not null check (source in ('healthkit','health-connect')),
+  steps integer check (steps between 0 and 250000),
+  active_energy_kcal numeric(10,3) check (active_energy_kcal between 0 and 50000),
+  observed_at timestamptz not null,
+  primary key(user_id, activity_date, source)
+);
+alter table public.daily_activity_snapshots enable row level security;
+revoke all on public.daily_activity_snapshots from public, anon, authenticated;
+grant select, insert, update, delete on public.daily_activity_snapshots to authenticated;
+grant all on public.daily_activity_snapshots to service_role;
+create policy own_activity on public.daily_activity_snapshots for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+create or replace function public.save_activity_snapshot(p_owner uuid, p_date date, p_source text, p_steps integer, p_energy numeric, p_observed_at timestamptz)
+returns void language plpgsql security invoker set search_path = '' as $$
+begin
+  if (select auth.uid()) is null or p_owner is distinct from (select auth.uid()) then raise exception 'Authentication required' using errcode = '42501'; end if;
+  if p_date is null or p_date < date '2000-01-01' or p_date > current_date + 1 or p_observed_at is null or p_observed_at > now() + interval '5 minutes' then raise exception 'Invalid observation' using errcode = '22023'; end if;
+  insert into public.daily_activity_snapshots(user_id,activity_date,source,steps,active_energy_kcal,observed_at)
+  values((select auth.uid()),p_date,p_source,p_steps,p_energy,p_observed_at)
+  on conflict(user_id,activity_date,source) do update set steps=excluded.steps,active_energy_kcal=excluded.active_energy_kcal,observed_at=excluded.observed_at
+  where excluded.observed_at > public.daily_activity_snapshots.observed_at;
+end $$;
+revoke all on function public.save_activity_snapshot(uuid,date,text,integer,numeric,timestamptz) from public, anon;
+grant execute on function public.save_activity_snapshot(uuid,date,text,integer,numeric,timestamptz) to authenticated;
+
+-- Service-only threshold latch and delivery receipt state. Clients cannot trigger sends.
+create table public.campus_alert_state (
+  user_id uuid not null references public.users(id) on delete cascade,
+  installation_id uuid not null,
+  gym_slug text not null references public.gym_locations(slug),
+  below_threshold boolean not null default false,
+  checked_at timestamptz not null default now(),
+  ticket_id text,
+  expo_token text,
+  ticket_created_at timestamptz,
+  last_alert_at timestamptz,
+  receipt_checked boolean not null default true,
+  primary key(user_id, installation_id, gym_slug)
+);
+alter table public.campus_alert_state enable row level security;
+revoke all on public.campus_alert_state from public, anon, authenticated;
+grant all on public.campus_alert_state to service_role;
+create or replace function public.claim_campus_alert(p_user uuid,p_installation uuid,p_gym text,p_below boolean)
+returns boolean language plpgsql security invoker set search_path = '' as $$
+declare previous public.campus_alert_state; send boolean;
+begin
+  insert into public.campus_alert_state(user_id,installation_id,gym_slug) values(p_user,p_installation,p_gym) on conflict do nothing;
+  select * into previous from public.campus_alert_state where user_id=p_user and installation_id=p_installation and gym_slug=p_gym for update;
+  send := p_below and not previous.below_threshold and (previous.last_alert_at is null or previous.last_alert_at < now() - interval '4 hours');
+  update public.campus_alert_state set below_threshold=p_below,checked_at=now(),last_alert_at=case when send then now() else last_alert_at end where user_id=p_user and installation_id=p_installation and gym_slug=p_gym;
+  return send;
+end $$;
+revoke all on function public.claim_campus_alert(uuid,uuid,text,boolean) from public, anon, authenticated;
+grant execute on function public.claim_campus_alert(uuid,uuid,text,boolean) to service_role;
+create or replace function public.remove_invalid_push_token(p_user uuid,p_installation uuid,p_token text)
+returns void language sql security invoker set search_path = '' as $$
+  update public.profiles set push_tokens=push_tokens-p_installation::text where id=p_user and push_tokens->p_installation::text->>'expo_token'=p_token;
+$$;
+revoke all on function public.remove_invalid_push_token(uuid,uuid,text) from public, anon, authenticated;
+grant execute on function public.remove_invalid_push_token(uuid,uuid,text) to service_role;
+create index pending_campus_receipts on public.campus_alert_state(ticket_created_at) where not receipt_checked;
+commit;
+begin;
+create table public.user_feedback (
+  id uuid primary key,
+  user_id uuid not null references public.users(id) on delete cascade,
+  category text not null check (category in ('bug','feature','other')),
+  message text not null check (char_length(btrim(message)) between 10 and 4000),
+  context jsonb not null default '{}'::jsonb check (jsonb_typeof(context) = 'object' and pg_column_size(context) <= 2048),
+  created_at timestamptz not null default now()
+);
+create index user_feedback_user_created on public.user_feedback(user_id, created_at desc);
+alter table public.user_feedback enable row level security;
+revoke all on public.user_feedback from public, anon, authenticated;
+grant select, insert on public.user_feedback to authenticated;
+grant all on public.user_feedback to service_role;
+create policy read_own_feedback on public.user_feedback for select to authenticated using ((select auth.uid()) = user_id);
+create policy submit_own_feedback on public.user_feedback for insert to authenticated with check ((select auth.uid()) = user_id);
+-- Every insert, including direct Data API writes, shares one per-user rate limit.
+create function public.validate_feedback_insert() returns trigger language plpgsql security invoker set search_path = '' as $$
+begin
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(new.user_id::text, 7));
+  if exists(select 1 from public.user_feedback where id = new.id and user_id = new.user_id) then return null; end if;
+  if (select count(*) from public.user_feedback where user_id = new.user_id and created_at > now() - interval '1 day') >= 5 then
+    raise exception 'Daily feedback limit reached' using errcode = 'P0001';
+  end if;
+  if exists(select 1 from jsonb_each(new.context) as kv where kv.key not in ('os','os_version','app_version','build','update_id','runtime','channel') or jsonb_typeof(kv.value) <> 'string' or char_length(kv.value #>> '{}') > 160) then
+    raise exception 'Invalid device context' using errcode = '22023';
+  end if;
+  new.created_at := now(); return new;
+end $$;
+revoke all on function public.validate_feedback_insert() from public, anon, authenticated;
+create trigger feedback_validation before insert on public.user_feedback for each row execute function public.validate_feedback_insert();
+create function public.submit_feedback(p_owner uuid, p_id uuid, p_category text, p_message text, p_context jsonb)
+returns uuid language plpgsql security invoker set search_path = '' as $$
+declare previous public.user_feedback;
+begin
+  if (select auth.uid()) is null or p_owner is distinct from (select auth.uid()) then raise exception 'Authentication required' using errcode = '42501'; end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_owner::text, 7));
+  select * into previous from public.user_feedback where id = p_id;
+  if found then
+    if previous.category <> p_category or previous.message <> btrim(p_message) or previous.context <> p_context then raise exception 'Submission changed' using errcode = '22023'; end if;
+    return p_id;
+  end if;
+  insert into public.user_feedback(id,user_id,category,message,context) values(p_id,p_owner,p_category,btrim(p_message),p_context);
+  return p_id;
+end $$;
+revoke all on function public.submit_feedback(uuid,uuid,text,text,jsonb) from public, anon;
+grant execute on function public.submit_feedback(uuid,uuid,text,text,jsonb) to authenticated;
+-- Auth user deletion cascades through users and all owned application tables.
+-- This flag prevents new provider work while the backend completes deletion.
+alter table public.users add column deletion_requested_at timestamptz;
+revoke delete on public.users from authenticated;
+create function public.protect_deletion_flag() returns trigger language plpgsql security invoker set search_path = '' as $$
+begin
+  if current_user in ('authenticated','anon') and new.deletion_requested_at is distinct from old.deletion_requested_at then raise exception 'Deletion state is server-managed' using errcode = '42501'; end if;
+  return new;
+end $$;
+revoke all on function public.protect_deletion_flag() from public, anon, authenticated;
+create trigger protect_deletion_flag before update on public.users for each row execute function public.protect_deletion_flag();
+create function public.account_accepts_requests() returns boolean language sql stable security invoker set search_path = '' as $$
+  select exists(select 1 from public.users where id = (select auth.uid()) and deletion_requested_at is null);
+$$;
+revoke all on function public.account_accepts_requests() from public, anon;
+grant execute on function public.account_accepts_requests() to authenticated;
+commit;

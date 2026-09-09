@@ -14,6 +14,13 @@ for (const key of ['EXPO_PUBLIC_SUPABASE_URL', 'EXPO_PUBLIC_BACKEND_URL', 'EXPO_
   catch { failures.push(`${key} must be a valid ${variant === 'development' ? 'HTTP(S)' : 'HTTPS'} URL.`); }
 }
 const plugins = (exp.plugins ?? []).map(p => Array.isArray(p) ? p[0] : p);
-for (const name of ['react-native-health', 'react-native-health-connect', '@rnmapbox/maps', 'expo-build-properties', 'expo-location', 'expo-secure-store', 'expo-sqlite', 'expo-background-task']) if (!plugins.includes(name)) failures.push(`Missing native plugin: ${name}`);
+for (const name of ['react-native-health', 'react-native-health-connect', '@rnmapbox/maps', 'expo-build-properties', 'expo-location', 'expo-secure-store', 'expo-sqlite', 'expo-background-task', 'expo-notifications']) if (!plugins.includes(name)) failures.push(`Missing native plugin: ${name}`);
+if (process.env.EXPO_PUBLIC_SENTRY_DSN?.trim()) {
+  if (!/^https:\/\/[^@\s]+@[^\s]+\/\d+$/.test(process.env.EXPO_PUBLIC_SENTRY_DSN.trim())) failures.push('EXPO_PUBLIC_SENTRY_DSN must be a valid HTTPS Sentry DSN.');
+  if (!plugins.includes('@sentry/react-native/expo')) failures.push('Missing Sentry upload plugin.');
+  for (const key of ['SENTRY_ORG','SENTRY_PROJECT']) required(key);
+  if (process.env.EAS_BUILD === 'true') required('SENTRY_AUTH_TOKEN');
+  if (variant === 'production' && [process.env.SENTRY_DISABLE_AUTO_UPLOAD, process.env.SENTRY_ALLOW_FAILURE].includes('true')) failures.push('Production Sentry uploads must be enabled and upload failures must fail the build.');
+} else console.log('Sentry is disabled until EXPO_PUBLIC_SENTRY_DSN is configured.');
 if (failures.length) { console.error(failures.join('\n')); process.exitCode = 1; }
 else console.log(`EAS ${variant} configuration preflight passed. Signing credentials and native compilation are checked by EAS Build.`);

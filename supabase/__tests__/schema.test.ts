@@ -225,16 +225,66 @@ test('fresh Supabase schema: permissions, nutrition constraints, and workout int
       await fails('delete from private.nutrition_mutation_receipts', '42501');
     });
 
+    await t.test('Phase 6 push registrations and activity snapshots enforce owner, RLS, and retry order', async () => {
+      const install = '60000000-0000-4000-8000-000000000001';
+      const registration = { native_token: 'native', expo_token: 'ExpoPushToken[test]', platform: 'ios', gym_alerts: true, threshold: 30, time_zone: 'America/New_York' };
+      await signIn(alice);
+      await db.query('select public.set_push_installation($1,$2,$3)', [alice, install, JSON.stringify(registration)]);
+      await db.query('select public.set_push_installation($1,$2,$3)', [alice, install, JSON.stringify(registration)]);
+      const tokens = (await db.query<{ push_tokens: Record<string, unknown> }>('select push_tokens from public.profiles')).rows[0].push_tokens;
+      assert.equal(Object.keys(tokens).length, 1);
+      await assert.rejects(db.query('select public.set_push_installation($1,$2,$3)', [bob, install, JSON.stringify(registration)]), { code: '42501' });
+      await assert.rejects(db.query('select public.set_push_installation($1,$2,$3)', [alice, install, JSON.stringify({ ...registration, platform: null })]), { code: '22023' });
+      await db.query("select public.save_activity_snapshot($1,'2026-09-07','healthkit',5000,200,'2026-09-07T18:00:00Z')", [alice]);
+      await db.query("select public.save_activity_snapshot($1,'2026-09-07','healthkit',1000,50,'2026-09-07T17:00:00Z')", [alice]);
+      await db.query("select public.save_activity_snapshot($1,'2026-09-07','healthkit',5000,200,'2026-09-07T18:00:00Z')", [alice]);
+      assert.equal((await db.query<{ steps: number }>('select steps from public.daily_activity_snapshots')).rows[0].steps, 5000);
+      await assert.rejects(db.query("select public.save_activity_snapshot($1,'2026-09-07','healthkit',6000,300,now())", [bob]), { code: '42501' });
+      await fails("select public.claim_campus_alert('" + alice + "','" + install + "','werblin',true)", '42501');
+      await signIn(bob); assert.equal((await db.query('select * from public.profiles')).rows.length, 0);
+      assert.equal((await db.query('select * from public.daily_activity_snapshots')).rows.length, 0);
+      await db.exec('reset role; set role service_role');
+      const claim = async (below: boolean) => (await db.query<{ claim_campus_alert: boolean }>('select public.claim_campus_alert($1,$2,\'werblin\',$3)', [alice, install, below])).rows[0].claim_campus_alert;
+      assert.equal(await claim(true), true); assert.equal(await claim(true), false);
+      assert.equal(await claim(false), false); assert.equal(await claim(true), false); // Four-hour cooldown.
+      await db.query('select public.remove_invalid_push_token($1,$2,$3)', [alice, install, 'old-token']);
+      assert.equal(Object.keys((await db.query<{ push_tokens: object }>('select push_tokens from public.profiles')).rows[0].push_tokens).length, 1);
+      await db.query('select public.remove_invalid_push_token($1,$2,$3)', [alice, install, registration.expo_token]);
+      assert.equal(Object.keys((await db.query<{ push_tokens: object }>('select push_tokens from public.profiles')).rows[0].push_tokens).length, 0);
+    });
+
+    await t.test('Phase 7 feedback retries, ownership, rate limits, context and server-managed deletion', async () => {
+      await signIn(alice);
+      const id = '70000000-0000-4000-8000-000000000001';
+      const submit = (key: string, owner = alice) => db.query('select public.submit_feedback($1,$2,$3,$4,$5)', [owner, key, 'bug', 'The menu did not load today.', '{"os":"ios"}']);
+      await submit(id); await submit(id);
+      assert.equal((await db.query('select * from public.user_feedback')).rows.length, 1);
+      await assert.rejects(submit(id, bob), { code: '42501' });
+      await fails(`update public.users set deletion_requested_at = now()`, '42501');
+      await fails(`insert into public.user_feedback(id,user_id,category,message,context) values ('70000000-0000-4000-8000-000000000099','${alice}','bug','A sufficiently long report','{"token":"private"}')`, '22023');
+      for (let i = 2; i <= 5; i++) await submit(`70000000-0000-4000-8000-00000000000${i}`);
+      await assert.rejects(submit('70000000-0000-4000-8000-000000000006'), { code: 'P0001' });
+      await submit(id); // Lost acknowledgements do not consume another daily slot.
+      await signIn(bob); assert.equal((await db.query('select * from public.user_feedback')).rows.length, 0);
+      await db.exec('reset role; set role anon'); await fails('select * from public.user_feedback', '42501');
+      await db.exec('reset role');
+      await db.exec(`update public.users set deletion_requested_at = now() where id = '${alice}'`);
+      await signIn(alice); assert.equal((await db.query<{ account_accepts_requests: boolean }>('select public.account_accepts_requests()')).rows[0].account_accepts_requests, false);
+    });
+
     await t.test('profile deletion cascades owned nutrition, workouts, custom lifts, and sets', async () => {
       await signIn(alice);
       await db.exec(`insert into public.sets (workout_id, exercise_id, exercise_position, set_position, weight_kg, reps, is_completed)
         values ('${aliceWorkout}', '${row}', 1, 1, 90, 5, true)`);
-      await db.exec('delete from public.users');
+      await fails('delete from public.users', '42501');
+      await db.exec('reset role');
+      await db.exec(`delete from auth.users where id = '${alice}'`);
       await db.exec('reset role');
       assert.deepEqual((await db.query(`select * from public.workouts where user_id = '${alice}'`)).rows, []);
       assert.deepEqual((await db.query(`select * from public.sets where workout_id = '${aliceWorkout}'`)).rows, []);
       assert.deepEqual((await db.query(`select * from public.daily_nutrition_logs where user_id = '${alice}'`)).rows, []);
       assert.equal((await db.query('select id from public.users')).rows.length, 1);
+      for (const table of ['user_feedback', 'profiles', 'daily_activity_snapshots', 'campus_alert_state']) assert.equal((await db.query(`select * from public.${table} where ${table === 'profiles' ? 'id' : 'user_id'} = '${alice}'`)).rows.length, 0);
     });
   } finally {
     await db.close();

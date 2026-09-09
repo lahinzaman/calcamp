@@ -7,7 +7,7 @@ import type { Session } from '@supabase/supabase-js';
 import type { UserProfile } from '../../types/profile';
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, __DEV__: true });
 mock.module('react-native', { namedExports: {
-  View: 'View', Text: 'Text', Pressable: 'Pressable', TextInput: 'TextInput', ScrollView: 'ScrollView', Switch: 'Switch', KeyboardAvoidingView: 'KeyboardAvoidingView',
+  Modal: 'Modal', View: 'View', Text: 'Text', Pressable: 'Pressable', TextInput: 'TextInput', ScrollView: 'ScrollView', Switch: 'Switch', KeyboardAvoidingView: 'KeyboardAvoidingView',
   Platform: { OS: 'web' }, AppState: { addEventListener: () => ({ remove() {} }) }, Linking: { openURL: async () => {} },
 } });
 mock.module('react-native-safe-area-context', { namedExports: { SafeAreaView: 'SafeAreaView' } });
@@ -28,7 +28,7 @@ mock.module('../../api/campus.ts', { namedExports: {
   fetchGymBaselines: async () => [{ slug: 'werblin', baseline: 80 }],
   fetchGymSummary: async () => [{ location_slug: 'werblin', vote_count: 2, crowd_score: 25, latest_vote_at: new Date().toISOString() }],
   submitGymVote: async (slug: string, status: string) => { voteInput = { slug, status }; },
-  fetchMacroRescue: async (location: unknown, remaining: unknown, preference: unknown) => { rescueInput = { location, remaining, preference }; return { matches: [], eligibleRestaurants: 0, uncoveredRestaurants: 0 }; },
+  fetchMacroRescue: async (location: unknown, remaining: unknown, preference: unknown) => { rescueInput = { location, remaining, preference }; return { matches: [], eligibleRestaurants: 0, uncoveredRestaurants: 0, checkedAt: new Date().toISOString() }; },
 } });
 const { default: AuthScreen } = require('../auth/AuthScreen') as typeof import('../auth/AuthScreen');
 const { default: OnboardingFlow } = require('../onboarding/OnboardingFlow') as typeof import('../onboarding/OnboardingFlow');
@@ -92,4 +92,13 @@ test('macro rescue switches between Easton preset and live Millburn GPS after 10
   assert.deepEqual((rescueInput as { location: unknown }).location, { latitude: 40.4989, longitude: -74.4477 }); assert.equal(gpsCalls, 0);
   await press('Live GPS (including Millburn)'); await press('Find meals that fit'); await settle();
   assert.deepEqual((rescueInput as { location: unknown }).location, { latitude: 40.724, longitude: -74.304 }); assert.equal(gpsCalls, 1);
+});
+
+test('notification settings mount and report invalid input without permission requests', async () => {
+  login(); await render(<GymStatus />); await settle();
+  await press('Reminders & background activity');
+  assert.equal(root!.root.findByType('Modal' as React.ElementType).props.visible, true);
+  assert.equal(root!.root.findByProps({ accessibilityLabel: 'Allow notifications' }).props.value, false);
+  await type('Gym alert threshold', '0'); await press('Save settings');
+  assert.ok(text().includes('Gym threshold must be between 5 and 95.'));
 });

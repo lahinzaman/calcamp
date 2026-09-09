@@ -1,3 +1,4 @@
+import { logMealTokenForUser } from './logmeal-account';
 import { Router, json, type ErrorRequestHandler } from 'express';
 import cors from 'cors';
 import { structuredLimit as rateLimit } from './http';
@@ -53,14 +54,12 @@ export function createVisionProxyRouter(options: VisionProxyOptions = {}) {
     const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false },
       global: { fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(10_000) }) } });
     const { data, error } = await client.auth.getUser(bearer);
-    return error ? null : data.user?.id ?? null;
+    if (error || !data.user) return null;
+    const scoped = createClient(url, key, { auth: { persistSession: false }, global: { headers: { Authorization: `Bearer ${bearer}` }, fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(10000) }) } });
+    const active = await scoped.rpc('account_accepts_requests');
+    return !active.error && active.data === true ? data.user.id : null;
   });
-  const tokenForUser = options.tokenForUser ?? ((userId: string) => {
-    // LogMeal APIUser tokens own their intake history. Never share one across app accounts.
-    const tokens = JSON.parse(process.env.LOGMEAL_USER_TOKENS_JSON ?? '{}') as Record<string, unknown>;
-    if (typeof tokens[userId] === 'string') return tokens[userId];
-    return userId === process.env.LOGMEAL_USER_ID ? process.env.LOGMEAL_API_KEY : undefined;
-  });
+  const tokenForUser = options.tokenForUser ?? logMealTokenForUser;
   router.use(cors({ origin: process.env.VISION_ALLOWED_ORIGIN?.split(',') ?? false,
     methods: ['POST'], allowedHeaders: ['Content-Type', 'Authorization'] }));
   router.use(rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false }));

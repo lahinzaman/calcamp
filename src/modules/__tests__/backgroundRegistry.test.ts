@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import { mock, test } from 'node:test';
+import { durableStorage } from '../sync/storage';
+import { savePreferences } from '../notifications/preferences';
+import { defaultPreferences } from '../notifications/policy';
+type Callback = (input: { data?: unknown; error?: unknown }) => Promise<unknown>;
+const tasks = new Map<string, Callback>(); let handler: (notification: unknown) => Promise<{ shouldShowBanner: boolean }>;
+let wakes = 0; let prompts = 0;
+mock.module('react-native', { namedExports: { Platform: { OS: 'ios' } } });
+mock.module('expo-task-manager', { namedExports: { defineTask: (name: string, callback: Callback) => tasks.set(name, callback) } });
+mock.module('expo-notifications', { namedExports: { setNotificationHandler: (h: { handleNotification: typeof handler }) => { handler = h.handleNotification; }, BackgroundNotificationTaskResult: { NoData: 1, NewData: 2, Failed: 3 } } });
+mock.module('expo-location', { namedExports: { GeofencingEventType: { Enter: 1, Exit: 2 } } });
+mock.module('../background/wake.ts', { namedExports: { wakeSync: async () => { wakes++; return true; } } });
+mock.module('../notifications/service.ts', { namedExports: { notifyOnce: async () => { prompts++; } } });
+test('headless tasks reject foreign/malformed pushes and suppress duplicate geofence arrivals', async () => {
+  await import('../background/registry.native');
+  durableStorage.set('active-sync-owner', 'alice'); savePreferences('alice', { ...defaultPreferences, enabled: true, geofencing: true });
+  const push = tasks.get('rulocked-push-v1')!;
+  const payload = (value: unknown) => ({ data: { data: { dataString: JSON.stringify(value) } } });
+  assert.equal(await push(payload({ owner: 'bob', kind: 'sync' })), 1); assert.equal(wakes, 0);
+  assert.equal(await push({ data: { data: { dataString: '{' } } }), 3);
+  assert.equal(await push(payload({ owner: 'alice', kind: 'sync' })), 2); assert.equal(wakes, 1);
+  assert.equal((await handler({ request: { content: { data: { owner: 'bob', kind: 'gym' } } } })).shouldShowBanner, false);
+  const geo = tasks.get('rulocked-campus-geofence-v1')!;
+  durableStorage.set('geofence-started:alice', String(Date.now()));
+  const event = (eventType: number) => ({ data: { eventType, region: { identifier: 'gym:werblin' } } });
+  await geo(event(1)); assert.equal(prompts, 0); // Initial iOS inside event.
+  await geo(event(2)); await geo(event(1)); await geo(event(1)); assert.equal(prompts, 1);
+  savePreferences('alice', defaultPreferences); await geo(event(2)); await geo(event(1)); assert.equal(prompts, 1);
+});

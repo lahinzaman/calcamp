@@ -2,7 +2,6 @@
   "expo": {
     "name": "RULocked",
     "slug": "rulocked",
-    "newArchEnabled": false,
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -23,7 +22,8 @@
         "android.permission.health.READ_STEPS",
         "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
         "android.permission.health.WRITE_EXERCISE",
-        "android.permission.health.WRITE_NUTRITION"
+        "android.permission.health.WRITE_NUTRITION",
+        "android.permission.POST_NOTIFICATIONS"
       ]
     },
     "web": {
@@ -62,11 +62,29 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Use your location to generate a campus walking loop."
+          "locationWhenInUsePermission": "Use your location to generate a campus walking loop.",
+          "locationAlwaysAndWhenInUsePermission": "Allow RULocked to detect campus arrivals in the background for meal and workout prompts. Your route is not continuously recorded.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": false
         }
       ],
       "expo-sqlite",
-      "expo-background-task"
+      "expo-background-task",
+      [
+        "expo-notifications",
+        {
+          "color": "#CC0033",
+          "defaultChannel": "rulocked-reminders",
+          "enableBackgroundRemoteNotifications": true
+        }
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
@@ -78,6 +96,14 @@
         "projectId": "83bb9069-dd83-4d41-bfa5-a760d7d1c06a"
       }
     },
-    "owner": "lahin.zaman"
+    "owner": "lahin.zaman",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/83bb9069-dd83-4d41-bfa5-a760d7d1c06a",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    }
   }
 }

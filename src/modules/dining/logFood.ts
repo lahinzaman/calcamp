@@ -9,7 +9,7 @@ const MICRO_KEYS: Record<string, NutrientKey> = {
 };
 
 /** Overrides are per listed serving; the resulting totals reflect the serving multiplier. */
-export function foodLogAmounts(item: DailyMenuItem, servings: number, macros: MacroTotals) {
+export function foodLogAmounts(item: Pick<DailyMenuItem, 'nutrients'>, servings: number, macros: MacroTotals) {
   if (!Number.isFinite(servings) || servings <= 0 || servings > 100) throw new RangeError('Enter 0–100 servings (greater than zero).');
   const consumed: MacroTotals = { ...macros };
   for (const key of ['caloriesKcal', 'proteinG', 'carbsG', 'fatG'] as const) {

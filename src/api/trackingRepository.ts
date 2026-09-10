@@ -1,3 +1,4 @@
+import { kgToLbs, lbsToKg } from '../lib/units';
 import type { NutritionMutation } from '../modules/sync/engine';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { v5 as uuid } from 'uuid';
@@ -9,7 +10,7 @@ export interface DailyTotals {
   consumedMacros: MacroTotals;
   consumedMicros: MicronutrientTotals;
   isAdherent: boolean;
-  bodyWeightKg: number | null;
+  bodyWeightLbs: number | null;
 }
 export interface TrackingRepository {
   userId(): Promise<string>;
@@ -41,13 +42,13 @@ export function createTrackingRepository(client: SupabaseClient): TrackingReposi
     async applyNutritionMutation(userId, id, mutation) {
       await verify(userId);
       const { data, error } = await client.rpc('apply_nutrition_mutation', {
-        p_id: id, p_date: mutation.date, p_macros: mutation.macros, p_micros: mutation.micros, p_patch: mutation.patch,
+        p_id: id, p_date: mutation.date, p_macros: mutation.macros, p_micros: mutation.micros, p_patch: mutation.legacyMetricPatch ?? { ...(mutation.patch.isAdherent === undefined ? {} : { isAdherent: mutation.patch.isAdherent }), ...(!('bodyWeightLbs' in mutation.patch) ? {} : { bodyWeightKg: mutation.patch.bodyWeightLbs === null ? null : lbsToKg(mutation.patch.bodyWeightLbs!) }) },
       });
       check(error);
       if (!data || data.user_id !== userId || data.log_date !== mutation.date) throw new Error('Invalid sync response.');
       return { date: data.log_date, consumedMacros: { caloriesKcal: Number(data.calories_kcal), proteinG: Number(data.protein_g),
         carbsG: Number(data.carbs_g), fatG: Number(data.fat_g) }, consumedMicros: data.micronutrients,
-        isAdherent: data.is_adherent, bodyWeightKg: data.body_weight_kg === null ? null : Number(data.body_weight_kg) };
+        isAdherent: data.is_adherent, bodyWeightLbs: data.body_weight_kg === null ? null : kgToLbs(Number(data.body_weight_kg)) };
     },
     async userId() {
       const { data, error } = await client.auth.getUser();
@@ -69,7 +70,7 @@ export function createTrackingRepository(client: SupabaseClient): TrackingReposi
       return { date: data.log_date, consumedMacros: { caloriesKcal: Number(data.calories_kcal),
         proteinG: Number(data.protein_g), carbsG: Number(data.carbs_g), fatG: Number(data.fat_g) },
       consumedMicros: data.micronutrients, isAdherent: data.is_adherent,
-      bodyWeightKg: data.body_weight_kg === null ? null : Number(data.body_weight_kg) };
+      bodyWeightLbs: data.body_weight_kg === null ? null : kgToLbs(Number(data.body_weight_kg)) };
     },
     async saveDay(userId, totals) {
       await ensureProfile(userId);
@@ -77,7 +78,7 @@ export function createTrackingRepository(client: SupabaseClient): TrackingReposi
       const { error } = await client.from('daily_nutrition_logs').upsert({ user_id: userId,
         log_date: totals.date, calories_kcal: m.caloriesKcal, protein_g: m.proteinG,
         carbs_g: m.carbsG, fat_g: m.fatG, micronutrients: totals.consumedMicros,
-        body_weight_kg: totals.bodyWeightKg, is_adherent: totals.isAdherent,
+        body_weight_kg: totals.bodyWeightLbs === null ? null : lbsToKg(totals.bodyWeightLbs), is_adherent: totals.isAdherent,
       }, { onConflict: 'user_id,log_date' });
       check(error);
     },
@@ -103,7 +104,7 @@ export function createTrackingRepository(client: SupabaseClient): TrackingReposi
         const position = (counts.get(s.sessionExerciseId) ?? 0) + 1;
         counts.set(s.sessionExerciseId, position);
         return { workout_id: id, exercise_id: exercise.id, exercise_position: exercise.position,
-          set_position: position, weight_kg: s.weightKg, reps: s.reps, rpe: s.rpe,
+          set_position: position, weight_kg: s.weightLbs === null ? null : lbsToKg(s.weightLbs), reps: s.reps, rpe: s.rpe,
           is_warmup: s.isWarmup, is_completed: true, rest_seconds: s.restSeconds,
           completed_at: new Date(s.completedAtMs!).toISOString() };
       });

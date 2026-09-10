@@ -1,34 +1,24 @@
-import { useState } from 'react';
-import { Linking, ScrollView, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Action } from '../../components/FormControls';
-import { NotificationSettings } from '../notifications/NotificationSettings';
-import { FeedbackModal } from '../feedback/FeedbackModal';
-import { DeleteAccountModal } from '../account/DeleteAccountModal';
-import { UpdateControls } from '../updates/UpdateControls';
-import { useAuthStore } from '../../store/authStore';
-import { appInfo } from './appInfo';
+import { View } from 'react-native';
+import { useQuery } from '@tanstack/react-query';
+import { Text } from '../../theme/primitives';
+import { SafeAreaView } from '../../theme/SafeArea';
+import { useSyncStatus } from '../../store/syncStore';
+export async function checkService(signal: AbortSignal): Promise<boolean> {
+  const base = process.env.EXPO_PUBLIC_BACKEND_URL;
+  if (!base) return false;
+  const controller = new AbortController(); const cancel = () => controller.abort();
+  signal.addEventListener('abort', cancel, { once: true }); if (signal.aborted) cancel();
+  const timer = setTimeout(cancel, 10000);
+  try {
+    const response = await fetch(new URL('/health', base), { signal: controller.signal });
+    if (!response.ok) return false;
+    const value = await response.json(); return value.status === 'ok' && value.database === 'ok';
+  } finally { clearTimeout(timer); signal.removeEventListener('abort', cancel); }
+}
 export default function SettingsScreen() {
-  const owner = useAuthStore(s => s.session?.user.id); const [modal, setModal] = useState<'feedback' | 'delete' | null>(null);
-  const [notice, setNotice] = useState<string | null>(null); const info = appInfo();
-  const open = (url: string | undefined) => { if (!url?.startsWith('https://')) { setNotice('This link is not configured in this build.'); return; } void Linking.openURL(url).catch(() => setNotice('Unable to open this link.')); };
-  return <SafeAreaView edges={['top','left','right']} className="flex-1 bg-[#F7F7F2]">
-    <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40, width: '100%', maxWidth: 760, alignSelf: 'center' }}>
-      <Text className="mb-5 text-3xl font-bold text-zinc-950">Settings</Text>
-      <View className="rounded-2xl bg-white p-4"><Text className="mb-2 text-lg font-bold">App Info</Text>
-        <Text selectable className="text-zinc-700">Version {info.app_version} (Build {info.build}) · Update: {info.update_id === 'embedded' ? 'embedded' : info.update_id.slice(0, 8)}</Text>
-        <Text selectable className="mt-2 text-xs text-zinc-600">Channel: {info.channel} · Runtime: {info.runtime}</Text>
-      </View>
-      <UpdateControls /><NotificationSettings />
-      <Action label="Send feedback or report a bug" onPress={() => setModal('feedback')} />
-      <Action label="Privacy policy" secondary onPress={() => open(process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL)} />
-      <Action label="Help & support" secondary onPress={() => open(process.env.EXPO_PUBLIC_SUPPORT_URL)} />
-      {notice && <Text accessibilityRole="alert" className="mb-4 text-zinc-700">{notice}</Text>}
-      <View className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4"><Text className="mb-3 font-bold text-red-800">Account</Text>
-        <Action label="Delete account" onPress={() => setModal('delete')} disabled={!owner} />
-      </View>
-    </ScrollView>
-    {modal === 'feedback' && owner && <FeedbackModal key={owner} onClose={() => setModal(null)} />}
-    {modal === 'delete' && owner && <DeleteAccountModal key={owner} onClose={() => setModal(null)} />}
-  </SafeAreaView>;
+  const s = useSyncStatus();
+  const service = useQuery({ queryKey: ['service-health'], queryFn: ({ signal }) => checkService(signal), enabled: s.online,
+    refetchInterval: 60000, retry: false, staleTime: 30000 });
+  const label = !s.online ? 'Offline' : s.blocked ? 'Sync needs review' : s.syncing ? 'Syncing…' : s.queued ? `${s.queued} queued` : !s.ready || service.isPending ? 'Checking…' : service.isError || !service.data || s.error ? 'Connection unavailable' : s.lastSyncedAt ? 'Synced' : 'Waiting for first sync';
+  return <SafeAreaView edges={['top','left','right']} className="flex-1 bg-background"><View className="p-6"><Text className="mb-6 text-3xl font-bold">Settings</Text><View className="rounded-3xl bg-surface p-6"><Text className="mb-3 text-sm">Backend & database</Text><Text accessibilityLiveRegion="polite" className="text-3xl font-bold">{label}</Text></View></View></SafeAreaView>;
 }

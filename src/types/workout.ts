@@ -27,13 +27,13 @@ export interface SessionExercise {
 export interface WorkoutSet {
   id: string;
   sessionExerciseId: string;
-  weightKg: number | null;
+  weightLbs: number | null;
   reps: number | null;
   rpe: number | null;
   isWarmup: boolean;
   restSeconds: number;
   /** Supplied by the lifting module using Brzycki; the store does not infer it. */
-  estimatedOneRepMaxKg: number | null;
+  estimatedOneRepMaxLbs: number | null;
   completedAtMs: number | null;
 }
 

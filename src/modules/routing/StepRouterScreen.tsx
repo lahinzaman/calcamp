@@ -1,7 +1,10 @@
+import { metersToMiles, metersToFeet } from '../../lib/units';
 import { SyncIndicator } from '../../components/SyncIndicator';
 import { useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Modal, ScrollView, View } from 'react-native';
+import { Pressable } from '../../theme/Pressable';
+import { Text, TextInput } from '../../theme/primitives';
+import { SafeAreaView } from '../../theme/SafeArea';
 import * as Location from 'expo-location';
 import { useHealthSync } from '../health/useHealthSync';
 import RouteMap from './RouteMap';
@@ -56,37 +59,37 @@ export default function StepRouterScreen() {
     } catch (cause) { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Route unavailable.'); }
     finally { if (request.current === controller) setBusy(false); }
   }
-  return <SafeAreaView edges={['top', 'left', 'right']} className="flex-1 bg-[#F7F7F2]">
+  return <SafeAreaView edges={['left', 'right', 'bottom']} className="flex-1 bg-background">
     <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40, maxWidth: 760, width: '100%', alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
-      <Text className="text-sm font-black tracking-widest text-scarlet">RULOCKED · CAMPUS WALKS</Text>
-      <Text className="mb-2 mt-5 text-4xl font-bold text-zinc-950">Close your step gap.</Text>
-      <Text className="mb-6 text-base text-zinc-500">A walk toward your 10,000-step goal.</Text>
+      <Text className="text-sm font-black tracking-widest text-ink">CALCAMP · CAMPUS WALKS</Text>
+      <Text className="mb-2 mt-5 text-4xl font-bold text-ink">Close your step gap.</Text>
+      <Text className="mb-6 text-base text-ink">A walk toward your 10,000-step goal.</Text>
       <SyncIndicator />
-      <View className="mb-5 rounded-3xl bg-zinc-950 p-6">
-        <Text className="text-sm text-zinc-400">{health.date} · Today's steps</Text>
-        <Text className="my-3 text-4xl font-bold text-white">{steps === null ? '—' : steps.toLocaleString()}</Text>
-        <Text className="text-sm text-zinc-300">{deficit ? `${deficit.remainingSteps.toLocaleString()} steps remaining · ${(deficit.distanceMeters / 1000).toFixed(2)} km target` : 'Connect health or enter a step count.'}</Text>
-        <Text className="mt-3 text-xs text-zinc-400">Active energy: {health.activeEnergyKcal === null ? 'unavailable' : `${Math.round(health.activeEnergyKcal)} kcal`}</Text>
+      <View className="mb-5 rounded-3xl bg-background p-6">
+        <Text className="text-sm text-ink">{health.date} · Today's steps</Text>
+        <Text className="my-3 text-4xl font-bold text-ink">{steps === null ? '—' : steps.toLocaleString()}</Text>
+        <Text className="text-sm text-ink">{deficit ? `${deficit.remainingSteps.toLocaleString()} steps remaining · ${metersToMiles(deficit.distanceMeters).toFixed(2)} mi target` : 'Connect health or enter a step count.'}</Text>
+        <Text className="mt-3 text-xs text-ink">Active energy: {health.activeEnergyKcal === null ? 'unavailable' : `${Math.round(health.activeEnergyKcal)} kcal`}</Text>
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel="Connect or refresh health" disabled={health.status === 'initializing'} onPress={() => { if (health.initialized) void health.refresh(); else setHealthPrompt(true); }} className="mb-3 rounded-xl bg-white p-4"><Text className="font-semibold">{health.status === 'initializing' ? 'Connecting…' : 'Connect / refresh health'}</Text></Pressable>
-      {health.refreshedAt && <Text className="mb-3 text-xs text-zinc-500">Last health refresh: {new Date(health.refreshedAt).toLocaleTimeString()} · background updates are scheduled by the device.</Text>}
-      <Modal transparent animationType="slide" visible={healthPrompt} onRequestClose={() => setHealthPrompt(false)}><View className="flex-1 justify-end bg-black/40 p-6"><View className="rounded-3xl bg-white p-6">
-        <Text className="text-xl font-bold">Connect your health data</Text><Text className="mt-3 leading-6 text-zinc-600">RULocked reads today's steps and active energy. On iOS, recent workouts appear separately from your lifting diary. Completed RULocked workouts will be exported automatically while connected. Dietary energy is shared only when you request an export. You can change access in your device's Health settings.</Text>
-        <Pressable accessibilityRole="button" className="mt-5 rounded-xl bg-scarlet p-4" onPress={() => { setHealthPrompt(false); void health.initialize(); }}><Text className="text-center font-bold text-white">Continue to permissions</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Connect or refresh health" disabled={health.status === 'initializing'} onPress={() => { if (health.initialized) void health.refresh(); else setHealthPrompt(true); }} className="mb-3 rounded-xl bg-surface p-4"><Text className="font-semibold">{health.status === 'initializing' ? 'Connecting…' : 'Connect / refresh health'}</Text></Pressable>
+      {health.refreshedAt && <Text className="mb-3 text-xs text-ink">Last health refresh: {new Date(health.refreshedAt).toLocaleTimeString()} · background updates are scheduled by the device.</Text>}
+      <Modal presentationStyle="pageSheet" animationType="slide" visible={healthPrompt} onRequestClose={() => setHealthPrompt(false)}><SafeAreaView className="flex-1 bg-surface"><ScrollView contentContainerStyle={{ padding: 24 }}>
+        <Text className="text-xl font-bold">Connect your health data</Text><Text className="mt-3 leading-6 text-ink">CalCamp reads today's steps and active energy. On iOS, recent workouts appear separately from your lifting diary. Completed CalCamp workouts will be exported automatically while connected. Dietary energy is shared only when you request an export. You can change access in your device's Health settings.</Text>
+        <Pressable accessibilityRole="button" className="mt-5 rounded-xl bg-accent p-4" onPress={() => { setHealthPrompt(false); void health.initialize(); }}><Text className="text-center font-bold text-ink">Continue to permissions</Text></Pressable>
         <Pressable accessibilityRole="button" className="mt-2 p-4" onPress={() => setHealthPrompt(false)}><Text className="text-center">Maybe later</Text></Pressable>
-      </View></View></Modal>
-      {health.error && <Text className="mb-3 text-sm text-zinc-600">{health.error}</Text>}
-      <Text className="mb-2 text-sm text-zinc-600">Optional manual step count</Text>
-      <TextInput accessibilityLabel="Manual step count" keyboardType="number-pad" inputMode="numeric" value={manualSteps} onChangeText={setManualSteps} placeholder="Use health steps" className="mb-4 rounded-xl border border-zinc-200 bg-white p-4" />
-      <Text className="mb-4 text-xs leading-5 text-zinc-500">Distance assumes 0.75 m per step. HealthKit may return no visible data when read access is denied. Samsung Health data must be shared with Health Connect.</Text>
-      {!token && <Text className="mb-4 text-sm text-scarlet">Add a public Mapbox token to enable route generation.</Text>}
-      <Pressable accessibilityRole="button" disabled={busy || !token || !deficit || deficit.distanceMeters < 100} onPress={() => void generate(true)} className="mb-3 rounded-2xl bg-scarlet p-4 disabled:opacity-40"><Text className="text-center font-bold text-white">{busy ? 'Finding a walk…' : 'Walk from my location'}</Text></Pressable>
-      <Pressable accessibilityRole="button" disabled={busy || !token || !deficit || deficit.distanceMeters < 100} onPress={() => void generate(false)} className="mb-5 rounded-xl bg-white p-4"><Text className="text-center font-semibold">Start at Rutgers College Ave</Text></Pressable>
-      {deficit && deficit.remainingSteps === 0 && <Text className="mb-4 font-semibold text-emerald-700">Step goal reached.</Text>}
-      {deficit && deficit.remainingSteps > 0 && deficit.distanceMeters < 100 && <Text className="mb-4 text-zinc-600">Less than 100 m remains. A short walk is enough; no loop is needed.</Text>}
-      {error && <Text accessibilityRole="alert" className="mb-4 text-scarlet">{error}</Text>}
+      </ScrollView></SafeAreaView></Modal>
+      {health.error && <Text className="mb-3 text-sm text-ink">{health.error}</Text>}
+      <Text className="mb-2 text-sm text-ink">Optional manual step count</Text>
+      <TextInput accessibilityLabel="Manual step count" keyboardType="number-pad" inputMode="numeric" value={manualSteps} onChangeText={setManualSteps} placeholder="Use health steps" className="mb-4 rounded-xl border border-border bg-surface p-4" />
+      <Text className="mb-4 text-xs leading-5 text-ink">Distance assumes 2.46 ft per step. HealthKit may return no visible data when read access is denied. Samsung Health data must be shared with Health Connect.</Text>
+      {!token && <Text className="mb-4 text-sm text-ink">Add a public Mapbox token to enable route generation.</Text>}
+      <Pressable accessibilityRole="button" disabled={busy || !token || !deficit || deficit.distanceMeters < 100} onPress={() => void generate(true)} className="mb-3 rounded-2xl bg-accent p-4 disabled:opacity-40"><Text className="text-center font-bold text-ink">{busy ? 'Finding a walk…' : 'Walk from my location'}</Text></Pressable>
+      <Pressable accessibilityRole="button" disabled={busy || !token || !deficit || deficit.distanceMeters < 100} onPress={() => void generate(false)} className="mb-5 rounded-xl bg-surface p-4"><Text className="text-center font-semibold">Start at Rutgers College Ave</Text></Pressable>
+      {deficit && deficit.remainingSteps === 0 && <Text className="mb-4 font-semibold text-ink">Step goal reached.</Text>}
+      {deficit && deficit.remainingSteps > 0 && deficit.distanceMeters < 100 && <Text className="mb-4 text-ink">Less than 328 ft remains. A short walk is enough; no loop is needed.</Text>}
+      {error && <Text accessibilityRole="alert" className="mb-4 text-ink">{error}</Text>}
       {token && <RouteMap start={start} route={route} token={token} />}
-      {route && <View className="mt-5 rounded-3xl bg-white p-5"><Text className="text-xl font-bold">{(route.distanceMeters / 1000).toFixed(2)} km · {Math.round(route.durationSeconds / 60)} min</Text><Text className="mt-2 text-zinc-600">{startLabel}</Text><Text className="mt-3 text-zinc-600">{route.withinTolerance ? 'Close to your target' : 'Closest loop found'} · {Math.round(Math.abs(route.differenceMeters))} m {route.differenceMeters >= 0 ? 'longer' : 'shorter'}</Text><Text className="mt-3 text-xs leading-5 text-zinc-500">Walking paths determine the final distance. This loop may retrace sections. Check access and crossings before heading out.</Text></View>}
+      {route && <View className="mt-5 rounded-3xl bg-surface p-5"><Text className="text-xl font-bold">{metersToMiles(route.distanceMeters).toFixed(2)} mi · {Math.round(route.durationSeconds / 60)} min</Text><Text className="mt-2 text-ink">{startLabel}</Text><Text className="mt-3 text-ink">{route.withinTolerance ? 'Close to your target' : 'Closest loop found'} · {Math.round(metersToFeet(Math.abs(route.differenceMeters)))} ft {route.differenceMeters >= 0 ? 'longer' : 'shorter'}</Text><Text className="mt-3 text-xs leading-5 text-ink">Walking paths determine the final distance. This loop may retrace sections. Check access and crossings before heading out.</Text></View>}
     </ScrollView>
   </SafeAreaView>;
 }

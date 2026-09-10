@@ -21,8 +21,8 @@ test('BestTime coalesces paid forecast requests and caches failures without inve
     calls++; assert.equal(init?.method, 'POST'); assert.ok(String(input).startsWith('https://besttime.app/api/v1/forecasts?'));
     return Response.json(forecast);
   } });
-  const [first, second] = await Promise.all([service(), service()]); assert.equal(calls, 3); assert.deepEqual(first, second);
-  await service(); assert.equal(calls, 3);
+  const [first, second] = await Promise.all([service(), service()]); assert.equal(calls, 4); assert.deepEqual(first, second);
+  await service(); assert.equal(calls, 4);
   const unavailable = await createBestTimeService({ key: () => 'server-only', fetchImpl: async () => { throw new Error('secret'); } })();
   assert.ok(unavailable.every(g => g.baseline === null && g.status === 'unavailable'));
 });

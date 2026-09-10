@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { AppState, Linking, Text, View } from 'react-native';
+import { AppState, Linking, View } from 'react-native';
+import { Text } from '../../theme/primitives';
 import * as Location from 'expo-location';
 import { readRescuePrefetch } from '../background/rescuePrefetch';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -54,26 +55,26 @@ export default function MacroRescue() {
     finally { if (generation === locationGeneration.current) setLocating(false); }
   };
   const switchLocation = (next: 'live' | 'easton') => { locationGeneration.current++; setLocating(false); setMode(next); setRequested(false); setLocation(null); setError(null); };
-  return <View className="my-5 rounded-3xl border border-red-100 bg-white p-5">
-    <Text className="text-xl font-bold text-zinc-950">Late-night macro rescue</Text>
-    {!enabled ? <Text className="mt-2 text-zinc-600">Available 10 PM–midnight Eastern when your daily targets have more than 400 kcal remaining.</Text> : <>
-      <Text className="my-3 text-zinc-600">{Math.round(remaining!.caloriesKcal)} kcal left · P {Math.round(remaining!.proteinG)} · C {Math.round(remaining!.carbsG)} · F {Math.round(remaining!.fatG)} g</Text>
+  return <View className="my-5 rounded-3xl border border-border bg-surface p-5">
+    <Text className="text-xl font-bold text-ink">Late-night macro rescue</Text>
+    {!enabled ? <Text className="mt-2 text-ink">Available 10 PM–midnight Eastern when your daily targets have more than 400 kcal remaining.</Text> : <>
+      <Text className="my-3 text-ink">{Math.round(remaining!.caloriesKcal)} kcal left · P {Math.round(remaining!.proteinG)} · C {Math.round(remaining!.carbsG)} · F {Math.round(remaining!.fatG)} g</Text>
       <View className="flex-row flex-wrap"><Choice label="Live GPS (including Millburn)" selected={mode === 'live'} onPress={() => switchLocation('live')} /><Choice label="Easton Ave, New Brunswick" selected={mode === 'easton'} onPress={() => switchLocation('easton')} /></View>
       <View className="my-2 flex-row flex-wrap"><Choice label="High protein · 20 g+" selected={preference === 'protein'} onPress={() => setPreference('protein')} /><Choice label="Carb-focused · 30 g+" selected={preference === 'carbs'} onPress={() => setPreference('carbs')} /></View>
       <Action label={locating ? 'Getting location…' : search.isFetching ? 'Finding open restaurants…' : 'Find meals that fit'} disabled={locating || search.isFetching} onPress={() => { if (requested && location) void search.refetch(); else void locate(); }} />
-      {location && <Text className="mb-3 text-xs text-zinc-500">Searching within 2.5 km of {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}</Text>}
-      {(error || search.error) && <Text accessibilityRole="alert" className="mb-3 text-red-700">{error ?? search.error?.message}</Text>}
+      {location && <Text className="mb-3 text-xs text-ink">Searching within 1.55 mi of {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}</Text>}
+      {(error || search.error) && <Text accessibilityRole="alert" className="mb-3 text-ink">{error ?? search.error?.message}</Text>}
       {requested && search.data && <>
-        <Text className="mb-3 text-xs font-semibold text-zinc-600">Google Maps · Open when checked {new Date(search.data.checkedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · 4★+ · 20+ reviews</Text>
-        {search.data.matches.filter(match => fitsMacros(match.meal.macros, remaining!, preference)).map(match => <View key={`${match.placeId}/${match.meal.id}`} className="mb-3 rounded-xl bg-zinc-50 p-4">
-          <Text className="font-bold text-zinc-900">{match.restaurant} · {match.rating}★</Text><Text className="mt-1 text-sm text-zinc-600">{match.address}</Text>
-          <Text className="my-2 font-semibold text-zinc-800">{match.meal.name}</Text><Text className="mb-3 text-zinc-600">{match.meal.macros.caloriesKcal} kcal · P {match.meal.macros.proteinG} · C {match.meal.macros.carbsG} · F {match.meal.macros.fatG} g</Text>
+        <Text className="mb-3 text-xs font-semibold text-ink">Google Maps · Open when checked {new Date(search.data.checkedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · 4★+ · 20+ reviews</Text>
+        {search.data.matches.filter(match => fitsMacros(match.meal.macros, remaining!, preference)).map(match => <View key={`${match.placeId}/${match.meal.id}`} className="mb-3 rounded-xl bg-background p-4">
+          <Text className="font-bold text-ink">{match.restaurant} · {match.rating}★</Text><Text className="mt-1 text-sm text-ink">{match.address}</Text>
+          <Text className="my-2 font-semibold text-ink">{match.meal.name}</Text><Text className="mb-3 text-ink">{match.meal.macros.caloriesKcal} kcal · P {match.meal.macros.proteinG} · C {match.meal.macros.carbsG} · F {match.meal.macros.fatG} g</Text>
           <Action secondary label="Restaurant on Google Maps" onPress={() => { void Linking.openURL(match.mapsUrl); }} />
           <Action secondary label="Published nutrition source" onPress={() => { void Linking.openURL(match.meal.sourceUrl); }} />
-          {match.attributions.map((a, i) => <Text key={i} className="text-xs text-zinc-500">{a.provider}</Text>)}
+          {match.attributions.map((a, i) => <Text key={i} className="text-xs text-ink">{a.provider}</Text>)}
         </View>)}
-        {search.data.matches.length === 0 && <Text className="mb-3 text-zinc-700">No verified meals fit all four remaining targets among the nearby open, highly-rated restaurants.</Text>}
-        <Text className="text-xs text-zinc-500">Published standard portions; actual portions and item availability vary. Nutrition coverage currently includes selected Chipotle bowls. {search.data.uncoveredRestaurants} eligible restaurant(s) excluded because verified nutrition is unavailable. Check the restaurant before ordering.</Text>
+        {search.data.matches.length === 0 && <Text className="mb-3 text-ink">No verified meals fit all four remaining targets among the nearby open, highly-rated restaurants.</Text>}
+        <Text className="text-xs text-ink">Published standard portions; actual portions and item availability vary. Nutrition coverage currently includes selected Chipotle bowls. {search.data.uncoveredRestaurants} eligible restaurant(s) excluded because verified nutrition is unavailable. Check the restaurant before ordering.</Text>
       </>}
     </>}
   </View>;

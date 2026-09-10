@@ -11,7 +11,7 @@ function repository(overrides: Partial<TrackingRepository> = {}): TrackingReposi
 }
 test('cloud diary hydration precedes edits; retries write complete totals without double counting', async () => {
   let saved: DailyTotals | null = null;
-  const db = repository({ loadDay: async () => ({ date: '2026-09-07', consumedMacros: macros, consumedMicros: { fiber_g: 3 }, isAdherent: true, bodyWeightKg: 70 }),
+  const db = repository({ loadDay: async () => ({ date: '2026-09-07', consumedMacros: macros, consumedMicros: { fiber_g: 3 }, isAdherent: true, bodyWeightLbs: 70 }),
     saveDay: async (_user, day) => { saved = day; } });
   const store = createNutritionStore({ now: () => date, repository: db });
   await store.getState().saveToday();
@@ -20,7 +20,7 @@ test('cloud diary hydration precedes edits; retries write complete totals withou
   store.getState().addConsumed(macros, { fiber_g: 2 });
   await store.getState().saveToday(); await store.getState().saveToday();
   assert.equal(saved!.consumedMacros.caloriesKcal, 800); assert.equal(saved!.consumedMicros.fiber_g, 5);
-  assert.equal(saved!.bodyWeightKg, 70); assert.equal(saved!.isAdherent, true);
+  assert.equal(saved!.bodyWeightLbs, 70); assert.equal(saved!.isAdherent, true);
 });
 test('cloud loads cannot overwrite concurrent edits, and reset invalidates in-flight loads', async () => {
   let resolve!: (value: DailyTotals | null) => void;
@@ -38,10 +38,10 @@ test('failed workouts retain detached snapshots for retry and cannot move to ano
     saveWorkout: async () => { calls++; if (fail) throw new Error('Offline'); return 'uuid'; } }) });
   store.getState().startSession({ id: 'local-session', name: 'Upper', startedAtMs: 0 });
   store.getState().addExercise({ id: 'row', exercise: { id: 'catalog', name: 'Row' }, defaultRestSeconds: 90 });
-  store.getState().addSet({ id: 'set', sessionExerciseId: 'row', weightKg: 100, reps: 5 }); store.getState().completeSet('set');
-  const finished = store.getState().finishSession(); finished.sets[0].weightKg = 1;
+  store.getState().addSet({ id: 'set', sessionExerciseId: 'row', weightLbs: 100, reps: 5 }); store.getState().completeSet('set');
+  const finished = store.getState().finishSession(); finished.sets[0].weightLbs = 1;
   await store.getState().savePendingWorkouts();
-  assert.equal(store.getState().pendingWorkouts[0].workout.sets[0].weightKg, 100);
+  assert.equal(store.getState().pendingWorkouts[0].workout.sets[0].weightLbs, 100);
   assert.equal(store.getState().pendingWorkouts[0].ownerId, 'alice');
   user = 'bob'; fail = false; await store.getState().savePendingWorkouts(); assert.equal(calls, 1);
   user = 'alice'; await store.getState().savePendingWorkouts();

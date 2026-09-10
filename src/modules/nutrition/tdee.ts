@@ -2,10 +2,10 @@ const MS_PER_DAY = 86_400_000;
 export const POUNDS_PER_KG = 2.2046226218;
 export const KCAL_PER_POUND = 3500;
 
-/** Numeric projection of daily_nutrition_logs; body weight is stored in kilograms. */
+/** Numeric projection of daily_nutrition_logs; convert database kilograms to pounds before calling. */
 export interface TdeeDailyLog {
   log_date: string;
-  body_weight_kg: number | null;
+  body_weight_lbs: number | null;
   calories_kcal: number | null;
   is_adherent: boolean;
 }
@@ -70,13 +70,13 @@ export function calculateTdee(
   const end = options.asOfDate ? dayNumber(options.asOfDate)
     : dated.length ? Math.max(...dated.map(({ day }) => day)) : 0;
   const eligible = dated.filter(({ log, day }) => day <= end && day > end - windowDays
-    && log.is_adherent && log.body_weight_kg !== null && log.calories_kcal !== null)
+    && log.is_adherent && log.body_weight_lbs !== null && log.calories_kcal !== null)
     .sort((a, b) => a.day - b.day);
   const seen = new Set<number>();
   for (const { log, day } of eligible) {
     if (seen.has(day)) throw new RangeError('Duplicate adherent log date.');
     seen.add(day);
-    if (!Number.isFinite(log.body_weight_kg) || log.body_weight_kg! <= 0
+    if (!Number.isFinite(log.body_weight_lbs) || log.body_weight_lbs! <= 0
       || !Number.isFinite(log.calories_kcal) || log.calories_kcal! < 0) {
       throw new RangeError('Adherent weights must be positive and intakes nonnegative, finite numbers.');
     }
@@ -84,7 +84,7 @@ export function calculateTdee(
   const alpha = 2 / (windowDays + 1);
   const weightTrend: WeightTrendPoint[] = [];
   eligible.forEach(({ log, day }, index) => {
-    const weightLbs = log.body_weight_kg! * POUNDS_PER_KG;
+    const weightLbs = log.body_weight_lbs!;
     // Compound decay over calendar gaps rather than treating two distant weights as adjacent days.
     const elapsedAlpha = index ? 1 - (1 - alpha) ** (day - eligible[index - 1].day) : 1;
     weightTrend.push({

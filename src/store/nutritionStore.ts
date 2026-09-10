@@ -21,7 +21,7 @@ export interface NutritionState {
   dailyTargets: NutritionTargets | null;
   activeDiningHall: DiningHallSlug | null;
   isAdherent: boolean;
-  bodyWeightKg: number | null;
+  bodyWeightLbs: number | null;
   cloudOwnerId: string | null;
   cloudDate: string | null;
   syncStatus: 'idle' | 'loading' | 'saving' | 'saved' | 'error';
@@ -31,7 +31,7 @@ export interface NutritionState {
 export interface NutritionActions {
   loadToday: () => Promise<void>;
   saveToday: () => Promise<void>;
-  setBodyWeightKg: (weight: number | null) => void;
+  setBodyWeightLbs: (weight: number | null) => void;
   setConsumed: (macros: MacroTotals, micronutrients?: MicronutrientTotals) => void;
   addConsumed: (macros: MacroTotals, micronutrients?: MicronutrientTotals) => void;
   setDailyTargets: (targets: NutritionTargets | null) => void;
@@ -91,7 +91,7 @@ function freshDay(now: Date) {
     consumedMacros: emptyMacros(),
     consumedMicros: {} as MicronutrientTotals,
     isAdherent: false,
-    bodyWeightKg: null as number | null,
+    bodyWeightLbs: null as number | null,
     cloudDate: null as string | null,
     syncStatus: 'idle' as const,
     syncError: null as string | null,
@@ -115,16 +115,16 @@ export function createNutritionStore(options: { now?: () => Date; repository?: T
     cloudOwnerId: null,
     dailyTargets: null,
     activeDiningHall: null,
-    setBodyWeightKg: (bodyWeightKg) => {
-      if (bodyWeightKg !== null && (!Number.isFinite(bodyWeightKg) || bodyWeightKg < 1 || bodyWeightKg > 1000)) throw new RangeError('Weight must be 1–1000 kg.');
-      get().syncToday(); set({ bodyWeightKg, syncStatus: 'idle' });
+    setBodyWeightLbs: (bodyWeightLbs) => {
+      if (bodyWeightLbs !== null && (!Number.isFinite(bodyWeightLbs) || bodyWeightLbs < 2 || bodyWeightLbs > 2204)) throw new RangeError('Weight must be 2–2204 lbs.');
+      get().syncToday(); set({ bodyWeightLbs, syncStatus: 'idle' });
     },
     loadToday: async () => {
       if (options.durable && syncBridge.refresh) return syncBridge.refresh();
       if (inFlight) return;
       get().syncToday();
       const snapshot = get();
-      if (Object.values(snapshot.consumedMacros).some(value => value !== 0) || Object.keys(snapshot.consumedMicros).length || snapshot.bodyWeightKg !== null || snapshot.isAdherent) {
+      if (Object.values(snapshot.consumedMacros).some(value => value !== 0) || Object.keys(snapshot.consumedMicros).length || snapshot.bodyWeightLbs !== null || snapshot.isAdherent) {
         set({ syncStatus: 'error', syncError: 'Load the cloud diary before entering local totals, or save your current edits.' }); return;
       }
       const token = generation; inFlight = true; set({ syncStatus: 'loading', syncError: null });
@@ -134,9 +134,9 @@ export function createNutritionStore(options: { now?: () => Date; repository?: T
         const day = await db.loadDay(owner, snapshot.date);
         if (token !== generation) return;
         if (get().date !== snapshot.date || get().consumedMacros !== snapshot.consumedMacros
-          || get().consumedMicros !== snapshot.consumedMicros || get().bodyWeightKg !== snapshot.bodyWeightKg || get().isAdherent !== snapshot.isAdherent) throw new Error('Diary changed while loading. Try again without editing.');
+          || get().consumedMicros !== snapshot.consumedMicros || get().bodyWeightLbs !== snapshot.bodyWeightLbs || get().isAdherent !== snapshot.isAdherent) throw new Error('Diary changed while loading. Try again without editing.');
         set({ ...(day ? { consumedMacros: copyMacros(day.consumedMacros), consumedMicros: copyMicros(day.consumedMicros),
-          bodyWeightKg: day.bodyWeightKg, isAdherent: day.isAdherent } : {}),
+          bodyWeightLbs: day.bodyWeightLbs, isAdherent: day.isAdherent } : {}),
           cloudOwnerId: owner, cloudDate: snapshot.date, syncStatus: 'saved' });
       } catch (error) { if (token === generation) set({ syncStatus: 'error', syncError: error instanceof Error ? error.message : 'Cloud load failed.' }); }
       finally { inFlight = false; }
@@ -158,7 +158,7 @@ export function createNutritionStore(options: { now?: () => Date; repository?: T
         await db.saveDay(owner, snapshot);
         if (token === generation && get().date === snapshot.date) set({ cloudDate: snapshot.date,
           syncStatus: get().consumedMacros === snapshot.consumedMacros && get().consumedMicros === snapshot.consumedMicros
-            && get().bodyWeightKg === snapshot.bodyWeightKg && get().isAdherent === snapshot.isAdherent ? 'saved' : 'idle' });
+            && get().bodyWeightLbs === snapshot.bodyWeightLbs && get().isAdherent === snapshot.isAdherent ? 'saved' : 'idle' });
       } catch (error) { if (token === generation) set({ syncStatus: 'error', syncError: error instanceof Error ? error.message : 'Cloud save failed.' }); }
       finally { inFlight = false; }
     },

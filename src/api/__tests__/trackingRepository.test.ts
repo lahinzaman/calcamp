@@ -22,7 +22,7 @@ test('real supabase-js sends owner-scoped, duplicate-safe writes and omits gener
   const repo = createTrackingRepository(client); const user = await repo.userId();
   const workout: CompletedWorkout = { session: { id: 'local-123', name: 'Upper A', startedAtMs: 1_000 }, endedAtMs: 61_000,
     exercises: [{ id: 'first', exercise: { id: '10000000-0000-4000-8000-000000000001', name: 'Row' }, defaultRestSeconds: 90 }],
-    sets: [{ id: 'set', sessionExerciseId: 'first', weightKg: 100, reps: 5, rpe: 8, isWarmup: false, restSeconds: 90, estimatedOneRepMaxKg: 112.5, completedAtMs: 30_000 }] };
+    sets: [{ id: 'set', sessionExerciseId: 'first', weightLbs: 100, reps: 5, rpe: 8, isWarmup: false, restSeconds: 90, estimatedOneRepMaxLbs: 112.5, completedAtMs: 30_000 }] };
   await assert.rejects(repo.saveWorkout(user, workout), /Transient failure/);
   assert.equal(finished, false);
   const firstId = (requests.find(r => r.table === 'workouts' && r.method === 'POST')!.body as Record<string, unknown>).id;
@@ -35,7 +35,7 @@ test('real supabase-js sends owner-scoped, duplicate-safe writes and omits gener
   assert.ok(!JSON.stringify(requests.map(r => r.body)).includes('volume_kg_reps'));
   await repo.saveWorkout(user, workout); assert.equal(requests.filter(r => r.table === 'sets').length, 2);
   await repo.saveDay(user, { date: '2026-09-07', consumedMacros: { caloriesKcal: 200, proteinG: 10, carbsG: 20, fatG: 8 },
-    consumedMicros: { sodium_mg: 100 }, bodyWeightKg: 70, isAdherent: true });
+    consumedMicros: { sodium_mg: 100 }, bodyWeightLbs: 70, isAdherent: true });
   const daily = requests.find(r => r.table === 'daily_nutrition_logs')!;
   assert.equal((daily.body as Record<string, unknown>).user_id, user);
   assert.ok(daily.query.includes('on_conflict=user_id%2Clog_date'));

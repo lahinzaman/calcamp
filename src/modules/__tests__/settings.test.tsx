@@ -5,7 +5,14 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Session } from '@supabase/supabase-js';
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, __DEV__: true });
-mock.module('react-native', { namedExports: { View: 'View', Text: 'Text', Pressable: 'Pressable', TextInput: 'TextInput', ScrollView: 'ScrollView', Modal: 'Modal', KeyboardAvoidingView: 'KeyboardAvoidingView', Platform: { OS: 'ios', Version: '18.0' }, Linking: { openURL: async () => {} } } });
+mock.module('nativewind', { namedExports: { cssInterop: () => {}, vars: (value: unknown) => value } });
+const transition = { duration: () => ({ reduceMotion: () => undefined }) };
+mock.module('react-native-reanimated', { defaultExport: { View: 'AnimatedView', createAnimatedComponent: (component: unknown) => component }, namedExports: {
+  ReduceMotion: { System: 'system' }, LinearTransition: transition, FadeInDown: transition, FadeOutUp: transition, useReducedMotion: () => false,
+  useSharedValue: (value: unknown) => React.useRef({ value }).current,
+  useAnimatedStyle: (fn: () => unknown) => fn(), withTiming: (value: unknown) => value,
+} });
+mock.module('react-native', { namedExports: { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1, scale: 3 }), View: 'View', Text: 'Text', Pressable: 'Pressable', TextInput: 'TextInput', ScrollView: 'ScrollView', Modal: 'Modal', KeyboardAvoidingView: 'KeyboardAvoidingView', Platform: { OS: 'ios', Version: '18.0' }, Linking: { openURL: async () => {} } } });
 mock.module('react-native-safe-area-context', { namedExports: { SafeAreaView: 'SafeAreaView' } });
 mock.module('expo-application', { namedExports: { nativeApplicationVersion: '1.0.0', nativeBuildVersion: '5' } });
 mock.module('expo-constants', { defaultExport: { expoConfig: {} } });
@@ -20,24 +27,35 @@ mock.module('../../api/supabase', { namedExports: { getSupabase: () => ({ rpc: a
   return { error: submits === 1 ? { code: 'NETWORK' } : null };
 } }) } });
 const { authStore } = require('../../store/authStore') as typeof import('../../store/authStore');
+const { FeedbackModal } = require('../feedback/FeedbackModal') as typeof import('../feedback/FeedbackModal');
+const { DeleteAccountModal } = require('../account/DeleteAccountModal') as typeof import('../account/DeleteAccountModal');
+const { useSyncStatus } = require('../../store/syncStore') as typeof import('../../store/syncStore');
 const { default: SettingsScreen } = require('../settings/SettingsScreen') as typeof import('../settings/SettingsScreen');
-test('settings mounts app info, retains feedback across failed submission, and confirms deletion explicitly', async () => {
+test('feedback and deletion remain functional as standalone account modules', async () => {
   authStore.setState({ session: { user: { id: 'alice' } } as Session });
   const client = new QueryClient(); let view!: ReactTestRenderer;
   const text = () => JSON.stringify(view.toJSON());
   const button = (label: string) => view.root.findAllByType('Pressable' as React.ElementType).find(node => node.findAllByType('Text' as React.ElementType).some(child => child.props.children === label))!;
   try {
-    await act(async () => { view = create(<QueryClientProvider client={client}><SettingsScreen /></QueryClientProvider>); });
-    assert.ok(text().includes('8f4a2b99')); assert.ok(text().includes('App Info'));
-    await act(async () => button('Check for Updates').props.onPress()); assert.ok(text().includes('installed release build'));
-    await act(async () => button('Send feedback or report a bug').props.onPress());
+    await act(async () => { view = create(<QueryClientProvider client={client}><FeedbackModal onClose={()=>{}} /></QueryClientProvider>); });
     await act(async () => view.root.findByProps({ accessibilityLabel: 'Your feedback' }).props.onChangeText('The dining menu could be clearer.'));
     await act(async () => button('Send report').props.onPress()); assert.ok(text().includes('draft is still here'));
     assert.equal(view.root.findByProps({ accessibilityLabel: 'Your feedback' }).props.value, 'The dining menu could be clearer.');
     await act(async () => button('Send report').props.onPress()); assert.deepEqual(ids, ['retry-id','retry-id']); assert.ok(text().includes('report has been saved'));
-    await act(async () => button('Close').props.onPress());
-    await act(async () => button('Delete account').props.onPress()); assert.equal(button('Delete my account').props.disabled, true); assert.equal(deleted, 0);
+    await act(async () => view.update(<QueryClientProvider client={client}><DeleteAccountModal onClose={()=>{}} /></QueryClientProvider>)); assert.equal(button('Delete my account').props.disabled, true); assert.equal(deleted, 0);
     await act(async () => view.root.findByProps({ accessibilityLabel: 'Type DELETE to confirm' }).props.onChangeText('DELETE'));
     await act(async () => button('Delete my account').props.onPress()); assert.equal(deleted, 1);
   } finally { await act(async () => view?.unmount()); client.clear(); authStore.setState({ session: null }); }
+});
+
+test('Settings only reports real backend and diary state, never synced while offline or queued', async()=>{
+ const client=new QueryClient({defaultOptions:{queries:{staleTime:Infinity,retry:false}}});client.setQueryData(['service-health'],true);
+ useSyncStatus.setState({ready:true,online:true,queued:0,blocked:0,syncing:false,error:null,lastSyncedAt:Date.now()});
+ let view!:ReactTestRenderer;
+ try{
+  await act(async()=>{view=create(<QueryClientProvider client={client}><SettingsScreen/></QueryClientProvider>);});
+  assert.ok(JSON.stringify(view.toJSON()).includes('Synced'));assert.equal(view.root.findAllByType('Pressable' as React.ElementType).length,0);
+  await act(async()=>useSyncStatus.setState({online:false}));assert.ok(JSON.stringify(view.toJSON()).includes('Offline'));assert.ok(!JSON.stringify(view.toJSON()).includes('Synced'));
+  await act(async()=>useSyncStatus.setState({online:true,queued:2}));assert.ok(JSON.stringify(view.toJSON()).includes('2 queued'));
+ }finally{await act(async()=>view.unmount());client.clear();}
 });

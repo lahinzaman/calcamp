@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
-import { Modal, ScrollView, Text } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Modal, ScrollView } from 'react-native';
+import { Text } from '../../theme/primitives';
+import { SafeAreaView } from '../../theme/SafeArea';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../store/authStore';
 import { Action, Field } from '../../components/FormControls';
@@ -15,13 +16,13 @@ export function DeleteAccountModal({ onClose }: { onClose: () => void }) {
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Deletion unavailable. Please retry.'); }
     finally { deleting.current = false; setBusy(false); }
   };
-  return <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { if (!busy) onClose(); }}><SafeAreaView style={{ flex: 1, backgroundColor: '#FAFAFA' }}>
+  return <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { if (!busy) onClose(); }}><SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }}>
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24 }}>
-      <Text className="mb-4 text-2xl font-bold text-red-800">Delete account permanently</Text>
-      <Text className="mb-4 text-base text-zinc-700">This removes your sign-in, cloud diary, workouts, activity backups, feedback and device diary, including unsynced edits. Food recognition history is removed when configured. This cannot be undone.</Text>
-      <Text className="mb-4 text-zinc-600">Copies you exported to Apple Health or Health Connect remain under your control in those apps. Service backups and logs follow the privacy policy’s retention schedule.</Text>
+      <Text className="mb-4 text-2xl font-bold text-ink">Delete account permanently</Text>
+      <Text className="mb-4 text-base text-ink">This removes your sign-in, cloud diary, workouts, activity backups, feedback and device diary, including unsynced edits. Food recognition history is removed when configured. This cannot be undone.</Text>
+      <Text className="mb-4 text-ink">Copies you exported to Apple Health or Health Connect remain under your control in those apps. Service backups and logs follow the privacy policy’s retention schedule.</Text>
       <Field label="Type DELETE to confirm" autoCapitalize="characters" autoCorrect={false} editable={!busy} value={confirmation} onChangeText={setConfirmation} />
-      {error && <Text accessibilityRole="alert" className="mb-4 text-red-800">{error}</Text>}
+      {error && <Text accessibilityRole="alert" className="mb-4 text-ink">{error}</Text>}
       <Action label={busy ? 'Deleting account…' : 'Delete my account'} disabled={busy || confirmation !== 'DELETE'} onPress={() => void remove()} />
       <Action label="Cancel" secondary disabled={busy} onPress={onClose} />
     </ScrollView>

@@ -1,3 +1,5 @@
+import type { WorkoutRoutine } from '../workout/routines';
+import { migrateImperialSnapshot } from './imperialMigration';
 import { breadcrumb } from '../telemetry/events';
 import type { ActivitySnapshot } from '../../api/activity';
 import type { DailyTotals } from '../../api/trackingRepository';
@@ -6,15 +8,15 @@ import type { WorkoutState } from '../../store/workoutStore';
 import type { HealthSummary, HealthWorkout, HealthMeal } from '../health/types';
 import type { CompletedWorkout } from '../../types/workout';
 import type { DurableStorage } from './storage';
-export interface NutritionMutation { date: string; macros: MacroTotals; micros: MicronutrientTotals; patch: { isAdherent?: boolean; bodyWeightKg?: number | null } }
-export type SyncPayload = { kind: 'nutrition'; data: NutritionMutation } | { kind: 'workout'; data: CompletedWorkout }
+export interface NutritionMutation { legacyMetricPatch?: { isAdherent?: boolean; bodyWeightKg?: number | null }; date: string; macros: MacroTotals; micros: MicronutrientTotals; patch: { isAdherent?: boolean; bodyWeightLbs?: number | null } }
+export type SyncPayload = { kind: 'routine'; data: WorkoutRoutine } | { kind: 'nutrition'; data: NutritionMutation } | { kind: 'workout'; data: CompletedWorkout }
   | { kind: 'health-workout'; data: HealthWorkout } | { kind: 'health-meal'; data: HealthMeal } | { kind: 'activity'; data: ActivitySnapshot };
 export type Mutation = SyncPayload & { id: string; attempts: number; nextAttemptAt: number; blocked: boolean; error: string | null };
 export interface AccountData {
-  version: 1; days: Record<string, DailyTotals>; workout: WorkoutState | null; queue: Mutation[]; workoutReceipts: string[];
+  version: 2; routines?: WorkoutRoutine[]; days: Record<string, DailyTotals>; workout: WorkoutState | null; queue: Mutation[]; workoutReceipts: string[];
   health: { enabled: boolean; summary: HealthSummary | null; workouts: HealthWorkout[]; lastBatchAt: number | null; error: string | null; exported: string[] };
 }
-const fresh = (): AccountData => ({ version: 1, days: {}, workout: null, queue: [], workoutReceipts: [], health: { enabled: false, summary: null, workouts: [], lastBatchAt: null, error: null, exported: [] } });
+const fresh = (): AccountData => ({ version: 2, days: {}, workout: null, queue: [], workoutReceipts: [], health: { enabled: false, summary: null, workouts: [], lastBatchAt: null, error: null, exported: [] } });
 export function retryDelay(attempt: number, random = Math.random) { return Math.min(300_000, Math.round(1000 * 2 ** Math.min(attempt, 9) * (0.8 + random() * 0.4))); }
 export function isPermanent(error: unknown) {
   const e = error as { code?: string; status?: number };
@@ -37,8 +39,8 @@ export class SyncEngine {
   activate(owner: string | null) {
     if (this.owner === owner) return;
     const raw = owner ? this.storage.get(`account:${owner}`) : null;
-    const data: AccountData = raw ? JSON.parse(raw) : fresh();
-    if (data.version !== 1 || !Array.isArray(data.queue) || !data.days || !data.health) throw new Error('Offline storage needs recovery. Local data has been preserved.');
+    const data: AccountData = raw ? migrateImperialSnapshot(JSON.parse(raw)) as AccountData : fresh();
+    if (data.version !== 2 || !Array.isArray(data.queue) || !data.days || !data.health) throw new Error('Offline storage needs recovery. Local data has been preserved.');
     data.workoutReceipts ??= [];
     this.lastAckAt = null; this.generation++; this.revision++; this.owner = owner; this.data = data; this.storageError = null; this.changed();
   }
@@ -55,14 +57,14 @@ export class SyncEngine {
     this.commit({ ...this.data, ...update, queue: [...this.data.queue.filter(q => !(payload.kind === 'activity' && q.kind === 'activity' && q.data.date === payload.data.date && q.data.source === payload.data.source)), { ...payload, id, attempts: 0, nextAttemptAt: 0, blocked: false, error: null }] });
   }
   recordNutrition(next: DailyTotals, previous: DailyTotals, id: string) {
-    const old = next.date === previous.date ? previous : { ...previous, consumedMacros: emptyMacros(), consumedMicros: {}, isAdherent: false, bodyWeightKg: null };
+    const old = next.date === previous.date ? previous : { ...previous, consumedMacros: emptyMacros(), consumedMicros: {}, isAdherent: false, bodyWeightLbs: null };
     const macros = emptyMacros(); const micros: MicronutrientTotals = {}; const patch: NutritionMutation['patch'] = {};
     for (const k of Object.keys(macros) as (keyof MacroTotals)[]) macros[k] = next.consumedMacros[k] - old.consumedMacros[k];
     for (const k of new Set([...Object.keys(old.consumedMicros), ...Object.keys(next.consumedMicros)]) as Set<keyof MicronutrientTotals>) {
       const delta = (next.consumedMicros[k] ?? 0) - (old.consumedMicros[k] ?? 0); if (delta || (!(k in old.consumedMicros) && k in next.consumedMicros)) micros[k] = delta;
     }
     if (next.isAdherent !== old.isAdherent) patch.isAdherent = next.isAdherent;
-    if (next.bodyWeightKg !== old.bodyWeightKg) patch.bodyWeightKg = next.bodyWeightKg;
+    if (next.bodyWeightLbs !== old.bodyWeightLbs) patch.bodyWeightLbs = next.bodyWeightLbs;
     const days = { ...this.data.days, [next.date]: next };
     if (Object.values(macros).some(Boolean) || Object.keys(micros).length || Object.keys(patch).length) this.queue({ kind: 'nutrition', data: { date: next.date, macros, micros, patch } }, id, { days });
     else this.commit({ ...this.data, days });

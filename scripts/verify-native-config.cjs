@@ -9,6 +9,12 @@ for (const variant of ['development', 'preview', 'production']) {
   const config = JSON.parse(result.stdout);
   const ios = config._internal.modResults.ios;
   const android = config._internal.modResults.android;
+  assert.equal(config.name, variant === 'production' ? 'CalCamp' : `CalCamp ${variant === 'development' ? 'Dev' : 'Preview'}`);
+  assert.equal(ios.infoPlist.CFBundleDisplayName, config.name);
+  assert.deepEqual(ios.infoPlist.UIAppFonts, ['Manjari_100Thin.ttf', 'Manjari_400Regular.ttf', 'Manjari_700Bold.ttf']);
+  const authScheme = variant === 'production' ? 'calcamp' : `calcamp-${variant}`;
+  assert.ok(ios.infoPlist.CFBundleURLTypes.some(type => type.CFBundleURLSchemes.includes(authScheme)));
+  assert.equal(android.strings.resources.string.find(entry => entry.$.name === 'app_name')._, config.name);
   const profile = require('../eas.json').build[variant];
   assert.equal(profile.channel, { development: 'development', preview: 'testing', production: 'production' }[variant]);
   assert.equal(config.runtimeVersion.policy, 'fingerprint');
@@ -18,6 +24,8 @@ for (const variant of ['development', 'preview', 'production']) {
   assert.equal(ios.expoPlist.EXUpdatesLaunchWaitMs, 0);
   assert.equal(ios.expoPlist.EXUpdatesRuntimeVersion, 'file:fingerprint');
   assert.equal(ios.entitlements['com.apple.developer.healthkit'], true);
+  assert.ok(ios.infoPlist.NSCameraUsageDescription?.includes('CalCamp'));
+  assert.equal(ios.entitlements['com.apple.developer.applesignin'], undefined);
   assert.ok(ios.infoPlist.NSHealthShareUsageDescription);
   assert.ok(ios.infoPlist.NSHealthUpdateUsageDescription);
   assert.ok(ios.infoPlist.NSLocationWhenInUseUsageDescription);
@@ -31,6 +39,8 @@ for (const variant of ['development', 'preview', 'production']) {
   const manifest = android.manifest.manifest;
   const permissions = manifest['uses-permission'].map(p => p.$['android:name']);
   for (const permission of ['READ_STEPS', 'READ_ACTIVE_CALORIES_BURNED', 'WRITE_EXERCISE', 'WRITE_NUTRITION']) assert.ok(permissions.includes(`android.permission.health.${permission}`));
+  assert.ok(permissions.includes('android.permission.CAMERA'));
+  assert.ok(!permissions.includes('android.permission.RECORD_AUDIO'));
   for (const permission of ['ACCESS_BACKGROUND_LOCATION', 'POST_NOTIFICATIONS']) assert.ok(permissions.includes(`android.permission.${permission}`));
   assert.equal(manifest.application[0].$['android:usesCleartextTraffic'], String(variant === 'development'));
   assert.ok(manifest.application[0]['activity-alias'].some(a => a.$['android:name'] === 'ViewPermissionUsageActivity'));
@@ -39,5 +49,5 @@ for (const variant of ['development', 'preview', 'production']) {
   const metadata = manifest.application[0]['meta-data'];
   assert.equal(metadata.find(m => m.$['android:name'] === 'expo.modules.updates.ENABLED').$['android:value'], 'true');
   assert.equal(metadata.find(m => m.$['android:name'] === 'expo.modules.updates.EXPO_UPDATE_URL').$['android:value'], config.updates.url);
-  console.log(`${variant}: OTA fingerprint, channel, native permissions, HealthKit, Health Connect, Mapbox, background scheduling, SQLite, and transport policy verified.`);
+  console.log(`${variant}: OTA fingerprint, channel, native permissions, HealthKit, Health Connect, Mapbox, background scheduling, SQLite, camera/barcodes without microphone permission, and transport policy verified.`);
 }

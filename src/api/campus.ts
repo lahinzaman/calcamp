@@ -23,7 +23,7 @@ async function campusRequest<T>(path: string, signal: AbortSignal, body?: unknow
   } finally { clearTimeout(timer); signal.removeEventListener('abort', cancel); }
 }
 export async function fetchGymBaselines(signal: AbortSignal): Promise<GymBaseline[]> {
-  const key = 'campus:gyms'; let cached: { data: GymBaseline[]; at: number } | null = null;
+  const key = 'campus:gyms:v2'; let cached: { data: GymBaseline[]; at: number } | null = null;
   try { const raw = durableStorage.get(key); cached = raw ? JSON.parse(raw) : null; } catch { /* Cache failure never blocks a live read. */ }
   if (signal.aborted) throw new Error('Request cancelled.');
   if (cached && (!Number.isFinite(cached.at) || !Array.isArray(cached.data) || cached.data.some(g => !g || typeof g.slug !== 'string' || (g.baseline !== null && (!Number.isFinite(g.baseline) || g.baseline < 0 || g.baseline > 100))))) cached = null;

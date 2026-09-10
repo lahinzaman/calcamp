@@ -9,7 +9,7 @@ export function getSupabase(): SupabaseClient {
   const key = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) throw new Error('Configure the public Supabase URL and publishable key.');
   client = createClient(url, key, { global: { fetch: boundedFetch }, auth: {
-    storage: authStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false,
+    storage: authStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, flowType: 'pkce',
   } });
   return client;
 }

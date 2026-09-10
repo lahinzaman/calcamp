@@ -53,6 +53,6 @@ if (require.main === module) {
     throw new Error('PORT must be an integer from 1 through 65535.');
   }
   app.listen(port, () => {
-    console.log(`RULocked API listening on port ${port}`);
+    console.log(`CalCamp API listening on port ${port}`);
   });
 }

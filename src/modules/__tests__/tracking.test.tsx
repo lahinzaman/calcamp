@@ -8,9 +8,16 @@ import type { DailyMenuItem } from '../../types/nutrislice';
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, __DEV__: true });
 // Native host components only are mocked. Screens, hooks, stores, and Query are real.
+mock.module('nativewind', { namedExports: { cssInterop: () => {}, vars: (value: unknown) => value } });
+const transition = { duration: () => ({ reduceMotion: () => undefined }) };
+mock.module('react-native-reanimated', { defaultExport: { View: 'AnimatedView', createAnimatedComponent: (component: unknown) => component }, namedExports: {
+  ReduceMotion: { System: 'system' }, LinearTransition: transition, FadeInDown: transition, FadeOutUp: transition, useReducedMotion: () => false,
+  useSharedValue: (value: unknown) => React.useRef({ value }).current,
+  useAnimatedStyle: (fn: () => unknown) => fn(), withTiming: (value: unknown) => value,
+} });
 mock.module('react-native', { namedExports: {
-  View: 'View', Text: 'Text', Pressable: 'Pressable', TextInput: 'TextInput',
-  ScrollView: 'ScrollView', Modal: 'Modal', ActivityIndicator: 'ActivityIndicator',
+  useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1, scale: 3 }), View: 'View', Text: 'Text', Pressable: 'Pressable', TextInput: 'TextInput',
+  ScrollView: 'ScrollView', Modal: 'Modal', KeyboardAvoidingView: 'KeyboardAvoidingView', ActivityIndicator: 'ActivityIndicator',
   AppState: { addEventListener: () => ({ remove() {} }) }, Platform: { OS: 'web' },
   SectionList: (props: SectionListProps<DailyMenuItem, { title: string; data: DailyMenuItem[] }>) => <>
     {props.ListHeaderComponent as React.ReactNode}
@@ -28,6 +35,8 @@ mock.module('@shopify/flash-list', { namedExports: {
   </>,
   useRecyclingState: (value: unknown) => React.useState(value),
 } });
+mock.module('lottie-react-native', { defaultExport: 'LottieView' });
+mock.module('expo-crypto', { namedExports: { randomUUID: () => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' } });
 mock.module('expo-location', { namedExports: { requestForegroundPermissionsAsync: async () => ({ granted: false }), getCurrentPositionAsync: async () => ({ coords: { latitude: 0, longitude: 0 } }), Accuracy: { Balanced: 3 } } });
 mock.module('react-native-safe-area-context', { namedExports: { SafeAreaView: 'SafeAreaView' } });
 
@@ -68,7 +77,8 @@ test('dining screen mounts, changes hall, and logs corrected food into the real 
   await act(async () => rendered!.root.findAllByType('Pressable' as React.ElementType).find((node) => node.findAllByType('Text' as React.ElementType).some((text) => text.props.children === 'Confirm log'))!.props.onPress());
   assert.equal(nutritionStore.getState().consumedMacros.caloriesKcal, 400);
   assert.equal(nutritionStore.getState().consumedMicros.fiber_g, 4);
-  await act(async () => findLabel('The Atrium').props.onPress());
+  await act(async () => findLabel('Dining hall: Busch Dining Hall').props.onPress());
+  await act(async () => rendered!.root.findAllByType('Pressable' as React.ElementType).find(n=>n.props.accessibilityRole==='radio' && n.findAllByType('Text' as React.ElementType).some(t=>Array.isArray(t.props.children) && t.props.children.includes('The Atrium')))?.props.onPress());
   assert.equal(nutritionStore.getState().activeDiningHall, 'the-atrium');
   assert.ok(textContent().includes('No menu published'));
 });
@@ -78,14 +88,14 @@ test('workout screen mounts an active session, estimates 1RM, and completes a se
   store.startSession({ id: 'session', name: 'Upper A' });
   store.addExercise({ id: 'row', exercise: { id: 'lift', name: 'High-Pronated Grip Row' }, defaultRestSeconds: 90 });
   store.addSet({ id: 'set', sessionExerciseId: 'row' });
-  await act(async () => { rendered = create(<ActiveWorkoutScreen previousSets={{ lift: [{ weightKg: 90, reps: 5 }] }} />); });
+  await act(async () => { rendered = create(<ActiveWorkoutScreen previousSets={{ lift: [{ weightLbs: 90, reps: 5 }] }} />); });
   assert.ok(textContent().includes('90 × 5'));
-  await act(async () => findLabel('Weight kg set 1').props.onChangeText('100'));
+  await act(async () => findLabel('Weight lbs set 1').props.onChangeText('100'));
   await act(async () => findLabel('Reps set 1').props.onChangeText('5'));
   await act(async () => findLabel('RPE set 1').props.onChangeText('8'));
-  assert.ok(textContent().includes('112.5 kg'));
+  assert.ok(textContent().includes('112.5 lbs'));
   await act(async () => findLabel('Complete set 1').props.onPress());
-  assert.equal(workoutStore.getState().sets[0].estimatedOneRepMaxKg, 112.5);
+  assert.equal(workoutStore.getState().sets[0].estimatedOneRepMaxLbs, 112.5);
   assert.equal(workoutStore.getState().restTimer?.durationSeconds, 90);
   assert.ok(workoutStore.getState().sets[0].completedAtMs !== null);
 });
@@ -178,4 +188,24 @@ test('walk screen mounts, keeps manual steps usable and explains health sharing 
   await act(async () => findLabel('Manual step count').props.onChangeText('10000')); assert.ok(textContent().includes('Step goal reached.'));
   await act(async () => findLabel('Connect or refresh health').props.onPress());
   assert.equal(rendered!.root.find(node => String(node.type) === 'Modal').props.visible, true); assert.ok(textContent().includes('exported automatically'));
+});
+
+test('CalCamp dashboard mounts real targets and all four training days', async () => {
+  mock.module('expo-router', { namedExports: { router: { push: () => {} } } });
+  const { default: DashboardScreen } = require('../dashboard/DashboardScreen') as typeof import('../dashboard/DashboardScreen');
+  nutritionStore.getState().setDailyTargets({ macros: { caloriesKcal: 2400, proteinG: 150, carbsG: 270, fatG: 80 }, micronutrients: {} });
+  nutritionStore.getState().setConsumed({ caloriesKcal: 900, proteinG: 60, carbsG: 110, fatG: 25 });
+  await act(async () => { rendered = create(<DashboardScreen />); });
+  assert.ok(textContent().includes('1500 kcal remaining'));
+  for (const plan of ['Upper A','Upper B','Lower A','Lower B']) assert.ok(textContent().includes(plan));
+  assert.equal(rendered!.root.findAllByProps({ accessibilityRole: 'progressbar' }).length, 4);
+});
+
+test('workout templates create actual Lower sessions and removal clears a draft row', async () => {
+  await act(async () => { rendered = create(<ActiveWorkoutScreen />); });
+  const press = (label: string) => rendered!.root.findAllByType('Pressable' as React.ElementType).find(node => node.findAllByType('Text' as React.ElementType).some(text => text.props.children === label))!.props.onPress();
+  await act(async () => press('Lower B')); await act(async () => press('Start session'));
+  assert.equal(workoutStore.getState().activeSession?.name, 'Lower B'); assert.equal(workoutStore.getState().sets.length, 9);
+  assert.equal(workoutStore.getState().exerciseSequence[0].exercise.name, 'Romanian Deadlift');
+  await act(async () => findLabel('Remove set 1').props.onPress()); assert.equal(workoutStore.getState().sets.length, 8);
 });

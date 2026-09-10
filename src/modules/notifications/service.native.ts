@@ -31,7 +31,7 @@ export async function removePushRegistration(owner: string) {
 export function configureNotifications(owner: string, preferences: NotificationPreferences, profile: UserProfile | null, request = false) {
   return serialize(async () => {
     await verifyOwner(owner);
-    if (Platform.OS === 'android') await Notifications.setNotificationChannelAsync(channelId, { name: 'RULocked reminders', importance: Notifications.AndroidImportance.DEFAULT });
+    if (Platform.OS === 'android') await Notifications.setNotificationChannelAsync(channelId, { name: 'CalCamp reminders', importance: Notifications.AndroidImportance.DEFAULT });
     let permission = await Notifications.getPermissionsAsync();
     if (request && preferences.enabled && !permission.granted) permission = await Notifications.requestPermissionsAsync({ ios: { allowAlert: true, allowSound: true, allowBadge: false } });
     const allowed = permission.granted || permission.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;

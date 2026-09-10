@@ -1,3 +1,10 @@
+import { Dropdown } from '../../components/Dropdown';
+import { servingLabel } from './serving';
+import { rescueCatalog } from '../../data/rescueCatalog';
+import { NUTRIENT_UNITS, type NutrientKey } from '../../types/nutrition';
+import { foodEmoji } from './foodEmoji';
+import { AnimatedListCell } from '../../theme/motion';
+import { MacroOverview } from '../../components/MacroOverview';
 import { safelyEdit } from '../../components/safelyEdit';
 import { LoadingCards } from '../../components/LoadingCards';
 import MacroRescue from './MacroRescue';
@@ -5,8 +12,10 @@ import { CloudDiaryControls } from '../../components/CloudDiaryControls';
 import { useQuery } from '@tanstack/react-query';
 import { FlashList } from '@shopify/flash-list';
 import { memo, useEffect, useMemo, useState } from 'react';
-import { Linking, AppState, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Linking, AppState, KeyboardAvoidingView, Platform, Modal, ScrollView, View } from 'react-native';
+import { Pressable } from '../../theme/Pressable';
+import { Text, TextInput } from '../../theme/primitives';
+import { SafeAreaView } from '../../theme/SafeArea';
 
 import { fetchDailyMenu, normalizeMenuDate, NutrisliceError } from '../../api/nutrislice';
 import { DINING_HALLS, type DiningHallSlug } from '../../types/campus';
@@ -22,7 +31,7 @@ const display = (value: number | null) => value === null ? '—' : Number(value.
 const macroFields = [['caloriesKcal', 'Calories · kcal'], ['proteinG', 'Protein · g'], ['carbsG', 'Carbs · g'], ['fatG', 'Fats · g']] as const;
 
 export function FoodLogSheet({ item, onClose, onLogged }: {
-  item: DailyMenuItem; onClose: () => void; onLogged: (name: string) => void;
+  item: Pick<DailyMenuItem, 'id'|'name'|'serving'|'macros'|'nutrients'>; onClose: () => void; onLogged: (name: string) => void;
 }) {
   const [servings, setServings] = useState('1');
   const [fields, setFields] = useState(() => Object.fromEntries(macroFields.map(([key]) => [key, item.macros[key]?.toString() ?? ''])) as Record<keyof MacroTotals, string>);
@@ -37,33 +46,39 @@ export function FoodLogSheet({ item, onClose, onLogged }: {
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Check your portion and macros.'); }
   };
   return (
-    <Modal transparent animationType="slide" visible onRequestClose={onClose}>
-      <View className="flex-1 justify-end bg-black/50">
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerClassName="mx-auto w-full max-w-xl rounded-t-3xl bg-white px-6 pb-12 pt-6" style={{ maxHeight: '90%' }}>
-          <Text className="text-xs font-bold uppercase tracking-widest text-scarlet">Add to today's diary</Text>
-          <Text className="mt-2 text-2xl font-bold text-zinc-950">{item.name}</Text>
-          <Text className="mt-2 text-sm text-zinc-500">{item.serving.label ?? 'One listed serving'} · Confirm or adjust the values per serving.</Text>
-          <Text className="mb-2 mt-5 font-semibold text-zinc-700">Number of servings</Text>
-          <TextInput accessibilityLabel="Number of servings" keyboardType="decimal-pad" value={servings} onChangeText={setServings} className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-lg text-zinc-950" />
+    <Modal presentationStyle="pageSheet" animationType="slide" visible onRequestClose={onClose}>
+      <SafeAreaView className="flex-1 bg-surface"><KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerClassName="mx-auto w-full max-w-xl rounded-t-3xl bg-surface px-6 pb-12 pt-6" style={{ flex: 1 }}>
+          <Text className="text-xs font-bold uppercase tracking-widest text-ink">Add to today's diary</Text>
+          <Text className="mt-2 text-2xl font-bold text-ink">{item.name}</Text>
+          <View className="mt-5 rounded-2xl bg-raised p-4"><Text className="mb-2 font-bold">Serving Size</Text><Text className="text-3xl font-bold">{servingLabel(item.serving)}</Text></View>
+          <Text className="mt-3">Confirm or adjust the values per serving.</Text>
+          <Text className="mb-2 mt-5 font-semibold text-ink">Number of servings</Text>
+          <TextInput accessibilityLabel="Number of servings" keyboardType="decimal-pad" value={servings} onChangeText={setServings} className="rounded-xl border border-border bg-background p-4 text-3xl font-bold text-ink" />
           <View className="mt-4 flex-row flex-wrap gap-3">
             {macroFields.map(([key, label]) => (
               <View key={key} style={{ width: '46%' }}>
-                <Text className="mb-2 text-sm font-medium text-zinc-600">{label}</Text>
-                <TextInput accessibilityLabel={label} keyboardType="decimal-pad" placeholder="Required" value={fields[key]} onChangeText={(value) => setFields((current) => ({ ...current, [key]: value }))} className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-lg text-zinc-950" />
+                <Text className="mb-2 text-sm font-medium text-ink">{label}</Text>
+                <TextInput accessibilityLabel={label} keyboardType="decimal-pad" placeholder="Required" value={fields[key]} onChangeText={(value) => setFields((current) => ({ ...current, [key]: value }))} className="rounded-xl border border-border bg-background p-4 text-3xl font-bold text-ink" />
               </View>
             ))}
           </View>
-          {error && <Text accessibilityRole="alert" className="mt-4 text-sm text-red-700">{error}</Text>}
-          <Pressable accessibilityRole="button" onPress={save} className="mt-6 items-center rounded-2xl bg-scarlet p-4 active:opacity-80"><Text className="font-bold text-white">Confirm log</Text></Pressable>
-          <Pressable accessibilityRole="button" onPress={onClose} className="mt-2 items-center p-4"><Text className="font-semibold text-zinc-600">Cancel</Text></Pressable>
+          <View className="mt-5 rounded-2xl bg-raised p-4"><Text className="mb-3 text-lg font-bold">Other nutrients · per listed serving</Text>
+            {Object.entries(foodLogAmounts(item, 1, {caloriesKcal:0,proteinG:0,carbsG:0,fatG:0}).micros).map(([key,value]) => <View key={key} className="mb-2 flex-row justify-between gap-4"><Text className="flex-1 capitalize">{key.replace(/_(g|mg|mcg)$/, '').replaceAll('_',' ')}</Text><Text>{display(value)} {NUTRIENT_UNITS[key as NutrientKey]}</Text></View>)}
+            {!Object.keys(item.nutrients).length && <Text>Micronutrients not reported. Missing values are not zero.</Text>}
+          </View>
+          {error && <Text accessibilityRole="alert" className="mt-4 text-sm text-ink">{error}</Text>}
+          <Pressable accessibilityRole="button" onPress={save} className="mt-6 items-center rounded-2xl bg-accent p-4 active:opacity-80"><Text className="font-bold text-ink">Confirm log</Text></Pressable>
+          <Pressable accessibilityRole="button" onPress={onClose} className="mt-2 items-center p-4"><Text className="font-semibold text-ink">Cancel</Text></Pressable>
         </ScrollView>
-      </View>
+      </KeyboardAvoidingView></SafeAreaView>
     </Modal>
   );
 }
 
 export default function DiningHallScreen() {
   const hall = useNutritionStore((state) => state.activeDiningHall) ?? 'busch-dining-hall';
+  const [period,setPeriod] = useState<'breakfast'|'lunch'|'dinner'|'takeout'>('lunch');
   const [date, setDate] = useState(() => normalizeMenuDate(new Date()));
   const [selected, setSelected] = useState<DailyMenuItem | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -76,48 +91,48 @@ export default function DiningHallScreen() {
   }, []);
   useEffect(() => { setSelected(null); setNotice(null); }, [hall, date]);
   const menu = useQuery({
+    enabled: period !== 'takeout',
     queryKey: ['nutrislice', hall, date],
     queryFn: ({ signal }) => fetchDailyMenu(hall, date, {
       signal, fallbackBaseUrl: process.env.EXPO_PUBLIC_NUTRISLICE_PROXY_URL || process.env.EXPO_PUBLIC_BACKEND_URL || undefined,
     }),
   });
-  const rows = useMemo<DiningRow[]>(() => menu.isPending || (menu.isError && !menu.data) ? [] : MEAL_TYPES.flatMap(meal => {
+  const rows = useMemo<DiningRow[]>(() => menu.isPending || (menu.isError && !menu.data) ? [] : MEAL_TYPES.filter(meal => meal === period).flatMap(meal => {
     const foods = (menu.data ?? []).filter(item => item.meal === meal);
     return [{ kind: 'heading' as const, id: `heading:${meal}`, meal, count: foods.length },
       ...foods.map(food => ({ kind: 'food' as const, id: `${meal}:${food.id}`, food })),
       ...(!foods.length ? [{ kind: 'empty' as const, id: `empty:${meal}` }] : [])];
-  }), [menu.data, menu.isPending, menu.isError]);
+  }), [menu.data, menu.isPending, menu.isError, period]);
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} className="flex-1 bg-[#F7F7F2]">
-      <FlashList
+    <SafeAreaView edges={['top', 'left', 'right']} className="flex-1 bg-background">
+      <FlashList CellRendererComponent={AnimatedListCell}
         data={rows} keyExtractor={(item) => item.id} getItemType={item => item.kind}
-        contentContainerStyle={{ padding: 20, paddingBottom: 40, maxWidth: 760, width: '100%', alignSelf: 'center' }}
+        contentContainerStyle={{ padding: 20, paddingBottom: 110, maxWidth: 760, width: '100%', alignSelf: 'center' }}
         refreshing={menu.isRefetching} onRefresh={() => { void menu.refetch(); }}
-        ListFooterComponent={MacroRescue}
+        ListFooterComponent={period === 'takeout' ? TakeoutCatalog : undefined}
         ListHeaderComponent={<>
-          {menu.isPending && <LoadingCards label="Loading campus menus…" />}
-          {menu.data?.some(item => item.dataFreshness === 'stale') && <Text className="mb-4 rounded-xl bg-amber-50 p-3 text-amber-900">Showing a saved menu while Rutgers is unavailable. Confirm current portions and availability.</Text>}
-          <View className="mb-6 flex-row items-center justify-between"><Text className="text-sm font-black tracking-widest text-scarlet">RULOCKED</Text><Text className="text-xs font-semibold text-zinc-500">NEW BRUNSWICK</Text></View>
-          <Text className="text-4xl font-bold tracking-tight text-zinc-950">Campus dining</Text>
-          <Text className="mt-2 text-base text-zinc-500">Your campus. Your plate. Your goals.</Text>
-          <DiarySummary date={date} />
+          {period !== 'takeout' && menu.isPending && <LoadingCards label="Loading campus menus…" />}
+          {period !== 'takeout' && menu.data?.some(item => item.dataFreshness === 'stale') && <Text className="mb-4 rounded-xl bg-raised p-3 text-ink">Showing a saved menu while Rutgers is unavailable. Confirm current portions and availability.</Text>}
+          <View className="mb-6 flex-row items-center justify-between"><Text className="text-sm font-black tracking-widest text-ink">CALCAMP</Text><Text className="text-xs font-semibold text-ink">NEW BRUNSWICK</Text></View>
+          <Text className="text-4xl font-bold tracking-tight text-ink">Campus dining</Text>
+          <Text className="mt-2 text-base text-ink">Your campus. Your plate. Your goals.</Text>
+          <MacroOverview />
           <CloudDiaryControls />
-          <View className="mb-4 flex-row gap-2">
-            {(Object.keys(DINING_HALLS) as DiningHallSlug[]).map((slug) => <Pressable key={slug} accessibilityRole="tab" accessibilityLabel={DINING_HALLS[slug]} accessibilityState={{ selected: slug === hall }} onPress={() => nutritionStore.getState().setActiveDiningHall(slug)} className={slug === hall ? 'flex-1 items-center rounded-xl bg-scarlet py-3' : 'flex-1 items-center rounded-xl bg-white py-3'}><Text className={slug === hall ? 'text-xs font-bold text-white' : 'text-xs font-semibold text-zinc-600'}>{HALL_LABELS[slug]}</Text></Pressable>)}
-          </View>
-          <Text className="mb-3 text-sm text-zinc-500">{DINING_HALLS[hall]} · Nutrition per listed serving</Text>
-          {notice && <Text accessibilityRole="alert" className="mb-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</Text>}
+          <Dropdown label="Meal period" value={period} options={[{value:'breakfast',label:'Breakfast'},{value:'lunch',label:'Lunch'},{value:'dinner',label:'Dinner'},{value:'takeout',label:'Takeout'}] as const} onChange={value=>{setSelected(null);setPeriod(value);}} />
+          {period !== 'takeout' && <Dropdown key={period} label="Dining hall" value={hall} options={(Object.keys(DINING_HALLS) as DiningHallSlug[]).map(value=>({value,label:DINING_HALLS[value]}))} onChange={value=>nutritionStore.getState().setActiveDiningHall(value)} />}
+          <Text className="mb-3 text-sm text-ink">{period === 'takeout' ? 'Published takeout references' : DINING_HALLS[hall]} · Nutrition per listed serving</Text>
+          {notice && <Text accessibilityRole="alert" className="mb-3 rounded-xl bg-raised p-3 text-sm text-ink">{notice}</Text>}
 
-          {menu.error instanceof NutrisliceError && !!menu.error.fallbackMeals?.length && <View className="mb-4 rounded-2xl bg-amber-50 p-4">
-            <Text className="font-bold text-amber-950">Published takeout alternatives</Text>
-            <Text className="mt-2 text-sm text-amber-900">Campus menus are unavailable. These catalog meals are reference options; opening hours, availability and current portions have not been verified.</Text>
+          {period !== 'takeout' && menu.error instanceof NutrisliceError && !!menu.error.fallbackMeals?.length && <View className="mb-4 rounded-2xl bg-raised p-4">
+            <Text className="font-bold text-ink">Published takeout alternatives</Text>
+            <Text className="mt-2 text-sm text-ink">Campus menus are unavailable. These catalog meals are reference options; opening hours, availability and current portions have not been verified.</Text>
             {menu.error.fallbackMeals.map(meal => <View key={meal.id} className="mt-3"><Text className="font-semibold">{meal.name}</Text><Text className="mt-1 text-sm">{meal.macros.caloriesKcal} kcal · P {meal.macros.proteinG}g · C {meal.macros.carbsG}g · F {meal.macros.fatG}g</Text><Pressable accessibilityRole="link" onPress={() => { void Linking.openURL(meal.sourceUrl).catch(() => setNotice('Unable to open nutrition source. Try again when connected.')); }}><Text className="mt-2 text-sm underline">Nutrition source · reviewed {meal.reviewedAt}</Text></Pressable></View>)}
           </View>}
-          {menu.isError && <View className="rounded-2xl bg-red-50 p-4"><Text accessibilityRole="alert" className="font-semibold text-red-800">Menu unavailable</Text><Text className="mt-1 text-sm text-red-700">{menu.data ? 'Showing the last loaded menu. Pull to refresh.' : 'We could not reach campus dining. Please try again.'}</Text><Pressable accessibilityRole="button" onPress={() => { void menu.refetch(); }} className="mt-3 py-2"><Text className="font-bold text-red-800">Retry menu</Text></Pressable></View>}
+          {period !== 'takeout' && menu.isError && <View className="rounded-2xl bg-raised p-4"><Text accessibilityRole="alert" className="font-semibold text-ink">Menu unavailable</Text><Text className="mt-1 text-sm text-ink">{menu.data ? 'Showing the last loaded menu. Pull to refresh.' : 'We could not reach campus dining. Please try again.'}</Text><Pressable accessibilityRole="button" onPress={() => { void menu.refetch(); }} className="mt-3 py-2"><Text className="font-bold text-ink">Retry menu</Text></Pressable></View>}
         </>}
-        renderItem={({ item }) => item.kind === 'food' ? <FoodRow item={item.food} onSelect={setSelected} /> : item.kind === 'empty' ? <Text className="mb-3 text-sm text-zinc-500">No menu published for this meal.</Text>
-          : <View className="mb-3 mt-6 flex-row items-center justify-between"><Text className="text-2xl font-bold capitalize text-zinc-950">{item.meal}</Text><Text className="text-xs text-zinc-500">{item.count} items</Text></View>}
+        renderItem={({ item }) => item.kind === 'food' ? <FoodRow item={item.food} onSelect={setSelected} /> : item.kind === 'empty' ? <Text className="mb-3 text-sm text-ink">No menu published for this meal.</Text>
+          : <View className="mb-3 mt-6 flex-row items-center justify-between"><Text className="text-2xl font-bold capitalize text-ink">{item.meal}</Text><Text className="text-xs text-ink">{item.count} items</Text></View>}
       />
       {selected && <FoodLogSheet key={selected.id} item={selected} onClose={() => setSelected(null)} onLogged={(name) => { setSelected(null); setNotice(`${name} added to your diary.`); }} />}
     </SafeAreaView>
@@ -126,19 +141,19 @@ export default function DiningHallScreen() {
 
  type DiningRow = { kind: 'heading'; id: string; meal: string; count: number } | { kind: 'empty'; id: string } | { kind: 'food'; id: string; food: DailyMenuItem };
 const FoodRow = memo(function FoodRow({ item, onSelect }: { item: DailyMenuItem; onSelect: (item: DailyMenuItem) => void }) {
-  return <View className="mb-3 rounded-2xl border border-zinc-100 bg-white p-4">
-          <Text className="text-base font-semibold text-zinc-900">{item.name}</Text>
-          <Text className="mt-1 text-xs text-zinc-500">{item.serving.label ?? 'Serving size not listed'} · {display(item.macros.caloriesKcal)} kcal</Text>
-          <View className="mt-4 flex-row items-center justify-between gap-2"><Text className="flex-1 text-xs font-medium text-zinc-600">P {display(item.macros.proteinG)}g   C {display(item.macros.carbsG)}g   F {display(item.macros.fatG)}g</Text><Pressable accessibilityRole="button" accessibilityLabel={`Log ${item.name} to diary`} onPress={() => onSelect(item)} className="min-h-12 justify-center rounded-xl bg-zinc-100 px-3 py-3 active:bg-zinc-200"><Text className="text-xs font-bold text-zinc-900">Log to Diary +</Text></Pressable></View>
+  return <View className="mb-3 rounded-2xl border border-border bg-surface p-4">
+          <Pressable accessibilityRole="button" accessibilityLabel={`Food details for ${item.name}`} onPress={() => onSelect(item)} className="flex-row items-start gap-3"><Text accessibilityElementsHidden importantForAccessibility="no" className="text-3xl leading-[40px]">{foodEmoji(item.name)}</Text><Text className="flex-1 text-base font-semibold text-ink">{item.name}</Text></Pressable>
+          <Text className="mt-1 text-xs text-ink">{servingLabel(item.serving)} · {display(item.macros.caloriesKcal)} kcal</Text>
+          <View className="mt-4 flex-row items-center justify-between gap-2"><Text className="flex-1 text-xs font-medium text-ink">P {display(item.macros.proteinG)}g   C {display(item.macros.carbsG)}g   F {display(item.macros.fatG)}g</Text><Pressable accessibilityRole="button" accessibilityLabel={`Log ${item.name} to diary`} onPress={() => onSelect(item)} className="min-h-12 justify-center rounded-xl bg-raised px-3 py-3 active:bg-raised"><Text className="text-xs font-bold text-ink">Log to Diary +</Text></Pressable></View>
         </View>;
 });
-function DiarySummary({ date }: { date: string }) {
-  const consumed = useNutritionStore(s => s.consumedMacros); const targets = useNutritionStore(s => s.dailyTargets);
-  return <View className="my-6 rounded-3xl bg-zinc-950 p-5">
-            <View className="flex-row items-center justify-between"><Text className="text-xs font-bold uppercase tracking-widest text-zinc-400">Today's diary</Text><Text className="text-xs text-zinc-400">{date}</Text></View>
-            <View className="mt-3 flex-row items-baseline gap-2"><Text testID="consumed-calories" className="text-4xl font-bold text-white">{Math.round(consumed.caloriesKcal)}</Text><Text className="text-sm text-zinc-400">{targets ? `/ ${targets.macros.caloriesKcal} kcal` : 'kcal logged'}</Text></View>
-            <View className="mt-5 flex-row justify-between border-t border-zinc-700 pt-4">
-              {([['Protein', consumed.proteinG], ['Carbs', consumed.carbsG], ['Fats', consumed.fatG]] as const).map(([label, value]) => <View key={label}><Text className="text-xs text-zinc-400">{label}</Text><Text className="mt-1 text-lg font-semibold text-white">{display(value)} g</Text></View>)}
-            </View>
-          </View>;
+
+function TakeoutCatalog() {
+  const [selected,setSelected]=useState<Parameters<typeof FoodLogSheet>[0]['item']|null>(null);
+  const [notice,setNotice]=useState('');
+  return <View><Text className="mb-3">Standard portions from published menus. Availability and opening hours are not verified here.</Text>
+    {rescueCatalog.flatMap(group=>group.meals.map(meal=><View key={meal.id} className="mb-3 rounded-2xl bg-surface p-4"><Text className="font-bold">{meal.name}</Text><Text className="my-2">{meal.macros.caloriesKcal} kcal · P {meal.macros.proteinG} g · C {meal.macros.carbsG} g · F {meal.macros.fatG} g</Text><Pressable accessibilityRole="button" onPress={()=>setSelected({id:meal.id,name:meal.name,macros:meal.macros,nutrients:{},serving:{amount:8,unit:'oz',label:'8 oz total · two 4 oz ingredients'}})}><Text>Review portion & log</Text></Pressable><Pressable accessibilityRole="link" onPress={()=>{void Linking.openURL(meal.sourceUrl).catch(()=>setNotice('Nutrition source unavailable.'));}}><Text className="underline">Published nutrition · reviewed {meal.reviewedAt}</Text></Pressable></View>))}
+    {!!notice&&<Text accessibilityRole="alert">{notice}</Text>}<MacroRescue/>
+    {selected&&<FoodLogSheet item={selected} onClose={()=>setSelected(null)} onLogged={name=>{setSelected(null);setNotice(`${name} added to diary.`);}}/>}
+  </View>;
 }

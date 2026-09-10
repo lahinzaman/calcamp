@@ -6,8 +6,15 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Session } from '@supabase/supabase-js';
 import type { UserProfile } from '../../types/profile';
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, __DEV__: true });
+mock.module('nativewind', { namedExports: { cssInterop: () => {}, vars: (value: unknown) => value } });
+const transition = { duration: () => ({ reduceMotion: () => undefined }) };
+mock.module('react-native-reanimated', { defaultExport: { View: 'AnimatedView', createAnimatedComponent: (component: unknown) => component }, namedExports: {
+  ReduceMotion: { System: 'system' }, LinearTransition: transition, FadeInDown: transition, FadeOutUp: transition, useReducedMotion: () => false,
+  useSharedValue: (value: unknown) => React.useRef({ value }).current,
+  useAnimatedStyle: (fn: () => unknown) => fn(), withTiming: (value: unknown) => value,
+} });
 mock.module('react-native', { namedExports: {
-  Modal: 'Modal', View: 'View', Text: 'Text', Pressable: 'Pressable', TextInput: 'TextInput', ScrollView: 'ScrollView', Switch: 'Switch', KeyboardAvoidingView: 'KeyboardAvoidingView',
+  Modal: 'Modal', useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1, scale: 3 }), View: 'View', Text: 'Text', Pressable: 'Pressable', TextInput: 'TextInput', ScrollView: 'ScrollView', Switch: 'Switch', KeyboardAvoidingView: 'KeyboardAvoidingView',
   Platform: { OS: 'web' }, AppState: { addEventListener: () => ({ remove() {} }) }, Linking: { openURL: async () => {} },
 } });
 mock.module('react-native-safe-area-context', { namedExports: { SafeAreaView: 'SafeAreaView' } });
@@ -30,6 +37,7 @@ mock.module('../../api/campus.ts', { namedExports: {
   submitGymVote: async (slug: string, status: string) => { voteInput = { slug, status }; },
   fetchMacroRescue: async (location: unknown, remaining: unknown, preference: unknown) => { rescueInput = { location, remaining, preference }; return { matches: [], eligibleRestaurants: 0, uncoveredRestaurants: 0, checkedAt: new Date().toISOString() }; },
 } });
+mock.module('../auth/social', { namedExports: { authRedirect: () => 'calcamp://auth-callback', signInSocial: async () => {} } });
 const { default: AuthScreen } = require('../auth/AuthScreen') as typeof import('../auth/AuthScreen');
 const { default: OnboardingFlow } = require('../onboarding/OnboardingFlow') as typeof import('../onboarding/OnboardingFlow');
 const { default: GymStatus } = require('../busyness/GymStatus') as typeof import('../busyness/GymStatus');
@@ -58,21 +66,21 @@ afterEach(async () => {
 test('auth screen submits credentials and signup opens onboarding without manufacturing a session', async () => {
   await render(<AuthScreen />);
   await type('Email', 'student@example.com'); await type('Password', 'long-password');
-  await press('Sign in'); assert.deepEqual(signInInput, { email: 'student@example.com', password: 'long-password' }); assert.ok(text().includes('Invalid credentials'));
+  await press('Sign in'); assert.deepEqual(signInInput, { email: 'student@example.com', password: 'long-password' }); assert.ok(text().includes('Sign-in could not finish'));
   await press('New here? Create an account'); await press('Create account');
   assert.ok(signupInput); assert.equal(navigated.at(-1), '/onboarding'); assert.equal(authStore.getState().session, null);
 });
 test('onboarding branches to advanced and preserves decimal weight input', async () => {
-  await render(<OnboardingFlow />); await press('Advanced · training days and nutrient timing'); await press('Continue');
+  await render(<OnboardingFlow />); await press('Advanced · structured training'); await press('Continue');
   assert.equal(navigated.at(-1), '/onboarding/basics');
   await act(async () => root!.update(<QueryClientProvider client={cache!}><OnboardingFlow step="basics" /></QueryClientProvider>));
-  await type('Height (cm)', '180'); await type('Weight (kg)', '80.'); await type('Weight (kg)', '80.5'); await press('Continue');
-  assert.equal(useOnboardingStore.getState().draft.weight_kg, 80.5); assert.equal(navigated.at(-1), '/onboarding/advanced');
+  await type('Height · feet', '5'); await type('Height · inches', '11'); await type('Body weight · lbs', '180.'); await type('Body weight · lbs', '180.5'); await type('Age in years', '21'); await press('Calculate my starting budget');
+  assert.equal(useOnboardingStore.getState().draft.weight_lbs, 180.5); assert.equal(navigated.at(-1), '/onboarding/advanced');
 });
 test('advanced onboarding persists targets and timing within the daily budget', async () => {
-  login(); useOnboardingStore.getState().patch({ height_cm: 180, weight_kg: 80, is_advanced_track: true,
+  login(); useOnboardingStore.getState().patch({ height_inches: 71, weight_lbs: 180, lifestyle_survey: {age:21,metabolicSex:"male",composition:"balanced",priority:"energy",recovery:"steady",specializedNutrition:false}, is_advanced_track: true,
     training_targets: { caloriesKcal: 2400, proteinG: 160, carbsG: 300, fatG: 60 }, preworkout_fast_carbs: true, preworkout_carbs_g: 30 });
-  await render(<OnboardingFlow step="review" />); await press('Save profile & enter RULocked');
+  await render(<OnboardingFlow step="review" />); await press('Accept budget & enter CalCamp');
   assert.equal((savedProfile as UserProfile).is_advanced_track, true); assert.equal((savedProfile as UserProfile).preworkout_carbs_g, 30);
   assert.equal(authStore.getState().profile?.onboarding_completed_at, 'now');
 });

@@ -10,7 +10,7 @@ import { SyncEngine } from './engine';
 import { healthStore } from '../health/useHealthSync';
 import { syncBridge } from './bridge';
 let applying = false;
-const daily = (s: DailyTotals): DailyTotals => ({ date: s.date, consumedMacros: s.consumedMacros, consumedMicros: s.consumedMicros, isAdherent: s.isAdherent, bodyWeightKg: s.bodyWeightKg });
+const daily = (s: DailyTotals): DailyTotals => ({ date: s.date, consumedMacros: s.consumedMacros, consumedMicros: s.consumedMicros, isAdherent: s.isAdherent, bodyWeightLbs: s.bodyWeightLbs });
 export const syncEngine = new SyncEngine(durableStorage, async (owner, job) => {
   const { data } = await getSupabase().auth.getSession();
   if (data.session?.user.id !== owner) throw new Error('Sign in to resume synchronization.');
@@ -27,6 +27,7 @@ export const syncEngine = new SyncEngine(durableStorage, async (owner, job) => {
     if (readPreferences(owner).uploadActivity) await (await import('../../api/activity')).saveActivitySnapshot(owner, job.data);
     return;
   }
+  if (job.kind === 'routine') { await (await import('../../api/routines')).saveRoutine(owner, job.data); return; }
   const repository = await getTrackingRepository();
   if (job.kind === 'nutrition') {
     if (!repository.applyNutritionMutation) throw new Error('Update the sync repository.');
@@ -60,7 +61,7 @@ export async function refreshDiary() {
     const revision = syncEngine.revision;
     const remote = await (await getTrackingRepository()).loadDay(owner, date);
     if (owner !== syncEngine.owner) return;
-    if (!syncEngine.mergeRemoteIfUnchanged(remote ?? { date, consumedMacros: emptyMacros(), consumedMicros: {}, bodyWeightKg: null, isAdherent: false }, revision)) return;
+    if (!syncEngine.mergeRemoteIfUnchanged(remote ?? { date, consumedMacros: emptyMacros(), consumedMicros: {}, bodyWeightLbs: null, isAdherent: false }, revision)) return;
     applySnapshot(); syncEngine.lastAckAt = Date.now(); useSyncStatus.setState({ lastSyncedAt: syncEngine.lastAckAt, error: null });
   } catch { useSyncStatus.setState({ error: 'Cloud is unavailable. Your saved device diary is still available.' }); }
 }
@@ -104,7 +105,7 @@ export async function discardBlockedEdit(id: string) {
   if (!job?.blocked) throw new Error('This edit no longer needs review.');
   let remote: DailyTotals | undefined;
   if (job.kind === 'nutrition') remote = await (await getTrackingRepository()).loadDay(owner, job.data.date)
-    ?? { date: job.data.date, consumedMacros: emptyMacros(), consumedMicros: {}, bodyWeightKg: null, isAdherent: false };
+    ?? { date: job.data.date, consumedMacros: emptyMacros(), consumedMicros: {}, bodyWeightLbs: null, isAdherent: false };
   if (owner !== syncEngine.owner) throw new Error('Account changed.');
   syncEngine.discard(id, remote); applySnapshot();
 }

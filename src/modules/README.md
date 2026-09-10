@@ -1,4 +1,4 @@
-# RULocked feature modules
+# CalCamp feature modules
 
 See [Phase 3 setup](../../docs-phase-3.md) for provider credentials, authenticated
 persistence, native builds, validation, and current limitations.

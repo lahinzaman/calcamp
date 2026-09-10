@@ -1,27 +1,34 @@
+import { kgToLbs, lbsToKg, cmToInches, inchesToCm } from '../lib/units';
 import { durableStorage } from '../modules/sync/storage';
 import { useSyncStatus } from '../store/syncStore';
 import { getSupabase } from './supabase';
 import { validateOnboarding, type OnboardingProfile, type UserProfile } from '../types/profile';
-const columns = 'id,height_cm,weight_kg,is_advanced_track,activity_level,goal,training_days,training_targets,rest_targets,preworkout_fast_carbs,preworkout_carbs_g,preworkout_minutes,onboarding_completed_at';
+const columns = 'id,height_cm,weight_kg,is_advanced_track,activity_level,goal,training_days,training_targets,rest_targets,preworkout_fast_carbs,preworkout_carbs_g,preworkout_minutes,onboarding_completed_at,lifestyle_survey,dynamic_tdee_kcal';
 export async function loadProfile(userId: string): Promise<UserProfile | null> {
   let cached: UserProfile | null = null;
   try {
     const raw = durableStorage.get(`profile:${userId}`); const value = raw ? JSON.parse(raw) : null;
-    if (value?.id === userId && Array.isArray(value.training_days) && typeof value.is_advanced_track === 'boolean') cached = value;
+    if (value?.id === userId && Array.isArray(value.training_days) && typeof value.is_advanced_track === 'boolean') cached = 'weight_lbs' in value ? value : fromDatabase(value);
   } catch { /* A cache failure can still recover from an authoritative online read. */ }
   if (!useSyncStatus.getState().online && cached) return cached;
   const { data, error } = await getSupabase().from('users').select(columns).eq('id', userId).maybeSingle();
   if (error) { if (cached && (!error.code || /fetch|network|timeout/i.test(error.message))) return cached; throw new Error('Your profile could not be loaded. Try again when connected.'); }
   if (data) durableStorage.set(`profile:${userId}`, JSON.stringify(data)); else durableStorage.remove(`profile:${userId}`);
-  return data as UserProfile | null;
+  return data ? fromDatabase(data) : null;
 }
 export async function completeOnboarding(input: OnboardingProfile): Promise<UserProfile> {
   validateOnboarding(input);
   const client = getSupabase(); const { data: auth, error: authError } = await client.auth.getUser();
-  if (authError || !auth.user) throw new Error('Confirm your email and sign in before saving your profile.');
-  const { data, error } = await client.from('users').upsert({ ...input, id: auth.user.id,
+  if (authError || !auth.user) throw new Error('Sign in before saving your profile.');
+  const { height_inches, weight_lbs, ...rest } = input;
+  const { data, error } = await client.from('users').upsert({ ...rest, height_cm: inchesToCm(height_inches!), weight_kg: lbsToKg(weight_lbs!), id: auth.user.id,
     onboarding_completed_at: new Date().toISOString() }, { onConflict: 'id' }).select(columns).single();
   if (error) throw new Error('Your profile could not be saved. Check your connection and try again.');
   durableStorage.set(`profile:${auth.user.id}`, JSON.stringify(data));
-  return data as UserProfile;
+  return fromDatabase(data);
+}
+
+function fromDatabase(row: Record<string, any>): UserProfile {
+  const { height_cm, weight_kg, ...rest } = row;
+  return { ...rest, height_inches: height_cm === null ? null : cmToInches(Number(height_cm)), weight_lbs: weight_kg === null ? null : kgToLbs(Number(weight_kg)) } as UserProfile;
 }

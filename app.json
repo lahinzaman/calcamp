@@ -1,21 +1,20 @@
 {
   "expo": {
-    "name": "RULocked",
-    "slug": "rulocked",
+    "name": "CalCamp",
+    "slug": "calcamp",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "rulocked",
+    "icon": "./assets/brand/icon.png",
+    "scheme": [
+      "calcamp",
+      "rulocked"
+    ],
     "userInterfaceStyle": "automatic",
-    "ios": {
-      "icon": "./assets/expo.icon"
-    },
+    "ios": {},
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#101115",
+        "foregroundImage": "./assets/brand/mark.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
@@ -29,24 +28,24 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/brand/favicon.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#101115",
+          "image": "./assets/brand/mark.png",
+          "imageWidth": 120
         }
       ],
       "expo-secure-store",
       [
         "react-native-health",
         {
-          "healthSharePermission": "Allow RULocked to read steps, active energy, and recent workouts for activity tracking.",
-          "healthUpdatePermission": "Allow RULocked to save workouts and dietary energy you choose to share."
+          "healthSharePermission": "Allow CalCamp to read steps, active energy, and recent workouts for activity tracking.",
+          "healthUpdatePermission": "Allow CalCamp to save workouts and dietary energy you choose to share."
         }
       ],
       "react-native-health-connect",
@@ -63,7 +62,7 @@
         "expo-location",
         {
           "locationWhenInUsePermission": "Use your location to generate a campus walking loop.",
-          "locationAlwaysAndWhenInUsePermission": "Allow RULocked to detect campus arrivals in the background for meal and workout prompts. Your route is not continuously recorded.",
+          "locationAlwaysAndWhenInUsePermission": "Allow CalCamp to detect campus arrivals in the background for meal and workout prompts. Your route is not continuously recorded.",
           "isIosBackgroundLocationEnabled": true,
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": false
@@ -74,7 +73,7 @@
       [
         "expo-notifications",
         {
-          "color": "#CC0033",
+          "color": "#91ACFF",
           "defaultChannel": "rulocked-reminders",
           "enableBackgroundRemoteNotifications": true
         }
@@ -83,6 +82,25 @@
         "@sentry/react-native/expo",
         {
           "url": "https://sentry.io/"
+        }
+      ],
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./node_modules/@expo-google-fonts/manjari/100Thin/Manjari_100Thin.ttf",
+            "./node_modules/@expo-google-fonts/manjari/400Regular/Manjari_400Regular.ttf",
+            "./node_modules/@expo-google-fonts/manjari/700Bold/Manjari_700Bold.ttf"
+          ]
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow CalCamp to photograph meals and scan food barcodes.",
+          "recordAudioAndroid": false,
+          "microphonePermission": false,
+          "barcodeScannerEnabled": true
         }
       ]
     ],

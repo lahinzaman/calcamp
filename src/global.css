@@ -1,13 +1,15 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
 :root {
-  --font-display:
-    Spline Sans, Inter, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji,
-    Segoe UI Symbol, Noto Color Emoji;
-  --font-mono:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
-  --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
-  --font-serif: Georgia, 'Times New Roman', serif;
+  --font-display: 'Manjari', sans-serif;
+  --font-mono: 'Manjari', sans-serif;
+  --font-rounded: 'Manjari', sans-serif;
+  --font-serif: 'Manjari', sans-serif;
+  --color-background: 244 245 247;
+  --color-surface: 255 255 255;
+  --color-raised: 232 235 239;
+  --color-ink: 23 27 35;
+  --color-border: 204 210 219;
+  --color-accent: 201 216 255;
 }

@@ -7,7 +7,7 @@ import type { DailyMenuItem } from '../../types/nutrislice';
 
 const logs = (slope = 0): TdeeDailyLog[] => Array.from({ length: 28 }, (_, index) => ({
   log_date: `2026-08-${String(index + 1).padStart(2, '0')}`,
-  body_weight_kg: (180 + slope * index) / POUNDS_PER_KG,
+  body_weight_lbs: 180 + slope * index,
   calories_kcal: 2200,
   is_adherent: true,
 }));
@@ -33,8 +33,8 @@ test('stable weight returns intake; weight loss raises TDEE and gain lowers it',
 
 test('non-adherent intake and weight cannot poison the estimate; gaps remain elapsed days', () => {
   const input = logs(-0.1);
-  input[7] = { ...input[7], is_adherent: false, calories_kcal: 1000000, body_weight_kg: 5000 };
-  input[10] = { ...input[10], is_adherent: false, calories_kcal: NaN, body_weight_kg: NaN };
+  input[7] = { ...input[7], is_adherent: false, calories_kcal: 1000000, body_weight_lbs: 5000 };
+  input[10] = { ...input[10], is_adherent: false, calories_kcal: NaN, body_weight_lbs: NaN };
   assert.deepEqual(calculateTdee(input), calculateTdee(input.filter((row) => row.is_adherent)));
   assert.equal(calculateTdee(input).adherentDays, 26);
   assert.equal(calculateTdee(input).coverage, 26 / 28);
@@ -46,7 +46,7 @@ test('insufficient, missing, duplicated, and outside-window observations are han
   assert.equal(calculateTdee(logs(), { asOfDate: '2026-10-01' }).adherentDays, 0);
   assert.equal(calculateTdee(logs(), { windowDays: 14 }).adherentDays, 14);
   assert.throws(() => calculateTdee([...logs(), logs()[0]]));
-  const missing = logs().map((row) => ({ ...row, body_weight_kg: null }));
+  const missing = logs().map((row) => ({ ...row, body_weight_lbs: null }));
   assert.equal(calculateTdee(missing).status, 'insufficient-data');
 });
 

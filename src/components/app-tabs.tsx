@@ -1,25 +1,29 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { useColorScheme } from 'react-native';
+import { useThemeStore } from '../theme/store';
 
 import { Colors } from '@/constants/theme';
 
 export default function AppTabs() {
-  const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
+  const scheme = useThemeStore(s => s.mode);
+  const colors = Colors[scheme];
 
   return (
     <NativeTabs
       backgroundColor={colors.background}
       indicatorColor={colors.backgroundElement}
-      labelStyle={{ selected: { color: colors.text } }}>
+      labelStyle={{ color: colors.text, fontFamily: 'ManjariBold', fontSize: 12 }}>
       <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Label>Dining</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>Today</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           src={require('@/assets/images/tabIcons/home.png')}
           renderingMode="template"
         />
       </NativeTabs.Trigger>
 
+      <NativeTabs.Trigger name="dining">
+        <NativeTabs.Trigger.Label>Dining</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="fork.knife" md="restaurant" />
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="explore">
         <NativeTabs.Trigger.Label>Workout</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
@@ -27,10 +31,7 @@ export default function AppTabs() {
           renderingMode="template"
         />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="walk">
-        <NativeTabs.Trigger.Label>Walk</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="figure.walk" md="directions_walk" />
-      </NativeTabs.Trigger>
+
       <NativeTabs.Trigger name="campus">
         <NativeTabs.Trigger.Label>Campus</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="building.2" md="domain" />

@@ -4,7 +4,7 @@ import { SyncEngine, retryDelay, type NutritionMutation } from '../sync/engine';
 import { memoryStorage } from '../sync/storage';
 import { emptyMacros } from '../../types/nutrition';
 import type { DailyTotals } from '../../api/trackingRepository';
-const day = (n = 0, date = '2026-09-08'): DailyTotals => ({ date, consumedMacros: { ...emptyMacros(), caloriesKcal: n }, consumedMicros: {}, bodyWeightKg: null, isAdherent: false });
+const day = (n = 0, date = '2026-09-08'): DailyTotals => ({ date, consumedMacros: { ...emptyMacros(), caloriesKcal: n }, consumedMicros: {}, bodyWeightLbs: null, isAdherent: false });
 const mutation = (date = '2026-09-08'): NutritionMutation => ({ date, macros: { ...emptyMacros(), caloriesKcal: 100 }, micros: {}, patch: {} });
 test('outbox survives restart, stays account scoped, and drains on reconnection', async () => {
   const storage = memoryStorage(); const sent: string[] = [];

@@ -12,7 +12,7 @@ mock.module('expo-sqlite', { namedExports: { openDatabaseSync: () => ({
 const { durableStorage } = require('../sync/storage.native') as typeof import('../sync/storage.native');
 test('real SQLite commits the outbox and diary atomically and preserves prior data on a failed write', async () => {
   const engine = new SyncEngine(durableStorage, async () => {}); engine.activate('alice');
-  const previous = { date: '2026-09-08', consumedMacros: emptyMacros(), consumedMicros: {}, bodyWeightKg: null, isAdherent: false };
+  const previous = { date: '2026-09-08', consumedMacros: emptyMacros(), consumedMicros: {}, bodyWeightLbs: null, isAdherent: false };
   const next = { ...previous, consumedMacros: { ...emptyMacros(), caloriesKcal: 100 } };
   engine.recordNutrition(next, previous, 'one');
   const restored = new SyncEngine(durableStorage, async () => {}); restored.activate('alice');

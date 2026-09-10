@@ -19,9 +19,10 @@ export function configureGeofencing(owner: string, enabled: boolean, request = f
     if (!background.granted) throw new Error('Choose Always Allow location in Settings for campus arrival alerts.');
     if (durableStorage.get('active-sync-owner') !== owner || !readPreferences(owner).geofencing) return;
     // Re-registering on every foreground would emit new initial-state callbacks on iOS.
-    if (await Location.hasStartedGeofencingAsync(GEOFENCE_TASK) && durableStorage.get('geofence-owner') === owner) return;
+    if (await Location.hasStartedGeofencingAsync(GEOFENCE_TASK) && durableStorage.get('geofence-owner') === owner && durableStorage.get(`geofence-regions:${owner}`) === JSON.stringify(CAMPUS_REGIONS)) return;
+    await Location.startGeofencingAsync(GEOFENCE_TASK, CAMPUS_REGIONS);
     durableStorage.set('geofence-owner', owner);
     durableStorage.set(`geofence-started:${owner}`, String(Date.now()));
-    await Location.startGeofencingAsync(GEOFENCE_TASK, CAMPUS_REGIONS);
+    durableStorage.set(`geofence-regions:${owner}`, JSON.stringify(CAMPUS_REGIONS));
   });
 }

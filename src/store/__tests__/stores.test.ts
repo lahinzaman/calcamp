@@ -100,7 +100,7 @@ test('exercise sequence uses instance IDs and validates reorder without losing s
   const { store, exercise } = workoutFixture();
   const before = store.getState();
   exercise.exercise.name = 'Caller mutation';
-  store.getState().addSet({ id: 'set-1', sessionExerciseId: 'sequence-1', weightKg: 40, reps: 8 });
+  store.getState().addSet({ id: 'set-1', sessionExerciseId: 'sequence-1', weightLbs: 40, reps: 8 });
   store.getState().reorderExercises(['sequence-2', 'sequence-1']);
   assert.equal(store.getState().exerciseSequence[1].exercise.name, 'High-Pronated Grip Row');
   assert.equal(before.exerciseSequence[0].id, 'sequence-1');
@@ -117,7 +117,7 @@ test('completing a set requires data and starts a wall-clock timer that survives
   const { store } = workoutFixture();
   store.getState().addSet({ id: 'set-1', sessionExerciseId: 'sequence-1' });
   assert.throws(() => store.getState().completeSet('set-1', 2000));
-  store.getState().updateSet('set-1', { weightKg: 40, reps: 8, rpe: 8 });
+  store.getState().updateSet('set-1', { weightLbs: 40, reps: 8, rpe: 8 });
   const before = store.getState();
   store.getState().completeSet('set-1', 2000);
   const timer = store.getState().restTimer;
@@ -135,7 +135,7 @@ test('completing a set requires data and starts a wall-clock timer that survives
 
 test('removing an exercise cleans associated sets, selection, and the associated rest timer', () => {
   const { store } = workoutFixture();
-  store.getState().addSet({ id: 'set-1', sessionExerciseId: 'sequence-1', weightKg: 0, reps: 12 });
+  store.getState().addSet({ id: 'set-1', sessionExerciseId: 'sequence-1', weightLbs: 0, reps: 12 });
   store.getState().completeSet('set-1', 2000);
   store.getState().removeExercise('sequence-1');
   assert.equal(store.getState().activeExerciseId, 'sequence-2');
@@ -145,7 +145,7 @@ test('removing an exercise cleans associated sets, selection, and the associated
 
 test('finishing returns a detached snapshot and clears all active workout state', () => {
   const { store } = workoutFixture();
-  store.getState().addSet({ id: 'set-1', sessionExerciseId: 'sequence-1', weightKg: 40, reps: 8 });
+  store.getState().addSet({ id: 'set-1', sessionExerciseId: 'sequence-1', weightLbs: 40, reps: 8 });
   store.getState().completeSet('set-1', 2000);
   const before = store.getState();
   assert.throws(() => store.getState().finishSession(1500));

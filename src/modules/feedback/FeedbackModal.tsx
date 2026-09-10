@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, ScrollView, Text } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAvoidingView, Modal, Platform, ScrollView } from 'react-native';
+import { Text } from '../../theme/primitives';
+import { SafeAreaView } from '../../theme/SafeArea';
 import { randomUUID } from 'expo-crypto';
 import { Action, Choice, Field } from '../../components/FormControls';
 import { useAuthStore } from '../../store/authStore';
@@ -21,14 +22,14 @@ export function FeedbackModal({ onClose }: { onClose: () => void }) {
     finally { sending.current = false; setBusy(false); }
   };
   return <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { if (!busy) onClose(); }}>
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FAFAFA' }}><KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }}><KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24 }}>
-        <Text className="mb-4 text-2xl font-bold text-zinc-950">Send feedback</Text>
+        <Text className="mb-4 text-2xl font-bold text-ink">Send feedback</Text>
         {!sent && <>{FEEDBACK_CATEGORIES.map(value => <Choice key={value} label={value === 'bug' ? 'Report a bug' : value === 'feature' ? 'Request a feature' : 'Other feedback'} selected={category === value} onPress={() => { if (!busy) { edit(); setCategory(value); } }} />)}
           <Field label="Your feedback" multiline maxLength={4000} editable={!busy} value={message} onChangeText={text => { edit(); setMessage(text); }} style={{ minHeight: 160, textAlignVertical: 'top' }} />
-          <Text className="mb-4 text-sm text-zinc-600">Includes your account ID, OS version, app build and update ID so we can investigate. Please leave out passwords, health details and other sensitive information.</Text>
+          <Text className="mb-4 text-sm text-ink">Includes your account ID, OS version, app build and update ID so we can investigate. Please leave out passwords, health details and other sensitive information.</Text>
           <Action label={busy ? 'Sending…' : 'Send report'} disabled={busy || !owner} onPress={() => void send()} /></>}
-        {notice && <Text accessibilityRole="alert" className="mb-4 text-zinc-800">{notice}</Text>}
+        {notice && <Text accessibilityRole="alert" className="mb-4 text-ink">{notice}</Text>}
         <Action label="Close" secondary disabled={busy} onPress={onClose} />
       </ScrollView>
     </KeyboardAvoidingView></SafeAreaView>

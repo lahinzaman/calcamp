@@ -1,3 +1,3 @@
-import Screen from '../../modules/dining/DiningHallScreen';
+import DashboardScreen from '../../modules/dashboard/DashboardScreen';
 import { ScreenBoundary } from '../../components/ScreenBoundary';
-export default function TabScreen() { return <ScreenBoundary><Screen /></ScreenBoundary>; }
+export default function Dashboard() { return <ScreenBoundary><DashboardScreen /></ScreenBoundary>; }

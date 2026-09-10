@@ -1,10 +1,13 @@
+import type { LifestyleSurvey } from '../modules/onboarding/budget';
 import type { MacroTotals } from './nutrition';
 export const ACTIVITY_LEVELS = ['sedentary', 'light', 'moderate', 'high'] as const;
 export const GOALS = ['cut', 'bulk', 'maintain'] as const;
 export interface UserProfile {
   id: string;
-  height_cm: number | null;
-  weight_kg: number | null;
+  lifestyle_survey?: LifestyleSurvey;
+  dynamic_tdee_kcal?: number | null;
+  height_inches: number | null;
+  weight_lbs: number | null;
   is_advanced_track: boolean;
   activity_level: typeof ACTIVITY_LEVELS[number] | null;
   goal: typeof GOALS[number] | null;
@@ -24,8 +27,8 @@ export const DEFAULT_UPPER_LOWER = [
   { day: 5, name: 'Lower B', focus: 'Hinge emphasis' },
 ] as const;
 export function validateOnboarding(profile: OnboardingProfile) {
-  if (!Number.isFinite(profile.height_cm) || profile.height_cm! < 30 || profile.height_cm! > 300
-    || !Number.isFinite(profile.weight_kg) || profile.weight_kg! < 1 || profile.weight_kg! > 1000) throw new Error('Enter height in cm and weight in kg.');
+  if (!Number.isFinite(profile.height_inches) || profile.height_inches! < 12 || profile.height_inches! > 118
+    || !Number.isFinite(profile.weight_lbs) || profile.weight_lbs! < 2 || profile.weight_lbs! > 2204) throw new Error('Enter height in feet/inches and weight in lbs.');
   if (!ACTIVITY_LEVELS.includes(profile.activity_level!) || !GOALS.includes(profile.goal!)) throw new Error('Choose an activity level and goal.');
   if (profile.is_advanced_track && (profile.training_days.length !== 4 || new Set(profile.training_days).size !== 4
     || profile.training_days.some(day => !Number.isInteger(day) || day < 0 || day > 6))) throw new Error('Choose four distinct training days.');

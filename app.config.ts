@@ -13,12 +13,14 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     }] as [string, Record<string, unknown>];
     return plugin;
   });
+  // EAS project slug is an existing remote identity; change EXPO_PROJECT_SLUG after renaming it in Expo.
   return {
-    ...config, name: variant === 'production' ? 'RULocked' : `RULocked ${development ? 'Dev' : 'Preview'}`, slug: 'rulocked',
+    ...config, name: variant === 'production' ? 'CalCamp' : `CalCamp ${development ? 'Dev' : 'Preview'}`, slug: process.env.EXPO_PROJECT_SLUG ?? 'rulocked',
+    scheme: [variant === 'production' ? 'calcamp' : `calcamp-${variant}`, 'rulocked'],
     ...(process.env.EXPO_OWNER ? { owner: process.env.EXPO_OWNER } : {}),
     ios: { ...config.ios, bundleIdentifier: process.env.IOS_BUNDLE_IDENTIFIER ?? `com.rulocked.app${suffix}`,
       entitlements: { ...config.ios?.entitlements, 'aps-environment': development ? 'development' : 'production' },
-      infoPlist: { ...config.ios?.infoPlist, ITSAppUsesNonExemptEncryption: false,
+      infoPlist: { ...config.ios?.infoPlist, CFBundleDisplayName: variant === 'production' ? 'CalCamp' : `CalCamp ${development ? 'Dev' : 'Preview'}`, ITSAppUsesNonExemptEncryption: false,
         NSAppTransportSecurity: { NSAllowsArbitraryLoads: development, NSAllowsLocalNetworking: development } } },
     android: { ...config.android, package: process.env.ANDROID_PACKAGE ?? `com.rulocked.app${suffix}` },
     updates: { ...config.updates, url: `https://u.expo.dev/${projectId}` },

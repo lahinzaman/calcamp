@@ -83,14 +83,14 @@ function validateTimestamp(timestamp: number, session: WorkoutSession) {
 }
 
 function validateSet(set: WorkoutSet) {
-  if (set.weightKg !== null) nonnegative(set.weightKg, 'Weight');
+  if (set.weightLbs !== null) nonnegative(set.weightLbs, 'Weight');
   if (set.reps !== null && (!Number.isInteger(set.reps) || set.reps < 1 || set.reps > 1000)) {
     throw new RangeError('Reps must be an integer from 1 through 1000.');
   }
   if (set.rpe !== null && (!Number.isFinite(set.rpe) || set.rpe < 1 || set.rpe > 10)) {
     throw new RangeError('RPE must be between 1 and 10.');
   }
-  if (set.estimatedOneRepMaxKg !== null) nonnegative(set.estimatedOneRepMaxKg, 'Estimated 1RM');
+  if (set.estimatedOneRepMaxLbs !== null) nonnegative(set.estimatedOneRepMaxLbs, 'Estimated 1RM');
   validateRestDuration(set.restSeconds);
 }
 
@@ -183,12 +183,12 @@ export function createWorkoutStore(options: { now?: () => number; repository?: T
       const entry: WorkoutSet = {
         id: input.id,
         sessionExerciseId: input.sessionExerciseId,
-        weightKg: input.weightKg ?? null,
+        weightLbs: input.weightLbs ?? null,
         reps: input.reps ?? null,
         rpe: input.rpe ?? null,
         isWarmup: input.isWarmup ?? false,
         restSeconds: input.restSeconds ?? exercise.defaultRestSeconds,
-        estimatedOneRepMaxKg: input.estimatedOneRepMaxKg ?? null,
+        estimatedOneRepMaxLbs: input.estimatedOneRepMaxLbs ?? null,
         completedAtMs: null,
       };
       validateSet(entry);
@@ -201,15 +201,15 @@ export function createWorkoutStore(options: { now?: () => number; repository?: T
       // Ignore optional undefined values; preserve identity and completion fields.
       const next: WorkoutSet = {
         ...original,
-        weightKg: update.weightKg === undefined ? original.weightKg : update.weightKg,
+        weightLbs: update.weightLbs === undefined ? original.weightLbs : update.weightLbs,
         reps: update.reps === undefined ? original.reps : update.reps,
         rpe: update.rpe === undefined ? original.rpe : update.rpe,
         isWarmup: update.isWarmup ?? original.isWarmup,
         restSeconds: update.restSeconds ?? original.restSeconds,
-        estimatedOneRepMaxKg: update.estimatedOneRepMaxKg === undefined ? original.estimatedOneRepMaxKg : update.estimatedOneRepMaxKg,
+        estimatedOneRepMaxLbs: update.estimatedOneRepMaxLbs === undefined ? original.estimatedOneRepMaxLbs : update.estimatedOneRepMaxLbs,
       };
       validateSet(next);
-      if (next.completedAtMs !== null && (next.weightKg === null || next.reps === null)) {
+      if (next.completedAtMs !== null && (next.weightLbs === null || next.reps === null)) {
         throw new Error('Completed sets require weight and reps.');
       }
       set({ sets: state.sets.map((entry) => entry.id === id ? next : entry) });
@@ -224,7 +224,7 @@ export function createWorkoutStore(options: { now?: () => number; repository?: T
       const entry = state.sets.find((candidate) => candidate.id === id);
       if (!entry) throw new Error('Unknown set.');
       if (entry.completedAtMs !== null) return;
-      if (entry.weightKg === null || entry.reps === null) throw new Error('Enter weight and reps before completing a set.');
+      if (entry.weightLbs === null || entry.reps === null) throw new Error('Enter weight and reps before completing a set.');
       set({
         sets: state.sets.map((candidate) => candidate.id === id ? { ...candidate, completedAtMs } : candidate),
         restTimer: makeTimer(entry.restSeconds, completedAtMs, id),

@@ -8,7 +8,7 @@ mock.module('expo-location', { namedExports: {
   getForegroundPermissionsAsync: async () => ({ granted: foreground }), getBackgroundPermissionsAsync: async () => ({ granted: background }),
   requestForegroundPermissionsAsync: async () => { prompts++; return { granted: foreground }; }, requestBackgroundPermissionsAsync: async () => { prompts++; return { granted: background }; },
   hasStartedGeofencingAsync: async () => started, stopGeofencingAsync: async () => { started = false; },
-  startGeofencingAsync: async (_name: string, regions: unknown[]) => { assert.equal(regions.length, 7); started = true; starts++; },
+  startGeofencingAsync: async (_name: string, regions: unknown[]) => { assert.equal(regions.length, 8); started = true; starts++; },
 } });
 test('geofencing never prompts from background and reconciles registration once per account', async () => {
   const { configureGeofencing, stopGeofencing } = await import('../background/geofencing.native');

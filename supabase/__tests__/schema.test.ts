@@ -3,6 +3,8 @@ import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { PGlite } from '@electric-sql/pglite';
 
+import { EXERCISE_CATALOG } from '../../src/modules/workout/catalog';
+import { LIFTS } from '../../src/modules/workout/program';
 import { NUTRIENT_UNITS } from '../../src/types/nutrition';
 
 const alice = '20000000-0000-4000-8000-000000000001';
@@ -47,6 +49,22 @@ test('fresh Supabase schema: permissions, nutrition constraints, and workout int
         return true;
       });
     };
+
+    await t.test('Phase 9 routines enforce ownership, exercise visibility, retries and user-delete cascade', async () => {
+      await db.exec('set role anon'); await fails('select * from public.workout_routines','42501');
+      await signIn(alice);
+      const id='90000000-0000-4000-8000-000000000001';
+      await db.exec(`insert into public.workout_routines(id,user_id,name,exercise_ids) values ('${id}','${alice}','My routine',array['${row}']::uuid[])`);
+      await db.exec(`insert into public.workout_routines(id,user_id,name,exercise_ids) values ('${id}','${alice}','My routine',array['${row}']::uuid[]) on conflict(id) do nothing`);
+      await fails(`insert into public.workout_routines values ('90000000-0000-4000-8000-000000000002','${alice}','Private lift',array['${bobExercise}']::uuid[],now())`);
+      await signIn(bob); assert.equal((await db.query('select * from public.workout_routines')).rows.length,0);
+      await fails(`insert into public.workout_routines values ('90000000-0000-4000-8000-000000000003','${alice}','Other user',array['${row}']::uuid[],now())`,'42501');
+      await signIn(alice); await fails(`update public.workout_routines set user_id='${bob}'`,'42501');
+      const rows=await db.query<{id:string;name:string}>('select id,name from public.exercises where owner_user_id is null');
+      assert.deepEqual(rows.rows.sort((a,b)=>a.id.localeCompare(b.id)),EXERCISE_CATALOG.map(e=>({id:e.id,name:e.name})).sort((a,b)=>a.id.localeCompare(b.id)));
+      assert.ok((await db.query("select slug from public.gym_locations where slug='livingston'")).rows.length);
+      await db.exec('reset role');
+    });
 
     await t.test('nutrient units exactly match TypeScript and every public table has RLS', async () => {
       const definitions = await db.query<{ key: string; unit: string }>('select key, unit from public.nutrient_definitions');
@@ -98,7 +116,8 @@ test('fresh Supabase schema: permissions, nutrition constraints, and workout int
 
     await t.test('catalogue is shared and only owner custom variations can be edited', async () => {
       await signIn(alice);
-      assert.equal((await db.query('select id from public.exercises')).rows.length, 2);
+      assert.equal((await db.query('select id from public.exercises')).rows.length, 101);
+      for (const lift of Object.values(LIFTS)) assert.equal((await db.query<{ name: string }>('select name from public.exercises where id = $1', [lift.id])).rows[0]?.name, lift.name);
       assert.deepEqual((await db.query("update public.exercises set name = 'Oops' where owner_user_id is null returning id")).rows, []);
       await fails(`insert into public.exercises (name, movement_pattern, equipment, primary_muscle)
         values ('Fake Catalogue', 'row', 'cable', 'back')`, '42501');

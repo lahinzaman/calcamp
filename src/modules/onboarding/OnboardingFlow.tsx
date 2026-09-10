@@ -1,70 +1,69 @@
 import { useState } from 'react';
-import { ScrollView, Switch, Text, View } from 'react-native';
+import { ScrollView, Switch, View } from 'react-native';
 import { router } from 'expo-router';
+import { SafeAreaView } from '../../theme/SafeArea';
+import { Text } from '../../theme/primitives';
 import { Action, Choice, NumericField } from '../../components/FormControls';
 import { useOnboardingStore } from '../../store/onboardingStore';
 import { authStore, useAuthStore } from '../../store/authStore';
 import { completeOnboarding } from '../../api/profile';
-import { ACTIVITY_LEVELS, DEFAULT_UPPER_LOWER, GOALS, validateOnboarding } from '../../types/profile';
-import { emptyMacros, type MacroTotals } from '../../types/nutrition';
-
+import { ACTIVITY_LEVELS, DEFAULT_UPPER_LOWER } from '../../types/profile';
+import { heightInches, heightLabel } from '../../lib/units';
+import { applyStartingBudget, defaultSurvey, startingBudget, type LifestyleSurvey } from './budget';
 export type OnboardingStep = 'track' | 'basics' | 'advanced' | 'review';
-const labels: Record<keyof MacroTotals, string> = { caloriesKcal: 'Calories (kcal)', proteinG: 'Protein (g)', carbsG: 'Carbohydrates (g)', fatG: 'Fat (g)' };
-function TargetFields({ title, value, onChange }: { title: string; value: MacroTotals | null; onChange: (value: MacroTotals | null) => void }) {
-  return <View className="my-4 rounded-2xl bg-zinc-100 p-4"><Text className="mb-3 text-lg font-bold text-zinc-900">{title}</Text>
-    <Text className="mb-3 text-zinc-600">Optional personal targets. Enable to enter all four values.</Text>
-    <Switch accessibilityLabel={`Enable ${title}`} value={!!value} onValueChange={enabled => onChange(enabled ? emptyMacros() : null)} />
-    {value && (Object.keys(labels) as (keyof MacroTotals)[]).map(key => <NumericField key={key} label={`${title}: ${labels[key]}`} keyboardType="decimal-pad" value={value[key]} onValue={amount => onChange({ ...value, [key]: amount ?? 0 })} />)}
-  </View>;
-}
 export default function OnboardingFlow({ step = 'track' }: { step?: OnboardingStep }) {
-  const { draft, patch, reset } = useOnboardingStore();
-  const session = useAuthStore(s => s.session); const pendingEmail = useAuthStore(s => s.pendingSignupEmail);
+  const { draft, patch, reset } = useOnboardingStore(); const session = useAuthStore(s => s.session);
+  const pendingEmail = useAuthStore(s => s.pendingSignupEmail);
+  const [feet, setFeet] = useState<number | null>(draft.height_inches ? Math.floor(draft.height_inches / 12) : null);
+  const [inches, setInches] = useState<number | null>(draft.height_inches ? draft.height_inches % 12 : 0);
   const [error, setError] = useState<string | null>(null); const [busy, setBusy] = useState(false);
-  const save = async () => {
-    setError(null); if (!session || busy) return;
-    setBusy(true);
+  const survey = draft.lifestyle_survey ?? defaultSurvey;
+  const updateSurvey = (value: Partial<LifestyleSurvey>) => patch({ lifestyle_survey: { ...survey, ...value } });
+  let budget: ReturnType<typeof startingBudget> | null = null; let budgetError = '';
+  try { budget = startingBudget(draft); } catch (e) { budgetError = (e as Error).message; }
+  const advance = () => {
     try {
-      const input = { ...draft, ...(!draft.is_advanced_track ? { training_days: [], training_targets: null, preworkout_fast_carbs: false, preworkout_carbs_g: 0 } : {}) };
-      validateOnboarding(input);
-      const profile = await completeOnboarding(input);
-      authStore.getState().setProfile(profile); reset();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save your profile.'); }
-    finally { setBusy(false); }
+      const next = { ...draft, lifestyle_survey: {...survey,skipAutomaticBudget:false}, height_inches: heightInches(feet!, inches!) }; const calculated = applyStartingBudget(next);
+      patch(calculated); setError(null); router.push(draft.is_advanced_track ? '/onboarding/advanced' : '/onboarding/review');
+    } catch (e) { setError((e as Error).message); }
   };
-  return <ScrollView className="flex-1 bg-white" contentContainerStyle={{ padding: 24, paddingBottom: 60, maxWidth: 760, width: '100%', alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
-    <Text className="mb-2 text-sm font-bold uppercase tracking-widest text-red-700">Your RULocked routine</Text>
-    <Text className="mb-6 text-3xl font-bold text-zinc-950">{{ track: 'Choose your track', basics: 'Start with the basics', advanced: 'Fine-tune your training', review: 'Make it yours' }[step]}</Text>
-    {!!pendingEmail && !session && <View className="mb-5 rounded-xl bg-amber-50 p-4"><Text className="text-amber-900">Check {pendingEmail} for a confirmation link if required. You can prepare your profile here; confirm your email and sign in to save it.</Text><Action secondary label="Return to sign in" onPress={() => { authStore.getState().setPendingSignup(null); router.replace('/auth'); }} /></View>}
-    {step === 'track' && <>
-      <Choice label="Casual · simple daily tracking" selected={!draft.is_advanced_track} onPress={() => patch({ is_advanced_track: false, preworkout_fast_carbs: false })} />
-      <Choice label="Advanced · training days and nutrient timing" selected={draft.is_advanced_track} onPress={() => patch({ is_advanced_track: true })} />
-      <Action label="Continue" onPress={() => router.push('/onboarding/basics')} />
-    </>}
+  const save = async () => {
+    if (!session || busy) return; setBusy(true); setError(null);
+    try {
+      const input = survey.skipAutomaticBudget ? {...draft,goal:'maintain' as const,dynamic_tdee_kcal:null,rest_targets:null,training_targets:null,preworkout_fast_carbs:false,preworkout_carbs_g:0} : applyStartingBudget(draft);
+      const profile = await completeOnboarding({ ...input, ...(!draft.is_advanced_track ? { training_days: [], training_targets: null, preworkout_fast_carbs: false, preworkout_carbs_g: 0 } : {}) });
+      authStore.getState().setProfile(profile); reset();
+    } catch { setError('Could not save your profile. Check the survey and connection, then retry.'); } finally { setBusy(false); }
+  };
+  return <SafeAreaView edges={['left','right','bottom']} className="flex-1 bg-background"><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24, paddingBottom: 80, maxWidth: 760, width: '100%', alignSelf: 'center' }}>
+    <Text className="mb-2 text-sm font-bold">YOUR CALCAMP ROUTINE</Text><Text className="mb-6 text-3xl font-bold">{{ track: 'Your kind of progress', basics: 'A day in your life', advanced: 'Your training rhythm', review: 'Your starting budget' }[step]}</Text>
+    {!!pendingEmail && !session && <View className="mb-4"><Text>Confirm {pendingEmail}, then sign in to save. You can prepare this survey now.</Text><Action label="Return to sign in" onPress={() => { authStore.getState().setPendingSignup(null); router.replace('/auth'); }} /></View>}
+    {step === 'track' && <><Choice label="Casual · everyday nutrition" selected={!draft.is_advanced_track} onPress={() => patch({ is_advanced_track: false })} /><Choice label="Advanced · structured training" selected={draft.is_advanced_track} onPress={() => patch({ is_advanced_track: true })} /><Action label="Continue" onPress={() => router.push('/onboarding/basics')} /></>}
     {step === 'basics' && <>
-      <NumericField label="Height (cm)" keyboardType="decimal-pad" value={draft.height_cm} onValue={height_cm => patch({ height_cm })} />
-      <NumericField label="Weight (kg)" keyboardType="decimal-pad" value={draft.weight_kg} onValue={weight_kg => patch({ weight_kg })} />
-      <Text className="mb-2 text-lg font-semibold text-zinc-900">Activity level</Text><View className="flex-row flex-wrap">{ACTIVITY_LEVELS.map(level => <Choice key={level} label={level} selected={draft.activity_level === level} onPress={() => patch({ activity_level: level })} />)}</View>
-      <Text className="mb-2 mt-4 text-lg font-semibold text-zinc-900">Goal</Text><View className="flex-row flex-wrap">{GOALS.map(goal => <Choice key={goal} label={goal} selected={draft.goal === goal} onPress={() => patch({ goal })} />)}</View>
-      <Action label="Continue" onPress={() => router.push(draft.is_advanced_track ? '/onboarding/advanced' : '/onboarding/review')} />
+      <View className="flex-row gap-4"><View className="flex-1"><NumericField label="Height · feet" keyboardType="number-pad" value={feet} onValue={setFeet} /></View><View className="flex-1"><NumericField label="Height · inches" keyboardType="decimal-pad" value={inches} onValue={setInches} /></View></View>
+      <NumericField label="Body weight · lbs" keyboardType="decimal-pad" value={draft.weight_lbs} onValue={weight_lbs => patch({ weight_lbs })} />
+      <NumericField label="Age in years" keyboardType="number-pad" value={survey.age} onValue={age => updateSurvey({ age })} />
+      <Text className="mb-2 font-bold">Metabolic equation reference</Text><Text className="mb-3">Optional physiological reference for the estimate, not gender identity.</Text><View className="flex-row flex-wrap">{(['female','male','unspecified'] as const).map(v => <Choice key={v} label={v === 'unspecified' ? 'Prefer not to say' : v} selected={survey.metabolicSex === v} onPress={() => updateSurvey({ metabolicSex: v })} />)}</View>
+      <Text className="my-3 font-bold">How active is your typical week?</Text>{ACTIVITY_LEVELS.map((v,i) => <Choice key={v} label={['Mostly seated','Some walking / 1–2 active days','Regular walking / 3–4 active days','Physical work / 5+ active days'][i]} selected={draft.activity_level === v} onPress={() => patch({ activity_level: v })} />)}
+      <Text className="my-3 font-bold">How would you describe your build?</Text><View className="flex-row flex-wrap">{(['unsure','lean','balanced','higher'] as const).map(v => <Choice key={v} label={v === 'higher' ? 'More body fat' : v} selected={survey.composition === v} onPress={() => updateSurvey({ composition: v })} />)}</View>
+      <Text className="my-3 font-bold">What would make daily life better?</Text>{(['energy','strength','mobility'] as const).map((v,i) => <Choice key={v} label={['Steadier energy','Feeling stronger','Moving more comfortably'][i]} selected={survey.priority === v} onPress={() => updateSurvey({ priority: v })} />)}
+      <Text className="my-3 font-bold">How is your recovery?</Text><Choice label="Generally rested" selected={survey.recovery === 'steady'} onPress={() => updateSurvey({ recovery: 'steady' })} /><Choice label="Often tired or under-fueled" selected={survey.recovery === 'tired'} onPress={() => updateSurvey({ recovery: 'tired' })} />
+      <View className="my-4 flex-row items-center gap-3"><Text className="flex-1">Pregnant, breastfeeding, or following clinician-managed nutrition</Text><Switch accessibilityLabel="Specialized nutrition needs" value={survey.specializedNutrition} onValueChange={specializedNutrition => updateSurvey({ specializedNutrition })} /></View>
+      <Action label="Calculate my starting budget" onPress={advance} />
+      {(survey.specializedNutrition || (survey.age !== null && survey.age < 18)) && <Action secondary label="Track without automatic targets" onPress={() => {try {patch({height_inches:heightInches(feet!,inches!),lifestyle_survey:{...survey,skipAutomaticBudget:true}});router.push('/onboarding/review');}catch(e){setError((e as Error).message);}}} />}
     </>}
     {step === 'advanced' && <>
-      <Text className="mb-3 text-xl font-semibold text-zinc-900">4-day Upper / Lower</Text>
-      {DEFAULT_UPPER_LOWER.map((day, i) => <Text key={day.name} className="mb-2 text-zinc-700">Session {i + 1}: {day.name} · {day.focus}</Text>)}
-      <Text className="mb-2 mt-4 text-zinc-600">Select four days. Sessions follow the selected days in Monday-to-Sunday order.</Text>
-      <View className="flex-row flex-wrap">{[1, 2, 3, 4, 5, 6, 0].map(day => <Choice key={day} label={['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day]} selected={draft.training_days.includes(day)} onPress={() => patch({ training_days: draft.training_days.includes(day) ? draft.training_days.filter(d => d !== day) : [...draft.training_days, day] })} />)}</View>
-      <TargetFields title="Training-day targets" value={draft.training_targets} onChange={training_targets => patch({ training_targets })} />
-      <View className="my-3 flex-row items-center justify-between gap-3"><Text className="flex-1 font-semibold text-zinc-900">Allocate fast-digesting pre-workout carbs</Text><Switch accessibilityLabel="Allocate fast-digesting pre-workout carbs" value={draft.preworkout_fast_carbs} onValueChange={preworkout_fast_carbs => patch({ preworkout_fast_carbs })} /></View>
-      {draft.preworkout_fast_carbs && <><Text className="mb-4 text-zinc-600">This allocation is part of your daily carbohydrate target. Choose a food you tolerate before training.</Text><NumericField label="Pre-workout carbohydrates (g)" keyboardType="decimal-pad" value={draft.preworkout_carbs_g} onValue={value => patch({ preworkout_carbs_g: value ?? 0 })} /><NumericField label="Minutes before workout" keyboardType="number-pad" value={draft.preworkout_minutes} onValue={value => patch({ preworkout_minutes: value ?? 0 })} /></>}
+      {DEFAULT_UPPER_LOWER.map(d => <Text key={d.name} className="mb-3 text-lg">{d.name} · {d.focus}</Text>)}
+      <Text className="mb-3">Choose four days; sessions follow Monday-to-Sunday order.</Text><View className="flex-row flex-wrap">{[1,2,3,4,5,6,0].map(d => <Choice key={d} label={['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d]} selected={draft.training_days.includes(d)} onPress={() => patch({ training_days: draft.training_days.includes(d) ? draft.training_days.filter(x => x !== d) : [...draft.training_days,d] })} />)}</View>
+      <View className="my-4 flex-row items-center gap-3"><Text className="flex-1">Allocate fast-digesting pre-workout carbohydrates</Text><Switch accessibilityLabel="Pre-workout carbohydrate timing" value={draft.preworkout_fast_carbs} onValueChange={preworkout_fast_carbs => patch({ preworkout_fast_carbs, preworkout_carbs_g: 30 })} /></View>
+      {draft.preworkout_fast_carbs && <><NumericField label="Pre-workout carbs · g" value={draft.preworkout_carbs_g} onValue={v => patch({ preworkout_carbs_g: v ?? 0 })} /><NumericField label="Minutes before workout" value={draft.preworkout_minutes} onValue={v => patch({ preworkout_minutes: v ?? 60 })} /></>}
       <Action label="Review targets" onPress={() => router.push('/onboarding/review')} />
     </>}
     {step === 'review' && <>
-      <Text className="text-lg text-zinc-700">{draft.is_advanced_track ? 'Advanced · Upper / Lower' : 'Casual'} · {draft.goal}</Text>
-      <Text className="mt-2 text-zinc-600">{draft.height_cm ?? '—'} cm · {draft.weight_kg ?? '—'} kg · {draft.activity_level}</Text>
-      <TargetFields title={draft.is_advanced_track ? 'Rest-day targets' : 'Daily targets'} value={draft.rest_targets} onChange={rest_targets => patch({ rest_targets })} />
-      <Text className="mb-5 text-zinc-600">Targets are optional. Macro rescue becomes available after you set a calorie and macro budget.</Text>
-      {error && <Text accessibilityRole="alert" className="mb-4 text-red-700">{error}</Text>}
-      <Action label={busy ? 'Saving…' : 'Save profile & enter RULocked'} disabled={!session || busy} onPress={() => void save()} />
+      <Text className="mb-4">{draft.height_inches ? heightLabel(draft.height_inches) : '—'} · {draft.weight_lbs} lbs</Text>
+      {budget ? <><Text className="mb-4 text-xl font-bold">{budget.direction} · approximately {Math.abs(budget.weeklyChangeLbs).toFixed(2)} lbs/week</Text>{(draft.is_advanced_track ? [['Rest days',budget.rest],['Training days',budget.training]] as const : [['Daily budget',budget.rest]] as const).map(([label,m]) => <View key={label} className="mb-4 rounded-3xl bg-surface p-5"><Text className="font-bold">{label}</Text><Text className="my-3 text-3xl">{m.caloriesKcal} kcal</Text><Text>Protein {m.proteinG} g · Fats {m.fatG} g · Carbs {Math.round(m.carbsG)} g</Text></View>)}<Text className="mb-5">{budget.explanation}</Text></> : <Text>{budgetError}</Text>}
+      <Action label={busy ? 'Saving…' : 'Accept budget & enter CalCamp'} disabled={!session || busy || (!budget && !survey.skipAutomaticBudget)} onPress={() => void save()} /><Action label="Review my answers" secondary onPress={() => router.push('/onboarding/basics')} />
     </>}
-  </ScrollView>;
+    {error && <Text accessibilityRole="alert" className="my-4">{error}</Text>}
+  </ScrollView></SafeAreaView>;
 }

@@ -1,0 +1,911 @@
+[
+  {
+    "id": "10000000-0000-4000-8000-000000000001",
+    "name": "High-Pronated Grip Row",
+    "movementPattern": "horizontal_pull",
+    "equipment": "cable",
+    "primaryMuscle": "upper_back",
+    "description": "Brace your trunk and reach without rounding your lower back. Pull the elbows behind you toward the ribs, pause, and extend the arms under control. Use a palms-away grip.",
+    "demo": "row"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000002",
+    "name": "Neutral Grip Lat Pulldown",
+    "movementPattern": "vertical_pull",
+    "equipment": "cable",
+    "primaryMuscle": "lats",
+    "description": "Secure the thighs under the pad. Pull the elbows down toward your sides and bring the handle toward the upper chest; return overhead without swinging. Keep palms facing each other.",
+    "demo": "pulldown"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000003",
+    "name": "Dumbbell Bench Press",
+    "movementPattern": "horizontal_push",
+    "equipment": "dumbbell",
+    "primaryMuscle": "chest",
+    "description": "Lie on a stable bench with feet supported. Lower toward the chest with forearms under the load, then press upward without bouncing. ",
+    "demo": "press"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000004",
+    "name": "High-Bar Back Squat",
+    "movementPattern": "squat",
+    "equipment": "barbell",
+    "primaryMuscle": "quadriceps",
+    "description": "Brace your trunk. Bend hips and knees together with knees tracking the toes; lower to a controlled depth, then push through the whole foot to stand. ",
+    "demo": "squat"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000005",
+    "name": "Romanian Deadlift",
+    "movementPattern": "hip_hinge",
+    "equipment": "barbell",
+    "primaryMuscle": "hamstrings",
+    "description": "Keep the load close and spine neutral. Send the hips back with softly bent knees, then drive through the feet and extend the hips to stand. ",
+    "demo": "hinge"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000006",
+    "name": "Seated Dumbbell Shoulder Press",
+    "movementPattern": "vertical_push",
+    "equipment": "dumbbell",
+    "primaryMuscle": "shoulders",
+    "description": "Brace the abdomen with ribs over pelvis. Press the weight upward above the shoulders, then lower to shoulder level without arching the lower back. ",
+    "demo": "overhead"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000007",
+    "name": "Seated Leg Curl",
+    "movementPattern": "knee_flexion",
+    "equipment": "machine",
+    "primaryMuscle": "hamstrings",
+    "description": "Align the machine axis with the knee. Keep hips supported as you curl the pad toward the body, then straighten the knee slowly. ",
+    "demo": "legcurl"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000008",
+    "name": "Standing Calf Raise",
+    "movementPattern": "plantar_flexion",
+    "equipment": "machine",
+    "primaryMuscle": "calves",
+    "description": "Keep the ball of the foot supported. Lift the heel through a comfortable range, pause, and lower slowly without bouncing. ",
+    "demo": "calf"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000009",
+    "name": "Barbell Bench Press",
+    "movementPattern": "horizontal_push",
+    "equipment": "barbell",
+    "primaryMuscle": "chest",
+    "description": "Lie on a stable bench with feet supported. Lower toward the chest with forearms under the load, then press upward without bouncing. ",
+    "demo": "press"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000010",
+    "name": "Incline Barbell Bench Press",
+    "movementPattern": "horizontal_push",
+    "equipment": "barbell",
+    "primaryMuscle": "chest",
+    "description": "Lie on a stable bench with feet supported. Lower toward the chest with forearms under the load, then press upward without bouncing. Use a low incline so the shoulder stays comfortable.",
+    "demo": "press"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000011",
+    "name": "Incline Dumbbell Press",
+    "movementPattern": "horizontal_push",
+    "equipment": "dumbbell",
+    "primaryMuscle": "chest",
+    "description": "Lie on a stable bench with feet supported. Lower toward the chest with forearms under the load, then press upward without bouncing. Use a low incline so the shoulder stays comfortable.",
+    "demo": "press"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000012",
+    "name": "Dumbbell Floor Press",
+    "movementPattern": "horizontal_push",
+    "equipment": "dumbbell",
+    "primaryMuscle": "chest",
+    "description": "Lie on a stable bench with feet supported. Lower toward the chest with forearms under the load, then press upward without bouncing. ",
+    "demo": "press"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000013",
+    "name": "Close-Grip Bench Press",
+    "movementPattern": "horizontal_push",
+    "equipment": "free weight",
+    "primaryMuscle": "chest",
+    "description": "Lie on a stable bench with feet supported. Lower toward the chest with forearms under the load, then press upward without bouncing. ",
+    "demo": "press"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000014",
+    "name": "Smith Machine Bench Press",
+    "movementPattern": "horizontal_push",
+    "equipment": "machine",
+    "primaryMuscle": "chest",
+    "description": "Lie on a stable bench with feet supported. Lower toward the chest with forearms under the load, then press upward without bouncing. ",
+    "demo": "press"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000015",
+    "name": "Machine Chest Press",
+    "movementPattern": "horizontal_push",
+    "equipment": "machine",
+    "primaryMuscle": "chest",
+    "description": "Lie on a stable bench with feet supported. Lower toward the chest with forearms under the load, then press upward without bouncing. ",
+    "demo": "press"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000016",
+    "name": "Push-Up",
+    "movementPattern": "horizontal_push",
+    "equipment": "bodyweight",
+    "primaryMuscle": "chest",
+    "description": "Brace your trunk in a straight line. Bend the elbows to lower your chest, then push the support away while keeping hips aligned. ",
+    "demo": "pushup"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000017",
+    "name": "Incline Push-Up",
+    "movementPattern": "horizontal_push",
+    "equipment": "bodyweight",
+    "primaryMuscle": "chest",
+    "description": "Brace your trunk in a straight line. Bend the elbows to lower your chest, then push the support away while keeping hips aligned. Use a low incline so the shoulder stays comfortable.",
+    "demo": "pushup"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000018",
+    "name": "Knee Push-Up",
+    "movementPattern": "horizontal_push",
+    "equipment": "bodyweight",
+    "primaryMuscle": "chest",
+    "description": "Brace your trunk in a straight line. Bend the elbows to lower your chest, then push the support away while keeping hips aligned. Support the knees on the floor.",
+    "demo": "pushup"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000019",
+    "name": "Close-Grip Push-Up",
+    "movementPattern": "horizontal_push",
+    "equipment": "bodyweight",
+    "primaryMuscle": "chest",
+    "description": "Brace your trunk in a straight line. Bend the elbows to lower your chest, then push the support away while keeping hips aligned. ",
+    "demo": "pushup"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000020",
+    "name": "Cable Chest Fly",
+    "movementPattern": "horizontal_adduction",
+    "equipment": "cable",
+    "primaryMuscle": "chest",
+    "description": "Maintain a soft elbow bend. Bring the arms together in front of the chest, then open under control without forcing the shoulder backward. ",
+    "demo": "fly"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000021",
+    "name": "Low-to-High Cable Fly",
+    "movementPattern": "horizontal_adduction",
+    "equipment": "cable",
+    "primaryMuscle": "chest",
+    "description": "Maintain a soft elbow bend. Bring the arms together in front of the chest, then open under control without forcing the shoulder backward. ",
+    "demo": "fly"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000022",
+    "name": "Pec Deck Fly",
+    "movementPattern": "horizontal_adduction",
+    "equipment": "machine",
+    "primaryMuscle": "chest",
+    "description": "Maintain a soft elbow bend. Bring the arms together in front of the chest, then open under control without forcing the shoulder backward. ",
+    "demo": "fly"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000023",
+    "name": "Dumbbell Fly",
+    "movementPattern": "horizontal_adduction",
+    "equipment": "dumbbell",
+    "primaryMuscle": "chest",
+    "description": "Maintain a soft elbow bend. Bring the arms together in front of the chest, then open under control without forcing the shoulder backward. ",
+    "demo": "fly"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000024",
+    "name": "Barbell Bent-Over Row",
+    "movementPattern": "horizontal_pull",
+    "equipment": "barbell",
+    "primaryMuscle": "upper_back",
+    "description": "Brace your trunk and reach without rounding your lower back. Pull the elbows behind you toward the ribs, pause, and extend the arms under control. ",
+    "demo": "row"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000025",
+    "name": "Chest-Supported Dumbbell Row",
+    "movementPattern": "horizontal_pull",
+    "equipment": "dumbbell",
+    "primaryMuscle": "upper_back",
+    "description": "Brace your trunk and reach without rounding your lower back. Pull the elbows behind you toward the ribs, pause, and extend the arms under control. ",
+    "demo": "row"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000026",
+    "name": "Single-Arm Dumbbell Row",
+    "movementPattern": "horizontal_pull",
+    "equipment": "dumbbell",
+    "primaryMuscle": "upper_back",
+    "description": "Brace your trunk and reach without rounding your lower back. Pull the elbows behind you toward the ribs, pause, and extend the arms under control. Train each side separately and keep the pelvis level.",
+    "demo": "row"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000027",
+    "name": "Seated Cable Row",
+    "movementPattern": "horizontal_pull",
+    "equipment": "cable",
+    "primaryMuscle": "upper_back",
+    "description": "Brace your trunk and reach without rounding your lower back. Pull the elbows behind you toward the ribs, pause, and extend the arms under control. ",
+    "demo": "row"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000028",
+    "name": "T-Bar Row",
+    "movementPattern": "horizontal_pull",
+    "equipment": "free weight",
+    "primaryMuscle": "upper_back",
+    "description": "Brace your trunk and reach without rounding your lower back. Pull the elbows behind you toward the ribs, pause, and extend the arms under control. ",
+    "demo": "row"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000029",
+    "name": "Inverted Row",
+    "movementPattern": "horizontal_pull",
+    "equipment": "bodyweight",
+    "primaryMuscle": "upper_back",
+    "description": "Brace your trunk and reach without rounding your lower back. Pull the elbows behind you toward the ribs, pause, and extend the arms under control. ",
+    "demo": "row"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000030",
+    "name": "Single-Arm Cable Row",
+    "movementPattern": "horizontal_pull",
+    "equipment": "cable",
+    "primaryMuscle": "upper_back",
+    "description": "Brace your trunk and reach without rounding your lower back. Pull the elbows behind you toward the ribs, pause, and extend the arms under control. Train each side separately and keep the pelvis level.",
+    "demo": "row"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000031",
+    "name": "Machine Row",
+    "movementPattern": "horizontal_pull",
+    "equipment": "machine",
+    "primaryMuscle": "upper_back",
+    "description": "Brace your trunk and reach without rounding your lower back. Pull the elbows behind you toward the ribs, pause, and extend the arms under control. ",
+    "demo": "row"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000032",
+    "name": "Wide-Grip Lat Pulldown",
+    "movementPattern": "vertical_pull",
+    "equipment": "free weight",
+    "primaryMuscle": "lats",
+    "description": "Secure the thighs under the pad. Pull the elbows down toward your sides and bring the handle toward the upper chest; return overhead without swinging. ",
+    "demo": "pulldown"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000033",
+    "name": "Supinated Lat Pulldown",
+    "movementPattern": "vertical_pull",
+    "equipment": "free weight",
+    "primaryMuscle": "lats",
+    "description": "Secure the thighs under the pad. Pull the elbows down toward your sides and bring the handle toward the upper chest; return overhead without swinging. Use a palms-toward-you grip.",
+    "demo": "pulldown"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000034",
+    "name": "Single-Arm Cable Pulldown",
+    "movementPattern": "vertical_pull",
+    "equipment": "cable",
+    "primaryMuscle": "lats",
+    "description": "Secure the thighs under the pad. Pull the elbows down toward your sides and bring the handle toward the upper chest; return overhead without swinging. Train each side separately and keep the pelvis level.",
+    "demo": "pulldown"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000035",
+    "name": "Close-Grip Lat Pulldown",
+    "movementPattern": "vertical_pull",
+    "equipment": "free weight",
+    "primaryMuscle": "lats",
+    "description": "Secure the thighs under the pad. Pull the elbows down toward your sides and bring the handle toward the upper chest; return overhead without swinging. ",
+    "demo": "pulldown"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000036",
+    "name": "Pull-Up",
+    "movementPattern": "vertical_pull",
+    "equipment": "bodyweight",
+    "primaryMuscle": "lats",
+    "description": "Start from a controlled hang with the shoulder girdle engaged. Pull your chest toward the bar, then lower smoothly without kicking. ",
+    "demo": "pullup"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000037",
+    "name": "Chin-Up",
+    "movementPattern": "vertical_pull",
+    "equipment": "bodyweight",
+    "primaryMuscle": "lats",
+    "description": "Start from a controlled hang with the shoulder girdle engaged. Pull your chest toward the bar, then lower smoothly without kicking. Use a palms-toward-you grip.",
+    "demo": "pullup"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000038",
+    "name": "Assisted Pull-Up",
+    "movementPattern": "vertical_pull",
+    "equipment": "bodyweight",
+    "primaryMuscle": "lats",
+    "description": "Start from a controlled hang with the shoulder girdle engaged. Pull your chest toward the bar, then lower smoothly without kicking. ",
+    "demo": "pullup"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000039",
+    "name": "Neutral-Grip Pull-Up",
+    "movementPattern": "vertical_pull",
+    "equipment": "bodyweight",
+    "primaryMuscle": "lats",
+    "description": "Start from a controlled hang with the shoulder girdle engaged. Pull your chest toward the bar, then lower smoothly without kicking. Keep palms facing each other.",
+    "demo": "pullup"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000040",
+    "name": "Standing Barbell Overhead Press",
+    "movementPattern": "vertical_push",
+    "equipment": "barbell",
+    "primaryMuscle": "shoulders",
+    "description": "Brace the abdomen with ribs over pelvis. Press the weight upward above the shoulders, then lower to shoulder level without arching the lower back. ",
+    "demo": "overhead"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000041",
+    "name": "Standing Dumbbell Press",
+    "movementPattern": "vertical_push",
+    "equipment": "dumbbell",
+    "primaryMuscle": "shoulders",
+    "description": "Brace the abdomen with ribs over pelvis. Press the weight upward above the shoulders, then lower to shoulder level without arching the lower back. ",
+    "demo": "overhead"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000042",
+    "name": "Machine Shoulder Press",
+    "movementPattern": "vertical_push",
+    "equipment": "machine",
+    "primaryMuscle": "shoulders",
+    "description": "Brace the abdomen with ribs over pelvis. Press the weight upward above the shoulders, then lower to shoulder level without arching the lower back. ",
+    "demo": "overhead"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000043",
+    "name": "Single-Arm Dumbbell Press",
+    "movementPattern": "vertical_push",
+    "equipment": "dumbbell",
+    "primaryMuscle": "shoulders",
+    "description": "Brace the abdomen with ribs over pelvis. Press the weight upward above the shoulders, then lower to shoulder level without arching the lower back. Train each side separately and keep the pelvis level.",
+    "demo": "overhead"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000044",
+    "name": "Dumbbell Lateral Raise",
+    "movementPattern": "shoulder_abduction",
+    "equipment": "dumbbell",
+    "primaryMuscle": "shoulders",
+    "description": "Keep elbows slightly bent. Raise the arms out to the sides to a comfortable shoulder height, then lower slowly without shrugging or swinging. ",
+    "demo": "raise"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000045",
+    "name": "Cable Lateral Raise",
+    "movementPattern": "shoulder_abduction",
+    "equipment": "cable",
+    "primaryMuscle": "shoulders",
+    "description": "Keep elbows slightly bent. Raise the arms out to the sides to a comfortable shoulder height, then lower slowly without shrugging or swinging. ",
+    "demo": "raise"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000046",
+    "name": "Machine Lateral Raise",
+    "movementPattern": "shoulder_abduction",
+    "equipment": "machine",
+    "primaryMuscle": "shoulders",
+    "description": "Keep elbows slightly bent. Raise the arms out to the sides to a comfortable shoulder height, then lower slowly without shrugging or swinging. ",
+    "demo": "raise"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000047",
+    "name": "Leaning Cable Lateral Raise",
+    "movementPattern": "shoulder_abduction",
+    "equipment": "cable",
+    "primaryMuscle": "shoulders",
+    "description": "Keep elbows slightly bent. Raise the arms out to the sides to a comfortable shoulder height, then lower slowly without shrugging or swinging. ",
+    "demo": "raise"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000048",
+    "name": "Reverse Pec Deck",
+    "movementPattern": "horizontal_abduction",
+    "equipment": "free weight",
+    "primaryMuscle": "rear_delts",
+    "description": "Support or hinge your torso. Move the upper arms outward with a soft elbow bend, then return slowly while keeping the neck relaxed. ",
+    "demo": "rear"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000049",
+    "name": "Bent-Over Dumbbell Reverse Fly",
+    "movementPattern": "horizontal_abduction",
+    "equipment": "dumbbell",
+    "primaryMuscle": "rear_delts",
+    "description": "Support or hinge your torso. Move the upper arms outward with a soft elbow bend, then return slowly while keeping the neck relaxed. ",
+    "demo": "rear"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000050",
+    "name": "Cable Reverse Fly",
+    "movementPattern": "horizontal_abduction",
+    "equipment": "cable",
+    "primaryMuscle": "rear_delts",
+    "description": "Support or hinge your torso. Move the upper arms outward with a soft elbow bend, then return slowly while keeping the neck relaxed. ",
+    "demo": "rear"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000051",
+    "name": "Front Squat",
+    "movementPattern": "squat",
+    "equipment": "free weight",
+    "primaryMuscle": "quadriceps",
+    "description": "Brace your trunk. Bend hips and knees together with knees tracking the toes; lower to a controlled depth, then push through the whole foot to stand. ",
+    "demo": "squat"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000052",
+    "name": "Goblet Squat",
+    "movementPattern": "squat",
+    "equipment": "free weight",
+    "primaryMuscle": "quadriceps",
+    "description": "Brace your trunk. Bend hips and knees together with knees tracking the toes; lower to a controlled depth, then push through the whole foot to stand. ",
+    "demo": "squat"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000053",
+    "name": "Hack Squat",
+    "movementPattern": "squat",
+    "equipment": "free weight",
+    "primaryMuscle": "quadriceps",
+    "description": "Brace your trunk. Bend hips and knees together with knees tracking the toes; lower to a controlled depth, then push through the whole foot to stand. ",
+    "demo": "squat"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000054",
+    "name": "Smith Machine Squat",
+    "movementPattern": "squat",
+    "equipment": "machine",
+    "primaryMuscle": "quadriceps",
+    "description": "Brace your trunk. Bend hips and knees together with knees tracking the toes; lower to a controlled depth, then push through the whole foot to stand. ",
+    "demo": "squat"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000055",
+    "name": "Box Squat",
+    "movementPattern": "squat",
+    "equipment": "free weight",
+    "primaryMuscle": "quadriceps",
+    "description": "Brace your trunk. Bend hips and knees together with knees tracking the toes; lower to a controlled depth, then push through the whole foot to stand. ",
+    "demo": "squat"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000056",
+    "name": "Bodyweight Squat",
+    "movementPattern": "squat",
+    "equipment": "bodyweight",
+    "primaryMuscle": "quadriceps",
+    "description": "Brace your trunk. Bend hips and knees together with knees tracking the toes; lower to a controlled depth, then push through the whole foot to stand. ",
+    "demo": "squat"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000057",
+    "name": "Safety-Bar Squat",
+    "movementPattern": "squat",
+    "equipment": "free weight",
+    "primaryMuscle": "quadriceps",
+    "description": "Brace your trunk. Bend hips and knees together with knees tracking the toes; lower to a controlled depth, then push through the whole foot to stand. ",
+    "demo": "squat"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000058",
+    "name": "Leg Press",
+    "movementPattern": "knee_extension",
+    "equipment": "machine",
+    "primaryMuscle": "quadriceps",
+    "description": "Sit with hips and back supported. Bend the knees without rolling the pelvis, then press the platform away without locking the knees forcefully. ",
+    "demo": "legpress"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000059",
+    "name": "Single-Leg Press",
+    "movementPattern": "knee_extension",
+    "equipment": "machine",
+    "primaryMuscle": "quadriceps",
+    "description": "Sit with hips and back supported. Bend the knees without rolling the pelvis, then press the platform away without locking the knees forcefully. Train each side separately and keep the pelvis level.",
+    "demo": "legpress"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000060",
+    "name": "Horizontal Leg Press",
+    "movementPattern": "knee_extension",
+    "equipment": "machine",
+    "primaryMuscle": "quadriceps",
+    "description": "Sit with hips and back supported. Bend the knees without rolling the pelvis, then press the platform away without locking the knees forcefully. ",
+    "demo": "legpress"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000061",
+    "name": "Reverse Lunge",
+    "movementPattern": "lunge",
+    "equipment": "free weight",
+    "primaryMuscle": "quadriceps",
+    "description": "Use a stable split stance. Lower both knees while keeping the front heel grounded, then press through the front foot to return. ",
+    "demo": "lunge"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000062",
+    "name": "Forward Lunge",
+    "movementPattern": "lunge",
+    "equipment": "free weight",
+    "primaryMuscle": "quadriceps",
+    "description": "Use a stable split stance. Lower both knees while keeping the front heel grounded, then press through the front foot to return. ",
+    "demo": "lunge"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000063",
+    "name": "Dumbbell Split Squat",
+    "movementPattern": "lunge",
+    "equipment": "dumbbell",
+    "primaryMuscle": "quadriceps",
+    "description": "Use a stable split stance. Lower both knees while keeping the front heel grounded, then press through the front foot to return. ",
+    "demo": "lunge"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000064",
+    "name": "Bulgarian Split Squat",
+    "movementPattern": "lunge",
+    "equipment": "free weight",
+    "primaryMuscle": "quadriceps",
+    "description": "Use a stable split stance. Lower both knees while keeping the front heel grounded, then press through the front foot to return. Rest the rear foot on a stable low bench.",
+    "demo": "lunge"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000065",
+    "name": "Walking Lunge",
+    "movementPattern": "lunge",
+    "equipment": "free weight",
+    "primaryMuscle": "quadriceps",
+    "description": "Use a stable split stance. Lower both knees while keeping the front heel grounded, then press through the front foot to return. ",
+    "demo": "lunge"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000066",
+    "name": "Conventional Deadlift",
+    "movementPattern": "hip_hinge",
+    "equipment": "free weight",
+    "primaryMuscle": "hamstrings",
+    "description": "Keep the load close and spine neutral. Send the hips back with softly bent knees, then drive through the feet and extend the hips to stand. ",
+    "demo": "hinge"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000067",
+    "name": "Sumo Deadlift",
+    "movementPattern": "hip_hinge",
+    "equipment": "free weight",
+    "primaryMuscle": "hamstrings",
+    "description": "Keep the load close and spine neutral. Send the hips back with softly bent knees, then drive through the feet and extend the hips to stand. ",
+    "demo": "hinge"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000068",
+    "name": "Trap-Bar Deadlift",
+    "movementPattern": "hip_hinge",
+    "equipment": "free weight",
+    "primaryMuscle": "hamstrings",
+    "description": "Keep the load close and spine neutral. Send the hips back with softly bent knees, then drive through the feet and extend the hips to stand. ",
+    "demo": "hinge"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000069",
+    "name": "Dumbbell Romanian Deadlift",
+    "movementPattern": "hip_hinge",
+    "equipment": "dumbbell",
+    "primaryMuscle": "hamstrings",
+    "description": "Keep the load close and spine neutral. Send the hips back with softly bent knees, then drive through the feet and extend the hips to stand. ",
+    "demo": "hinge"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000070",
+    "name": "Single-Leg Romanian Deadlift",
+    "movementPattern": "hip_hinge",
+    "equipment": "free weight",
+    "primaryMuscle": "hamstrings",
+    "description": "Keep the load close and spine neutral. Send the hips back with softly bent knees, then drive through the feet and extend the hips to stand. Train each side separately and keep the pelvis level.",
+    "demo": "hinge"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000071",
+    "name": "Good Morning",
+    "movementPattern": "hip_hinge",
+    "equipment": "free weight",
+    "primaryMuscle": "hamstrings",
+    "description": "Keep the load close and spine neutral. Send the hips back with softly bent knees, then drive through the feet and extend the hips to stand. ",
+    "demo": "hinge"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000072",
+    "name": "Cable Pull-Through",
+    "movementPattern": "hip_hinge",
+    "equipment": "cable",
+    "primaryMuscle": "hamstrings",
+    "description": "Keep the load close and spine neutral. Send the hips back with softly bent knees, then drive through the feet and extend the hips to stand. ",
+    "demo": "hinge"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000073",
+    "name": "Barbell Hip Thrust",
+    "movementPattern": "hip_extension",
+    "equipment": "barbell",
+    "primaryMuscle": "glutes",
+    "description": "Set feet securely with knees bent. Extend the hips by squeezing the glutes, pause with ribs down, then lower without overextending the back. ",
+    "demo": "bridge"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000074",
+    "name": "Glute Bridge",
+    "movementPattern": "hip_extension",
+    "equipment": "bodyweight",
+    "primaryMuscle": "glutes",
+    "description": "Set feet securely with knees bent. Extend the hips by squeezing the glutes, pause with ribs down, then lower without overextending the back. ",
+    "demo": "bridge"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000075",
+    "name": "Single-Leg Glute Bridge",
+    "movementPattern": "hip_extension",
+    "equipment": "bodyweight",
+    "primaryMuscle": "glutes",
+    "description": "Set feet securely with knees bent. Extend the hips by squeezing the glutes, pause with ribs down, then lower without overextending the back. Train each side separately and keep the pelvis level.",
+    "demo": "bridge"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000076",
+    "name": "Machine Hip Thrust",
+    "movementPattern": "hip_extension",
+    "equipment": "machine",
+    "primaryMuscle": "glutes",
+    "description": "Set feet securely with knees bent. Extend the hips by squeezing the glutes, pause with ribs down, then lower without overextending the back. ",
+    "demo": "bridge"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000077",
+    "name": "Lying Leg Curl",
+    "movementPattern": "knee_flexion",
+    "equipment": "machine",
+    "primaryMuscle": "hamstrings",
+    "description": "Align the machine axis with the knee. Keep hips supported as you curl the pad toward the body, then straighten the knee slowly. ",
+    "demo": "legcurl"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000078",
+    "name": "Standing Single-Leg Curl",
+    "movementPattern": "knee_flexion",
+    "equipment": "machine",
+    "primaryMuscle": "hamstrings",
+    "description": "Align the machine axis with the knee. Keep hips supported as you curl the pad toward the body, then straighten the knee slowly. Train each side separately and keep the pelvis level.",
+    "demo": "legcurl"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000079",
+    "name": "Leg Extension",
+    "movementPattern": "knee_extension",
+    "equipment": "machine",
+    "primaryMuscle": "quadriceps",
+    "description": "Align the knee with the machine pivot and keep the thigh supported. Straighten the knee smoothly against the pad, then lower under control. ",
+    "demo": "legextension"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000080",
+    "name": "Single-Leg Extension",
+    "movementPattern": "knee_extension",
+    "equipment": "machine",
+    "primaryMuscle": "quadriceps",
+    "description": "Align the knee with the machine pivot and keep the thigh supported. Straighten the knee smoothly against the pad, then lower under control. Train each side separately and keep the pelvis level.",
+    "demo": "legextension"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000081",
+    "name": "Seated Calf Raise",
+    "movementPattern": "plantar_flexion",
+    "equipment": "free weight",
+    "primaryMuscle": "calves",
+    "description": "Keep the ball of the foot supported. Lift the heel through a comfortable range, pause, and lower slowly without bouncing. ",
+    "demo": "calf"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000082",
+    "name": "Leg Press Calf Raise",
+    "movementPattern": "plantar_flexion",
+    "equipment": "free weight",
+    "primaryMuscle": "calves",
+    "description": "Keep the ball of the foot supported. Lift the heel through a comfortable range, pause, and lower slowly without bouncing. ",
+    "demo": "calf"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000083",
+    "name": "Single-Leg Calf Raise",
+    "movementPattern": "plantar_flexion",
+    "equipment": "free weight",
+    "primaryMuscle": "calves",
+    "description": "Keep the ball of the foot supported. Lift the heel through a comfortable range, pause, and lower slowly without bouncing. Train each side separately and keep the pelvis level.",
+    "demo": "calf"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000084",
+    "name": "Barbell Curl",
+    "movementPattern": "elbow_flexion",
+    "equipment": "barbell",
+    "primaryMuscle": "biceps",
+    "description": "Keep the upper arm still and wrist stacked. Bend the elbow to bring the load up, then lower slowly without swinging the torso. ",
+    "demo": "curl"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000085",
+    "name": "Dumbbell Curl",
+    "movementPattern": "elbow_flexion",
+    "equipment": "dumbbell",
+    "primaryMuscle": "biceps",
+    "description": "Keep the upper arm still and wrist stacked. Bend the elbow to bring the load up, then lower slowly without swinging the torso. ",
+    "demo": "curl"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000086",
+    "name": "Hammer Curl",
+    "movementPattern": "elbow_flexion",
+    "equipment": "free weight",
+    "primaryMuscle": "biceps",
+    "description": "Keep the upper arm still and wrist stacked. Bend the elbow to bring the load up, then lower slowly without swinging the torso. Keep palms facing each other.",
+    "demo": "curl"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000087",
+    "name": "Preacher Curl",
+    "movementPattern": "elbow_flexion",
+    "equipment": "free weight",
+    "primaryMuscle": "biceps",
+    "description": "Keep the upper arm still and wrist stacked. Bend the elbow to bring the load up, then lower slowly without swinging the torso. ",
+    "demo": "curl"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000088",
+    "name": "Incline Dumbbell Curl",
+    "movementPattern": "elbow_flexion",
+    "equipment": "dumbbell",
+    "primaryMuscle": "biceps",
+    "description": "Keep the upper arm still and wrist stacked. Bend the elbow to bring the load up, then lower slowly without swinging the torso. Use a low incline so the shoulder stays comfortable.",
+    "demo": "curl"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000089",
+    "name": "Cable Curl",
+    "movementPattern": "elbow_flexion",
+    "equipment": "cable",
+    "primaryMuscle": "biceps",
+    "description": "Keep the upper arm still and wrist stacked. Bend the elbow to bring the load up, then lower slowly without swinging the torso. ",
+    "demo": "curl"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000090",
+    "name": "Concentration Curl",
+    "movementPattern": "elbow_flexion",
+    "equipment": "free weight",
+    "primaryMuscle": "biceps",
+    "description": "Keep the upper arm still and wrist stacked. Bend the elbow to bring the load up, then lower slowly without swinging the torso. ",
+    "demo": "curl"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000091",
+    "name": "EZ-Bar Curl",
+    "movementPattern": "elbow_flexion",
+    "equipment": "free weight",
+    "primaryMuscle": "biceps",
+    "description": "Keep the upper arm still and wrist stacked. Bend the elbow to bring the load up, then lower slowly without swinging the torso. ",
+    "demo": "curl"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000092",
+    "name": "Reverse Curl",
+    "movementPattern": "elbow_flexion",
+    "equipment": "free weight",
+    "primaryMuscle": "biceps",
+    "description": "Keep the upper arm still and wrist stacked. Bend the elbow to bring the load up, then lower slowly without swinging the torso. Use a palms-away grip.",
+    "demo": "curl"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000093",
+    "name": "Cable Triceps Pushdown",
+    "movementPattern": "elbow_extension",
+    "equipment": "cable",
+    "primaryMuscle": "triceps",
+    "description": "Hold the upper arm steady. Straighten the elbow against resistance, then bend it under control; avoid moving the shoulder to lift the weight. ",
+    "demo": "extension"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000094",
+    "name": "Rope Triceps Pushdown",
+    "movementPattern": "elbow_extension",
+    "equipment": "free weight",
+    "primaryMuscle": "triceps",
+    "description": "Hold the upper arm steady. Straighten the elbow against resistance, then bend it under control; avoid moving the shoulder to lift the weight. ",
+    "demo": "extension"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000095",
+    "name": "Overhead Cable Triceps Extension",
+    "movementPattern": "elbow_extension",
+    "equipment": "cable",
+    "primaryMuscle": "triceps",
+    "description": "Hold the upper arm steady. Straighten the elbow against resistance, then bend it under control; avoid moving the shoulder to lift the weight. ",
+    "demo": "extension"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000096",
+    "name": "Dumbbell Overhead Extension",
+    "movementPattern": "elbow_extension",
+    "equipment": "dumbbell",
+    "primaryMuscle": "triceps",
+    "description": "Hold the upper arm steady. Straighten the elbow against resistance, then bend it under control; avoid moving the shoulder to lift the weight. ",
+    "demo": "extension"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000097",
+    "name": "Lying EZ-Bar Triceps Extension",
+    "movementPattern": "elbow_extension",
+    "equipment": "free weight",
+    "primaryMuscle": "triceps",
+    "description": "Hold the upper arm steady. Straighten the elbow against resistance, then bend it under control; avoid moving the shoulder to lift the weight. ",
+    "demo": "extension"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000098",
+    "name": "Single-Arm Cable Pushdown",
+    "movementPattern": "elbow_extension",
+    "equipment": "cable",
+    "primaryMuscle": "triceps",
+    "description": "Hold the upper arm steady. Straighten the elbow against resistance, then bend it under control; avoid moving the shoulder to lift the weight. Train each side separately and keep the pelvis level.",
+    "demo": "extension"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000099",
+    "name": "Cable Crunch",
+    "movementPattern": "trunk_flexion",
+    "equipment": "cable",
+    "primaryMuscle": "abdominals",
+    "description": "Keep the pelvis controlled. Bring the rib cage toward the pelvis with a small trunk curl, then return slowly without pulling on the neck. ",
+    "demo": "crunch"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000100",
+    "name": "Floor Crunch",
+    "movementPattern": "trunk_flexion",
+    "equipment": "bodyweight",
+    "primaryMuscle": "abdominals",
+    "description": "Keep the pelvis controlled. Bring the rib cage toward the pelvis with a small trunk curl, then return slowly without pulling on the neck. ",
+    "demo": "crunch"
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000101",
+    "name": "Machine Ab Crunch",
+    "movementPattern": "trunk_flexion",
+    "equipment": "machine",
+    "primaryMuscle": "abdominals",
+    "description": "Keep the pelvis controlled. Bring the rib cage toward the pelvis with a small trunk curl, then return slowly without pulling on the neck. ",
+    "demo": "crunch"
+  }
+]

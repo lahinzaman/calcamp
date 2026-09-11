@@ -54,7 +54,10 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
     }else{
       if(!name.trim()||!portion.trim()||!Number.isFinite(Number(portion))||Number(portion)<=0||Number(portion)>352)throw new Error('Enter a food name and portion greater than 0 oz (up to 352 oz).');
       if(macroFields.some(([key])=>!values[key].trim()||!Number.isFinite(Number(values[key]))||Number(values[key])<0||Number(values[key])>20000))throw new Error('Complete all four macro values; unknown values are not zero.');
-      nutritionStore.getState().addConsumed(Object.fromEntries(macroFields.map(([k])=>[k,Number(values[k])])) as unknown as MacroTotals);
+      // The macro fields describe the whole portion entered, so that portion is one serving.
+      nutritionStore.getState().addEntry({name:name.trim(),servings:1,servingLabel:`${Number(portion)} oz`,
+        referenceMacros:Object.fromEntries(macroFields.map(([k])=>[k,Number(values[k])])) as unknown as MacroTotals,
+        source:action==='photo'?'photo':action==='barcode'?'barcode':'manual'});
     }locked.current=true;onClose();}catch(e){setError((e as Error).message);}
   };
   return <Modal visible presentationStyle="pageSheet" animationType="slide" onRequestClose={onClose}><SafeAreaView className="flex-1 bg-background"><KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:24,paddingBottom:60}}>

@@ -7,16 +7,19 @@ import { emptyMacros, type MacroTotals, type MicronutrientTotals } from '../../t
 import type { WorkoutState } from '../../store/workoutStore';
 import type { HealthSummary, HealthWorkout, HealthMeal } from '../health/types';
 import type { CompletedWorkout } from '../../types/workout';
+import type { FoodEntry } from '../../types/foodEntry';
 import type { DurableStorage } from './storage';
 export interface NutritionMutation { legacyMetricPatch?: { isAdherent?: boolean; bodyWeightKg?: number | null }; date: string; macros: MacroTotals; micros: MicronutrientTotals; patch: { isAdherent?: boolean; bodyWeightLbs?: number | null } }
+export interface FoodEntryMutation { op: 'upsert' | 'delete'; entry: FoodEntry }
 export type SyncPayload = { kind: 'routine'; data: WorkoutRoutine } | { kind: 'nutrition'; data: NutritionMutation } | { kind: 'workout'; data: CompletedWorkout }
+  | { kind: 'food-entry'; data: FoodEntryMutation }
   | { kind: 'health-workout'; data: HealthWorkout } | { kind: 'health-meal'; data: HealthMeal } | { kind: 'activity'; data: ActivitySnapshot };
 export type Mutation = SyncPayload & { id: string; attempts: number; nextAttemptAt: number; blocked: boolean; error: string | null };
 export interface AccountData {
-  version: 2; routines?: WorkoutRoutine[]; days: Record<string, DailyTotals>; workout: WorkoutState | null; queue: Mutation[]; workoutReceipts: string[];
+  version: 2; routines?: WorkoutRoutine[]; days: Record<string, DailyTotals>; entries?: Record<string, FoodEntry[]>; workout: WorkoutState | null; queue: Mutation[]; workoutReceipts: string[];
   health: { enabled: boolean; summary: HealthSummary | null; workouts: HealthWorkout[]; lastBatchAt: number | null; error: string | null; exported: string[] };
 }
-const fresh = (): AccountData => ({ version: 2, days: {}, workout: null, queue: [], workoutReceipts: [], health: { enabled: false, summary: null, workouts: [], lastBatchAt: null, error: null, exported: [] } });
+const fresh = (): AccountData => ({ version: 2, days: {}, entries: {}, workout: null, queue: [], workoutReceipts: [], health: { enabled: false, summary: null, workouts: [], lastBatchAt: null, error: null, exported: [] } });
 export function retryDelay(attempt: number, random = Math.random) { return Math.min(300_000, Math.round(1000 * 2 ** Math.min(attempt, 9) * (0.8 + random() * 0.4))); }
 export function isPermanent(error: unknown) {
   const e = error as { code?: string; status?: number };
@@ -41,7 +44,7 @@ export class SyncEngine {
     const raw = owner ? this.storage.get(`account:${owner}`) : null;
     const data: AccountData = raw ? migrateImperialSnapshot(JSON.parse(raw)) as AccountData : fresh();
     if (data.version !== 2 || !Array.isArray(data.queue) || !data.days || !data.health) throw new Error('Offline storage needs recovery. Local data has been preserved.');
-    data.workoutReceipts ??= [];
+    data.workoutReceipts ??= []; data.entries ??= {};
     this.lastAckAt = null; this.generation++; this.revision++; this.owner = owner; this.data = data; this.storageError = null; this.changed();
   }
   commit(data: AccountData) {
@@ -68,6 +71,27 @@ export class SyncEngine {
     const days = { ...this.data.days, [next.date]: next };
     if (Object.values(macros).some(Boolean) || Object.keys(micros).length || Object.keys(patch).length) this.queue({ kind: 'nutrition', data: { date: next.date, macros, micros, patch } }, id, { days });
     else this.commit({ ...this.data, days });
+  }
+  /** Entry rows are their own records; the aggregate totals still sync as nutrition deltas. */
+  recordEntries(date: string, next: FoodEntry[], previous: FoodEntry[]) {
+    if (!this.owner || next === previous) return;
+    const before = new Map(previous.map(e => [e.id, e]));
+    const after = new Map(next.map(e => [e.id, e]));
+    const changed: FoodEntryMutation[] = [];
+    for (const entry of next) {
+      const old = before.get(entry.id);
+      if (!old || JSON.stringify(old) !== JSON.stringify(entry)) changed.push({ op: 'upsert', entry });
+    }
+    for (const entry of previous) if (!after.has(entry.id)) changed.push({ op: 'delete', entry });
+    const entries = { ...this.data.entries, [date]: next };
+    if (!changed.length) { this.commit({ ...this.data, entries }); return; }
+    // A superseded edit for the same row is dropped: the newest payload already carries the final state.
+    const superseded = new Set(changed.map(c => `food-entry:${c.entry.id}`));
+    const queue = this.data.queue.filter(q => !(q.kind === 'food-entry' && superseded.has(`food-entry:${q.data.entry.id}`)));
+    this.commit({ ...this.data, entries, queue: [...queue, ...changed.map(data => ({
+      kind: 'food-entry' as const, data, id: `food-entry:${data.entry.id}:${data.op}:${this.now()}`,
+      attempts: 0, nextAttemptAt: 0, blocked: false, error: null,
+    }))] });
   }
   setOnline(online: boolean) { this.online = online; this.changed(); if (online) void this.drain(); }
   retryBlocked() { this.commit({ ...this.data, queue: this.data.queue.map(q => ({ ...q, blocked: false, nextAttemptAt: 0, error: null })) }); return this.drain(); }

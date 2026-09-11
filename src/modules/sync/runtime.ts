@@ -28,6 +28,11 @@ export const syncEngine = new SyncEngine(durableStorage, async (owner, job) => {
     return;
   }
   if (job.kind === 'routine') { await (await import('../../api/routines')).saveRoutine(owner, job.data); return; }
+  if (job.kind === 'food-entry') {
+    const entries = await import('../../api/foodEntries');
+    if (job.data.op === 'delete') await entries.deleteFoodEntry(owner, job.data.entry.id); else await entries.saveFoodEntry(owner, job.data.entry);
+    return;
+  }
   const repository = await getTrackingRepository();
   if (job.kind === 'nutrition') {
     if (!repository.applyNutritionMutation) throw new Error('Update the sync repository.');
@@ -45,7 +50,9 @@ function applySnapshot() {
   applying = true;
   try {
     const date = localDateKey(new Date()); const snapshot = syncEngine.data.days[date];
-    if (snapshot) nutritionStore.setState({ ...snapshot, cloudOwnerId: syncEngine.owner, syncStatus: 'idle', syncError: null });
+    const entries = syncEngine.data.entries?.[date] ?? [];
+    if (snapshot) nutritionStore.setState({ ...snapshot, entries, cloudOwnerId: syncEngine.owner, syncStatus: 'idle', syncError: null });
+    else if (entries.length) nutritionStore.setState({ entries });
     if (syncEngine.data.workout) workoutStore.setState(syncEngine.data.workout);
     workoutStore.setState({ importedWorkouts: syncEngine.data.health.workouts });
   } finally { applying = false; }
@@ -78,6 +85,7 @@ export function activateSync(owner: string | null) {
     if (applying || !syncEngine.owner) return;
     const a = daily(next); const b = daily(previous);
     if (JSON.stringify(a) !== JSON.stringify(b)) syncEngine.recordNutrition(a, b, randomUUID());
+    syncEngine.recordEntries(next.date, next.entries, previous.date === next.date ? previous.entries : []);
   };
   syncBridge.workout = next => {
     if (applying || !syncEngine.owner) return;

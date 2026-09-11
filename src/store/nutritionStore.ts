@@ -4,6 +4,7 @@ import { useStore } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 
 import type { DiningHallSlug } from '../types/campus';
+import { mealForHour, scaleMacros, scaleMicros, type FoodEntry, type MealSlot } from '../types/foodEntry';
 import {
   emptyMacros,
   NUTRIENT_UNITS,
@@ -18,6 +19,8 @@ export interface NutritionState {
   date: string;
   consumedMacros: MacroTotals;
   consumedMicros: MicronutrientTotals;
+  /** Individual foods logged for `date`. Totals stay authoritative for cloud aggregates. */
+  entries: FoodEntry[];
   dailyTargets: NutritionTargets | null;
   activeDiningHall: DiningHallSlug | null;
   isAdherent: boolean;
@@ -37,6 +40,13 @@ export interface NutritionActions {
   setDailyTargets: (targets: NutritionTargets | null) => void;
   setActiveDiningHall: (diningHall: DiningHallSlug | null) => void;
   setIsAdherent: (isAdherent: boolean) => void;
+  /** Logs one food and moves the day's totals by exactly that food's amounts. */
+  addEntry: (input: NewFoodEntry) => FoodEntry;
+  /** Removes a logged food and subtracts it back out of the totals. */
+  removeEntry: (id: string) => FoodEntry | null;
+  /** Re-portions or re-files a logged food, adjusting totals by the difference. */
+  updateEntry: (id: string, patch: { servings?: number; meal?: MealSlot; name?: string }) => void;
+  undoLastEntry: () => FoodEntry | null;
   /** Call on app foreground and before reading/logging a new day's totals. */
   syncToday: (now?: Date) => void;
   /** Clears totals/adherence while retaining targets and the selected hall. */
@@ -46,6 +56,23 @@ export interface NutritionActions {
 }
 
 export type NutritionStore = NutritionState & NutritionActions;
+
+export interface NewFoodEntry {
+  id?: string;
+  name: string;
+  meal?: MealSlot;
+  servings: number;
+  servingLabel?: string | null;
+  /** Values for a single serving; the stored entry scales these by `servings`. */
+  referenceMacros: MacroTotals;
+  referenceMicros?: MicronutrientTotals;
+  source: FoodEntry['source'];
+}
+
+function newEntryId() {
+  const random = globalThis.crypto?.randomUUID?.();
+  return random ?? `entry-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 export function localDateKey(date: Date): string {
   if (!Number.isFinite(date.getTime())) throw new RangeError('Invalid nutrition date.');
@@ -85,11 +112,25 @@ function copyMicros(micros: MicronutrientTotals): MicronutrientTotals {
   return copy;
 }
 
+/** Signed total adjustment for one entry; clamped so a removal can never produce a negative total. */
+function shiftTotals(state: { consumedMacros: MacroTotals; consumedMicros: MicronutrientTotals }, macros: MacroTotals, micros: MicronutrientTotals, sign: 1 | -1) {
+  const consumedMacros = { ...state.consumedMacros };
+  for (const key of Object.keys(consumedMacros) as (keyof MacroTotals)[]) consumedMacros[key] = Math.max(0, consumedMacros[key] + sign * macros[key]);
+  const consumedMicros = { ...state.consumedMicros };
+  for (const key of Object.keys(micros) as NutrientKey[]) {
+    const total = Math.max(0, (consumedMicros[key] ?? 0) + sign * micros[key]!);
+    if (sign === -1 && total === 0 && !(key in state.consumedMicros)) continue;
+    consumedMicros[key] = total;
+  }
+  return { consumedMacros, consumedMicros };
+}
+
 function freshDay(now: Date) {
   return {
     date: localDateKey(now),
     consumedMacros: emptyMacros(),
     consumedMicros: {} as MicronutrientTotals,
+    entries: [] as FoodEntry[],
     isAdherent: false,
     bodyWeightLbs: null as number | null,
     cloudDate: null as string | null,
@@ -193,6 +234,51 @@ export function createNutritionStore(options: { now?: () => Date; repository?: T
         }
         return { ...(state.date === today.date ? {} : today), consumedMacros, consumedMicros, syncStatus: 'idle' };
       });
+    },
+    addEntry: (input) => {
+      if (!input.name.trim() || input.name.length > 150) throw new RangeError('Enter a food name of 1–150 characters.');
+      if (!Number.isFinite(input.servings) || input.servings <= 0 || input.servings > 100) throw new RangeError('Servings must be greater than 0 and at most 100.');
+      const referenceMacros = copyMacros(input.referenceMacros);
+      const referenceMicros = copyMicros(input.referenceMicros ?? {});
+      const stamp = now();
+      const today = freshDay(stamp);
+      const entry: FoodEntry = {
+        id: input.id ?? newEntryId(), date: today.date, meal: input.meal ?? mealForHour(stamp.getHours()),
+        name: input.name.trim(), servings: input.servings, servingLabel: input.servingLabel ?? null,
+        macros: copyMacros(scaleMacros(referenceMacros, input.servings)), micros: copyMicros(scaleMicros(referenceMicros, input.servings)),
+        referenceMacros, referenceMicros, source: input.source, loggedAtMs: stamp.getTime(),
+      };
+      set((state) => {
+        const current = state.date === today.date ? state : { ...state, ...today };
+        return { ...(state.date === today.date ? {} : today), entries: [...current.entries, entry],
+          ...shiftTotals(current, entry.macros, entry.micros, 1), syncStatus: 'idle' };
+      });
+      return entry;
+    },
+    removeEntry: (id) => {
+      const state = get();
+      const entry = state.entries.find(e => e.id === id) ?? null;
+      if (!entry) return null;
+      set({ entries: state.entries.filter(e => e.id !== id), ...shiftTotals(state, entry.macros, entry.micros, -1), syncStatus: 'idle' });
+      return entry;
+    },
+    updateEntry: (id, patch) => {
+      const state = get();
+      const entry = state.entries.find(e => e.id === id);
+      if (!entry) throw new Error('That food is no longer in the diary.');
+      if (patch.servings !== undefined && (!Number.isFinite(patch.servings) || patch.servings <= 0 || patch.servings > 100)) throw new RangeError('Servings must be greater than 0 and at most 100.');
+      if (patch.name !== undefined && (!patch.name.trim() || patch.name.length > 150)) throw new RangeError('Enter a food name of 1–150 characters.');
+      const servings = patch.servings ?? entry.servings;
+      const next: FoodEntry = { ...entry, servings, meal: patch.meal ?? entry.meal, name: (patch.name ?? entry.name).trim(),
+        macros: copyMacros(scaleMacros(entry.referenceMacros, servings)), micros: copyMicros(scaleMicros(entry.referenceMicros, servings)) };
+      const removed = shiftTotals(state, entry.macros, entry.micros, -1);
+      const readded = shiftTotals({ ...state, ...removed }, next.macros, next.micros, 1);
+      set({ entries: state.entries.map(e => e.id === id ? next : e), ...readded, syncStatus: 'idle' });
+    },
+    undoLastEntry: () => {
+      const entries = get().entries;
+      if (!entries.length) return null;
+      return get().removeEntry(entries.reduce((latest, e) => e.loggedAtMs >= latest.loggedAtMs ? e : latest).id);
     },
     setDailyTargets: (targets) => {
       set({

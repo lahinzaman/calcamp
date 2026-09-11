@@ -5,16 +5,12 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { SectionListProps } from 'react-native';
 import type { DailyMenuItem } from '../../types/nutrislice';
+import { reanimatedMock } from './support/reanimated';
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, __DEV__: true });
 // Native host components only are mocked. Screens, hooks, stores, and Query are real.
 mock.module('nativewind', { namedExports: { cssInterop: () => {}, vars: (value: unknown) => value } });
-const transition = { duration: () => ({ reduceMotion: () => undefined }) };
-mock.module('react-native-reanimated', { defaultExport: { View: 'AnimatedView', createAnimatedComponent: (component: unknown) => component }, namedExports: {
-  ReduceMotion: { System: 'system' }, LinearTransition: transition, FadeInDown: transition, FadeOutUp: transition, useReducedMotion: () => false,
-  useSharedValue: (value: unknown) => React.useRef({ value }).current,
-  useAnimatedStyle: (fn: () => unknown) => fn(), withTiming: (value: unknown) => value,
-} });
+mock.module('react-native-reanimated', reanimatedMock);
 mock.module('react-native', { namedExports: {
   useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1, scale: 3 }), View: 'View', Text: 'Text', Pressable: 'Pressable', TextInput: 'TextInput',
   ScrollView: 'ScrollView', Modal: 'Modal', KeyboardAvoidingView: 'KeyboardAvoidingView', ActivityIndicator: 'ActivityIndicator',

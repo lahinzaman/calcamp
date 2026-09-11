@@ -15,6 +15,12 @@ module.exports = {
         carbs: 'rgb(var(--color-carbs) / <alpha-value>)',
         fat: 'rgb(var(--color-fat) / <alpha-value>)',
       },
+      fontFamily: {
+        sans: ['Manjari', 'sans-serif'],
+        serif: ['Manjari', 'sans-serif'],
+        display: ['Manjari', 'sans-serif'],
+        mono: ['Manjari', 'sans-serif'],
+      },
     },
   },
   plugins: [],

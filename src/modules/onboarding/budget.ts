@@ -50,6 +50,18 @@ const SPLITS: Record<DietStyle, { proteinPerLb: number; fatShare: number }> = {
   plant_forward: { proteinPerLb: 0.8, fatShare: 0.30 },
 };
 
+/** The weekly change the user actually asked for, in lbs; 0 for maintain, recomp and auto. */
+export function intendedWeeklyChange(s: LifestyleSurvey | undefined | null) {
+  const survey = { ...defaultSurvey, ...(s ?? {}) };
+  if (survey.goalDirection === 'lose') return -(survey.rateLbsPerWeek ?? 1);
+  if (survey.goalDirection === 'gain') return survey.rateLbsPerWeek ?? 1;
+  return 0;
+}
+/** Lowest intake this app will ever recommend for someone, before resting need is considered. */
+export function calorieFloor(s: LifestyleSurvey | undefined | null) {
+  return FLOOR[({ ...defaultSurvey, ...(s ?? {}) }).metabolicSex];
+}
+
 function validate(p: OnboardingProfile, s: LifestyleSurvey) {
   if (!['female','male','unspecified'].includes(s.metabolicSex) || !['unsure','lean','balanced','higher'].includes(s.composition)
     || !['energy','strength','mobility'].includes(s.priority) || !['steady','tired'].includes(s.recovery)

@@ -116,3 +116,46 @@ test('every diet style still balances macros to its calorie target, and goal ETA
   const wrongWay = startingBudget({ ...profile, lifestyle_survey: { ...base, goalWeightLbs: 190 } });
   assert.equal(wrongWay.weeksToGoal, null);
 });
+
+test('rescaling a target holds protein and the fat share, and stays balanced', () => {
+  const { rescale } = require('../nutrition/targetReview') as typeof import('../nutrition/targetReview');
+  const current = { caloriesKcal: 2400, proteinG: 180, carbsG: 270, fatG: 75 };
+  const next = rescale(current, 2150);
+  assert.equal(next.caloriesKcal, 2150);
+  assert.equal(next.proteinG, 180, 'protein is protected when calories fall');
+  assert.equal(next.proteinG * 4 + next.carbsG * 4 + next.fatG * 9, next.caloriesKcal);
+  assert.ok(next.carbsG < current.carbsG, 'the reduction comes out of carbs and fat');
+  // Protein cannot exceed 35% of a much smaller budget.
+  const tiny = rescale(current, 1500);
+  assert.ok(tiny.proteinG <= 1500 * .35 / 4);
+  assert.ok(tiny.carbsG >= 0);
+});
+
+test('the intended weekly change reflects the goal the user chose', () => {
+  const { intendedWeeklyChange, calorieFloor } = require('../onboarding/budget') as typeof import('../onboarding/budget');
+  assert.equal(intendedWeeklyChange({ ...defaultSurvey, goalDirection: 'lose', rateLbsPerWeek: 1.5 }), -1.5);
+  assert.equal(intendedWeeklyChange({ ...defaultSurvey, goalDirection: 'gain', rateLbsPerWeek: 0.5 }), 0.5);
+  assert.equal(intendedWeeklyChange({ ...defaultSurvey, goalDirection: 'maintain' }), 0);
+  // Recomp holds weight steady; the change comes from body composition, not the scale.
+  assert.equal(intendedWeeklyChange({ ...defaultSurvey, goalDirection: 'recomp' }), 0);
+  assert.equal(intendedWeeklyChange(null), 0);
+  assert.equal(calorieFloor({ ...defaultSurvey, metabolicSex: 'female' }), 1200);
+  assert.equal(calorieFloor({ ...defaultSurvey, metabolicSex: 'male' }), 1500);
+});
+
+test('the weekly weigh-in reminder schedules on the chosen weekday', () => {
+  const { reminderPlan, defaultPreferences, parsePreferences } = require('../notifications/policy') as typeof import('../notifications/policy');
+  const prefs = { ...defaultPreferences, enabled: true, weighInReminders: true, weighInDay: 3, weighInTime: '07:30' };
+  const plan = reminderPlan(prefs, null);
+  const weighIn = plan.find(reminder => reminder.kind === 'weigh-in')!;
+  assert.ok(weighIn, 'a weigh-in reminder should be scheduled');
+  // Expo weekdays are 1-7 starting at Sunday, so Wednesday (3) becomes 4.
+  assert.equal(weighIn.weekday, 4);
+  assert.equal(weighIn.hour, 7);
+  assert.equal(weighIn.minute, 30);
+  assert.equal(reminderPlan({ ...prefs, weighInReminders: false }, null).some(r => r.kind === 'weigh-in'), false);
+  assert.equal(reminderPlan({ ...prefs, enabled: false }, null).length, 0);
+  assert.throws(() => parsePreferences({ ...prefs, weighInDay: 9 }));
+  assert.throws(() => parsePreferences({ ...prefs, weighInTime: '25:00' }));
+  assert.equal(parsePreferences(prefs).weighInDay, 3);
+});

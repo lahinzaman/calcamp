@@ -2,6 +2,7 @@ import { MacroOverview } from '../../components/MacroOverview';
 import { FoodDiary } from '../diary/FoodDiary';
 import { WaterTracker } from '../../components/WaterTracker';
 import { StreakCard } from '../habits/StreakCard';
+import { MicronutrientPanel } from '../nutrition/MicronutrientPanel';
 import { ScrollView, View } from 'react-native';
 import { router } from 'expo-router';
 import { Text } from '../../theme/primitives';
@@ -18,7 +19,7 @@ export default function DashboardScreen() {
   const profile = useAuthStore(s => s.profile);
   return <SafeAreaView edges={['top','left','right','bottom']} className="flex-1 bg-background"><ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 110, maxWidth: 760, width: '100%', alignSelf: 'center' }}>
     <Reveal index={0}><Text className="text-sm font-bold tracking-widest">CALCAMP</Text><Text className="mt-3 text-4xl leading-[52px] font-bold">Your daily picture.</Text><Text className="mt-1">{date} · Nutrition & training, together</Text></Reveal>
-    <SyncIndicator /><StreakCard /><MacroOverview /><WaterTracker /><FoodDiary />
+    <SyncIndicator /><StreakCard /><MacroOverview /><MicronutrientPanel /><WaterTracker /><FoodDiary />
     <Reveal index={1}><View className="mb-5 rounded-3xl bg-surface p-5"><Text className="text-xl font-bold">4-day Upper / Lower</Text><Text className="mb-4 mt-1">{session ? `In progress · ${session.name}` : 'A clear plan. One session at a time.'}</Text>
       <View className="flex-row flex-wrap gap-3">{DEFAULT_UPPER_LOWER.map((day,index) => {
         const days = profile?.is_advanced_track ? [...profile.training_days].sort((a,b) => (a || 7) - (b || 7)) : [];

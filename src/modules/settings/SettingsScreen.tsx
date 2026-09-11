@@ -14,6 +14,7 @@ import { UpdateControls } from '../updates/UpdateControls';
 import { FeedbackModal } from '../feedback/FeedbackModal';
 import { AccountAccess } from '../account/AccountAccess';
 import { TargetEditor } from './TargetEditor';
+import { ExportControls } from './ExportControls';
 export async function checkService(signal: AbortSignal): Promise<boolean> {
   const base = process.env.EXPO_PUBLIC_BACKEND_URL;
   if (!base) return false;
@@ -57,7 +58,8 @@ export default function SettingsScreen() {
       </Section>
       <Section title="Notifications" index={4}><NotificationSettings /></Section>
       <Reveal index={5}><UpdateControls /></Reveal>
-      <Section title="Help & account" index={6}>
+      <Section title="Your data" index={6}><ExportControls /></Section>
+      <Section title="Help & account" index={7}>
         <Action secondary label="Send feedback" onPress={() => setFeedback(true)} />
         <AccountAccess />
       </Section>

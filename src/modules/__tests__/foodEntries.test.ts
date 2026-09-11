@@ -116,3 +116,20 @@ test('food search skips products missing any macro rather than reading them as z
   // Open Food Facts reports sodium in grams; the app stores milligrams.
   assert.equal(results[0].micros.sodium_mg, 400);
 });
+
+test('recipe totals scale by ingredient servings and divide by the yield', () => {
+  const { perServing, recipeTotals, saveRecipe, readRecipes, deleteRecipe } = require('../foods/recipes') as typeof import('../foods/recipes');
+  const recipe = { id: 'r1', name: 'Chili', yieldServings: 4, updatedAtMs: 0, items: [
+    { name: 'Beef', servings: 2, macros: { caloriesKcal: 200, proteinG: 20, carbsG: 0, fatG: 12 }, micros: { iron_mg: 2 } },
+    { name: 'Beans', servings: 1, macros: { caloriesKcal: 120, proteinG: 7, carbsG: 22, fatG: 1 }, micros: { iron_mg: 3 } },
+  ] };
+  assert.equal(recipeTotals(recipe).macros.caloriesKcal, 520);
+  assert.equal(recipeTotals(recipe).micros.iron_mg, 7);
+  assert.equal(perServing(recipe).macros.caloriesKcal, 130);
+  assert.equal(perServing(recipe).micros.iron_mg, 1.75);
+  assert.equal(saveRecipe('alice', recipe).length, 1);
+  assert.equal(readRecipes('alice')[0].name, 'Chili');
+  assert.throws(() => saveRecipe('alice', { ...recipe, items: [] }));
+  assert.throws(() => saveRecipe('alice', { ...recipe, yieldServings: 0 }));
+  assert.equal(deleteRecipe('alice', 'r1').length, 0);
+});

@@ -13,8 +13,10 @@ import { searchFoods, type SearchResult } from '../../api/foodSearch';
 import { MEAL_LABELS, MEAL_SLOTS, mealForHour, scaleMacros, type MealSlot } from '../../types/foodEntry';
 import { orderFoods, readSavedFoods, rememberFood, toggleFavorite, forgetFood, type SavedFood } from './savedFoods';
 import { foodEmoji } from '../dining/foodEmoji';
-type Tab = 'recent' | 'frequent' | 'favorite' | 'search';
-const TABS: [Tab, string][] = [['recent', 'Recent'], ['frequent', 'Frequent'], ['favorite', 'Favorites'], ['search', 'Search']];
+import { RecipeBuilder } from './RecipeBuilder';
+import { deleteRecipe, perServing, readRecipes, type Recipe } from './recipes';
+type Tab = 'recent' | 'frequent' | 'favorite' | 'recipe' | 'search';
+const TABS: [Tab, string][] = [['recent', 'Recent'], ['frequent', 'Frequent'], ['favorite', 'Favorites'], ['recipe', 'Recipes'], ['search', 'Search']];
 type Candidate = { name: string; servingLabel: string | null; macros: SearchResult['macros']; micros: SearchResult['micros']; source: SavedFood['source'] };
 export function FoodSearchModal({ onClose, meal }: { onClose: () => void; meal?: MealSlot }) {
   const owner = useAuthStore(s => s.session?.user.id) ?? 'anonymous';
@@ -22,10 +24,12 @@ export function FoodSearchModal({ onClose, meal }: { onClose: () => void; meal?:
   const [term, setTerm] = useState(''); const [query, setQuery] = useState('');
   const [saved, setSaved] = useState<SavedFood[]>(() => readSavedFoods(owner));
   const [chosen, setChosen] = useState<Candidate | null>(null);
+  const [recipes, setRecipes] = useState<Recipe[]>(() => readRecipes(owner));
+  const [building, setBuilding] = useState<Recipe | 'new' | null>(null);
   useEffect(() => { const id = setTimeout(() => setQuery(term), 400); return () => clearTimeout(id); }, [term]);
   const results = useQuery({ enabled: tab === 'search' && query.trim().length >= 2, queryKey: ['food-search', query],
     queryFn: ({ signal }) => searchFoods(query, signal), retry: false, staleTime: 300000 });
-  const list = useMemo(() => orderFoods(saved, tab === 'search' ? 'recent' : tab), [saved, tab]);
+  const list = useMemo(() => orderFoods(saved, tab === 'search' || tab === 'recipe' ? 'recent' : tab), [saved, tab]);
   if (chosen) return <PortionSheet candidate={chosen} meal={meal} owner={owner} onBack={() => setChosen(null)} onDone={onClose} />;
   return <Modal visible presentationStyle="pageSheet" animationType="slide" onRequestClose={onClose}>
     <SafeAreaView className="flex-1 bg-background"><KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -40,7 +44,15 @@ export function FoodSearchModal({ onClose, meal }: { onClose: () => void; meal?:
           {results.data?.map(result => <Row key={result.key} title={result.name} subtitle={`${result.brand ? `${result.brand} · ` : ''}${Math.round(result.macros.caloriesKcal)} kcal per ${result.servingLabel}`}
             onPress={() => setChosen({ name: result.name, servingLabel: result.servingLabel, macros: result.macros, micros: result.micros, source: 'custom' })} />)}
         </>}
-        {tab !== 'search' && <>
+        {tab === 'recipe' && <>
+          {!recipes.length && <Text className="mb-4">No recipes yet. Build one from foods you have already logged and it becomes a single tap.</Text>}
+          {recipes.map(recipe => { const single = perServing(recipe); return <Row key={recipe.id} title={recipe.name}
+            subtitle={`${Math.round(single.macros.caloriesKcal)} kcal per serving · makes ${recipe.yieldServings} · ${recipe.items.length} ingredients`}
+            onRemove={() => { setRecipes(deleteRecipe(owner, recipe.id)); haptic('warning'); }}
+            onPress={() => setChosen({ name: recipe.name, servingLabel: 'serving', macros: single.macros, micros: single.micros, source: 'recipe' })} />; })}
+          <Action secondary label="Create a recipe" onPress={() => setBuilding('new')} />
+        </>}
+        {tab !== 'search' && tab !== 'recipe' && <>
           {!list.length && <Text className="mb-4">{tab === 'favorite' ? 'No favourites yet. Star a food after logging it and it lands here.' : 'Nothing logged yet. Foods you log appear here so the second time is one tap.'}</Text>}
           {list.map(food => <Row key={food.key} title={food.name}
             subtitle={`${Math.round(food.macros.caloriesKcal)} kcal${food.servingLabel ? ` per ${food.servingLabel}` : ''} · logged ${food.uses}×`}
@@ -50,6 +62,8 @@ export function FoodSearchModal({ onClose, meal }: { onClose: () => void; meal?:
             onPress={() => setChosen({ name: food.name, servingLabel: food.servingLabel, macros: food.macros, micros: food.micros, source: food.source })} />)}
         </>}
         <Action secondary label="Close" onPress={onClose} />
+        {building && <RecipeBuilder owner={owner} existing={building === 'new' ? undefined : building}
+          onClose={() => setBuilding(null)} onSaved={setRecipes} />}
       </ScrollView>
     </KeyboardAvoidingView></SafeAreaView>
   </Modal>;

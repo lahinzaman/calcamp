@@ -50,3 +50,20 @@ test('session volume counts completed working sets only', () => {
   assert.equal(sessionVolume(workout([set(), set({ id: 'w', isWarmup: true, weightLbs: 45, reps: 10 })])), 135 * 8);
   assert.equal(dateKeyOf(Date.UTC(2026, 8, 11, 12)).length, 10);
 });
+
+test('plate loading is per side, greedy, and honest about what the rack cannot make', () => {
+  const { loadPlates, describePlates } = require('../workout/plates') as typeof import('../workout/plates');
+  const plan = loadPlates(225)!;
+  assert.deepEqual(plan.perSide, [45, 45]);
+  assert.equal(plan.achieved, 225);
+  assert.equal(plan.remainder, 0);
+  assert.equal(describePlates(plan), '2×45 per side = 225 lbs');
+  // 137.5 is not loadable on a standard rack; report the shortfall rather than rounding silently.
+  const odd = loadPlates(137.5)!;
+  assert.equal(odd.achieved, 135);
+  assert.equal(odd.remainder, 2.5);
+  assert.equal(loadPlates(45)!.perSide.length, 0);
+  assert.equal(describePlates(loadPlates(45)), 'Just the bar — 45 lbs.');
+  assert.equal(loadPlates(30)!.achieved, 45);
+  assert.equal(loadPlates(Number.NaN), null);
+});

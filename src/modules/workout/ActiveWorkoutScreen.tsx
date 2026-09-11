@@ -1,6 +1,7 @@
 import { RoutineBuilder } from './RoutineBuilder';
 import { overloadSuggestion, type LiftHistory, type PersonalRecord, type SessionVolumePoint } from './history';
 import { VolumeTrend } from './VolumeTrend';
+import { PlateCalculator } from './PlateCalculator';
 import { ExerciseHelp } from './ExerciseHelp';
 import { exerciseById } from './catalog';
 import type { WorkoutRoutine } from './routines';
@@ -169,6 +170,7 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
         </ScrollView>
         {active ? <View className="rounded-3xl bg-surface pt-4">
           <View className="mx-4 flex-row items-center gap-3"><Text className="flex-1 text-xl font-bold">{active.exercise.name}</Text><ExerciseHelp exercise={active.exercise} /></View>
+          <PlateCalculator suggested={suggestion?.weightLbs} />
           {suggestion && <View className="mx-4 mt-3 rounded-2xl bg-surface p-4"><Text className="font-bold">Suggested next set</Text><Text className="mt-1 text-lg font-bold">{suggestion.weightLbs} lbs × {suggestion.reps}</Text><Text className="mt-1 text-sm text-ink">{suggestion.reason}</Text></View>}
           {!!lifts[active.exercise.id] && <Text className="mx-4 mt-2 text-sm text-ink">Best so far: {Math.round(lifts[active.exercise.id].bestWeightLbs)} lbs · est. 1RM {Math.round(lifts[active.exercise.id].bestOneRepMaxLbs)} lbs · {lifts[active.exercise.id].sessions} session(s) logged.</Text>}
           <Text className="mx-4 mb-5 mt-2 text-sm text-ink">{active.exercise.grip ?? 'Custom grip'} · {active.exercise.equipment ?? 'Custom exercise'} · {active.defaultRestSeconds}s rest</Text>

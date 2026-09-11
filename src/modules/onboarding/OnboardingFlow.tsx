@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { SafeAreaView } from '../../theme/SafeArea';
 import { Text } from '../../theme/primitives';
 import { Action, Choice, NumericField } from '../../components/FormControls';
+import { ProgressBar } from '../../theme/motion';
 import { useOnboardingStore } from '../../store/onboardingStore';
 import { authStore, useAuthStore } from '../../store/authStore';
 import { completeOnboarding } from '../../api/profile';
@@ -18,6 +19,8 @@ export default function OnboardingFlow({ step = 'track' }: { step?: OnboardingSt
   const [inches, setInches] = useState<number | null>(draft.height_inches ? draft.height_inches % 12 : 0);
   const [error, setError] = useState<string | null>(null); const [busy, setBusy] = useState(false);
   const survey = draft.lifestyle_survey ?? defaultSurvey;
+  const totalSteps = draft.is_advanced_track ? 4 : 3;
+  const stepNumber = { track: 1, basics: 2, advanced: 3, review: totalSteps }[step];
   const updateSurvey = (value: Partial<LifestyleSurvey>) => patch({ lifestyle_survey: { ...survey, ...value } });
   let budget: ReturnType<typeof startingBudget> | null = null; let budgetError = '';
   try { budget = startingBudget(draft); } catch (e) { budgetError = (e as Error).message; }
@@ -36,7 +39,10 @@ export default function OnboardingFlow({ step = 'track' }: { step?: OnboardingSt
     } catch { setError('Could not save your profile. Check the survey and connection, then retry.'); } finally { setBusy(false); }
   };
   return <SafeAreaView edges={['left','right','bottom']} className="flex-1 bg-background"><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24, paddingBottom: 80, maxWidth: 760, width: '100%', alignSelf: 'center' }}>
-    <Text className="mb-2 text-sm font-bold">YOUR CALCAMP ROUTINE</Text><Text className="mb-6 text-3xl font-bold">{{ track: 'Your kind of progress', basics: 'A day in your life', advanced: 'Your training rhythm', review: 'Your starting budget' }[step]}</Text>
+    <Text className="mb-2 text-sm font-bold">YOUR CALCAMP ROUTINE</Text>
+    <Text className="mb-2 text-3xl font-bold">{{ track: 'Your kind of progress', basics: 'A day in your life', advanced: 'Your training rhythm', review: 'Your starting budget' }[step]}</Text>
+    <View className="mb-2"><ProgressBar value={stepNumber} target={totalSteps} tone="protein" height={6} /></View>
+    <Text className="mb-5 text-sm">Step {stepNumber} of {totalSteps} · {{ track: 'How closely you want to track.', basics: 'These set your starting calorie budget.', advanced: 'Which days you train, so rest and training targets differ.', review: 'Check the numbers before you start.' }[step]}</Text>
     {!!pendingEmail && !session && <View className="mb-4"><Text>Confirm {pendingEmail}, then sign in to save. You can prepare this survey now.</Text><Action label="Return to sign in" onPress={() => { authStore.getState().setPendingSignup(null); router.replace('/auth'); }} /></View>}
     {step === 'track' && <><Choice label="Casual · everyday nutrition" selected={!draft.is_advanced_track} onPress={() => patch({ is_advanced_track: false })} /><Choice label="Advanced · structured training" selected={draft.is_advanced_track} onPress={() => patch({ is_advanced_track: true })} /><Action label="Continue" onPress={() => router.push('/onboarding/basics')} /></>}
     {step === 'basics' && <>
@@ -44,6 +50,7 @@ export default function OnboardingFlow({ step = 'track' }: { step?: OnboardingSt
       <NumericField label="Body weight · lbs" keyboardType="decimal-pad" value={draft.weight_lbs} onValue={weight_lbs => patch({ weight_lbs })} />
       <NumericField label="Age in years" keyboardType="number-pad" value={survey.age} onValue={age => updateSurvey({ age })} />
       <Text className="mb-2 font-bold">Metabolic equation reference</Text><Text className="mb-3">Optional physiological reference for the estimate, not gender identity.</Text><View className="flex-row flex-wrap">{(['female','male','unspecified'] as const).map(v => <Choice key={v} label={v === 'unspecified' ? 'Prefer not to say' : v} selected={survey.metabolicSex === v} onPress={() => updateSurvey({ metabolicSex: v })} />)}</View>
+      <Text className="mt-1 text-sm">Height, weight and age feed the Mifflin–St Jeor equation. Nothing here is shared, and you can change it later.</Text>
       <Text className="my-3 font-bold">How active is your typical week?</Text>{ACTIVITY_LEVELS.map((v,i) => <Choice key={v} label={['Mostly seated','Some walking / 1–2 active days','Regular walking / 3–4 active days','Physical work / 5+ active days'][i]} selected={draft.activity_level === v} onPress={() => patch({ activity_level: v })} />)}
       <Text className="my-3 font-bold">How would you describe your build?</Text><View className="flex-row flex-wrap">{(['unsure','lean','balanced','higher'] as const).map(v => <Choice key={v} label={v === 'higher' ? 'More body fat' : v} selected={survey.composition === v} onPress={() => updateSurvey({ composition: v })} />)}</View>
       <Text className="my-3 font-bold">What would make daily life better?</Text>{(['energy','strength','mobility'] as const).map((v,i) => <Choice key={v} label={['Steadier energy','Feeling stronger','Moving more comfortably'][i]} selected={survey.priority === v} onPress={() => updateSurvey({ priority: v })} />)}

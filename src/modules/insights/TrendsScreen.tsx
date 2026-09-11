@@ -11,6 +11,8 @@ import { useAuthStore } from '../../store/authStore';
 import { useNutritionStore } from '../../store/nutritionStore';
 import { loadHistory, shiftDate, type HistoryDay } from '../../api/history';
 import { calculateTdee } from '../nutrition/tdee';
+import { MilestonesCard } from '../habits/MilestonesCard';
+import { milestones, summarizeStreak } from '../habits/streaks';
 import { localDateKey } from '../../store/nutritionStore';
 const RANGES = [[28, '4 weeks'], [56, '8 weeks'], [90, '13 weeks']] as const;
 function Card({ title, children, index }: { title: string; children: React.ReactNode; index: number }) {
@@ -78,7 +80,8 @@ export default function TrendsScreen() {
           <BarChart series={calories} target={targets?.caloriesKcal ?? null} tone="carbs" />
           <Text className="mt-2 text-sm">{calories.length} days logged{targets ? '. The dashed line is your target; bars above it are over.' : '.'}</Text>
         </Card>
-        <Card title="Consistency" index={5}>
+        <MilestonesCard items={milestones(summarizeStreak(rows, today), 0)} index={5} />
+        <Card title="Consistency" index={6}>
           <View className="flex-row flex-wrap gap-5">
             <View><Text className="text-3xl font-bold">{rows.filter(r => r.is_adherent).length}</Text><Text className="text-sm">Adherent days</Text></View>
             <View><Text className="text-3xl font-bold">{estimate?.averageIntakeKcal ? Math.round(estimate.averageIntakeKcal) : '—'}</Text><Text className="text-sm">Avg intake kcal</Text></View>

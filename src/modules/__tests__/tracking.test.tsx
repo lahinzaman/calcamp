@@ -194,7 +194,9 @@ test('CalCamp dashboard mounts real targets and all four training days', async (
   const { default: DashboardScreen } = require('../dashboard/DashboardScreen') as typeof import('../dashboard/DashboardScreen');
   nutritionStore.getState().setDailyTargets({ macros: { caloriesKcal: 2400, proteinG: 150, carbsG: 270, fatG: 80 }, micronutrients: {} });
   nutritionStore.getState().setConsumed({ caloriesKcal: 900, proteinG: 60, carbsG: 110, fatG: 25 });
-  await act(async () => { rendered = create(<DashboardScreen />); });
+  // Today now loads streak history, so the screen needs a query client.
+  const dashboardClient = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
+  await act(async () => { rendered = create(<QueryClientProvider client={dashboardClient}><DashboardScreen /></QueryClientProvider>); });
   assert.ok(textContent().includes('1500 kcal remaining'));
   for (const plan of ['Upper A','Upper B','Lower A','Lower B']) assert.ok(textContent().includes(plan));
   // Calories, three macros, and the water tracker.

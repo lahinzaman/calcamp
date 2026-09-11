@@ -85,3 +85,34 @@ test('entry rows round-trip through the Supabase column mapping', () => {
   assert.deepEqual(round, entry);
   assert.equal(mealForHour(23), 'snack');
 });
+
+test('recents merge repeats, favourites persist, and ordering separates recent from frequent', () => {
+  const { readSavedFoods, rememberFood, toggleFavorite, orderFoods, forgetFood } = require('../foods/savedFoods') as typeof import('../foods/savedFoods');
+  const base = { servingLabel: '1 cup', micros: {}, source: 'manual' as const };
+  rememberFood('alice', { ...base, name: 'Oats', macros: ref }, 1000);
+  rememberFood('alice', { ...base, name: 'Oats', macros: ref }, 2000);
+  rememberFood('alice', { ...base, name: 'Yogurt', macros: ref }, 3000);
+  const saved = readSavedFoods('alice');
+  assert.equal(saved.length, 2);
+  assert.equal(saved.find(f => f.name === 'Oats')!.uses, 2);
+  assert.equal(orderFoods(saved, 'recent')[0].name, 'Yogurt');
+  assert.equal(orderFoods(saved, 'frequent')[0].name, 'Oats');
+  assert.equal(orderFoods(saved, 'favorite').length, 0);
+  const starred = toggleFavorite('alice', saved.find(f => f.name === 'Oats')!.key);
+  assert.equal(orderFoods(starred, 'favorite')[0].name, 'Oats');
+  assert.equal(forgetFood('alice', starred[0].key).length, 1);
+});
+
+test('food search skips products missing any macro rather than reading them as zero', () => {
+  const { parseSearchProducts } = require('../../api/foodSearch') as typeof import('../../api/foodSearch');
+  const results = parseSearchProducts({ products: [
+    { code: '1', product_name: 'Complete', brands: 'Acme, Other', nutriments: { 'energy-kcal_100g': 120, proteins_100g: 5, carbohydrates_100g: 20, fat_100g: 2, sodium_100g: 0.4 } },
+    { code: '2', product_name: 'Missing fat', nutriments: { 'energy-kcal_100g': 120, proteins_100g: 5, carbohydrates_100g: 20 } },
+    { code: '3', product_name: '', nutriments: { 'energy-kcal_100g': 1, proteins_100g: 1, carbohydrates_100g: 1, fat_100g: 1 } },
+  ] });
+  assert.equal(results.length, 1);
+  assert.equal(results[0].name, 'Complete');
+  assert.equal(results[0].brand, 'Acme');
+  // Open Food Facts reports sodium in grams; the app stores milligrams.
+  assert.equal(results[0].micros.sodium_mg, 400);
+});

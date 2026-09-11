@@ -9,6 +9,19 @@ import { durableStorage } from './storage';
 import { SyncEngine } from './engine';
 import { healthStore } from '../health/useHealthSync';
 import { syncBridge } from './bridge';
+import { rememberFood } from '../foods/savedFoods';
+import type { FoodEntry } from '../../types/foodEntry';
+
+/** Every logging path feeds recents from one place, so the second log of a food is one tap. */
+function rememberNewFoods(owner: string, next: FoodEntry[], previous: FoodEntry[]) {
+  const seen = new Set(previous.map(entry => entry.id));
+  for (const entry of next) {
+    // Quick adds and water are one-off amounts, not foods worth offering again.
+    if (seen.has(entry.id) || entry.source === 'quick') continue;
+    try { rememberFood(owner, { name: entry.name, servingLabel: entry.servingLabel, macros: entry.referenceMacros, micros: entry.referenceMicros, source: entry.source }); }
+    catch { /* recents are a convenience; never block a log */ }
+  }
+}
 let applying = false;
 const daily = (s: DailyTotals): DailyTotals => ({ date: s.date, consumedMacros: s.consumedMacros, consumedMicros: s.consumedMicros, isAdherent: s.isAdherent, bodyWeightLbs: s.bodyWeightLbs });
 export const syncEngine = new SyncEngine(durableStorage, async (owner, job) => {
@@ -85,7 +98,9 @@ export function activateSync(owner: string | null) {
     if (applying || !syncEngine.owner) return;
     const a = daily(next); const b = daily(previous);
     if (JSON.stringify(a) !== JSON.stringify(b)) syncEngine.recordNutrition(a, b, randomUUID());
-    syncEngine.recordEntries(next.date, next.entries, previous.date === next.date ? previous.entries : []);
+    const before = previous.date === next.date ? previous.entries : [];
+    syncEngine.recordEntries(next.date, next.entries, before);
+    rememberNewFoods(syncEngine.owner, next.entries, before);
   };
   syncBridge.workout = next => {
     if (applying || !syncEngine.owner) return;

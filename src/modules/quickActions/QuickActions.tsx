@@ -9,9 +9,11 @@ import { Text } from '../../theme/primitives';
 import { ENTER_STAGGER, SPRING, TIMING } from '../../theme/motion';
 import { haptic } from '../../theme/haptics';
 import { QuickLogModal, type QuickAction } from './QuickLogModal';
-const actions:[QuickAction,string][]=[['photo','📷 AI Photo Log'],['barcode','▥ Barcode Scanner'],['manual','✎ Manual Food Log'],['weight','⚖ Update Body Weight']];
+import { FoodSearchModal } from '../foods/FoodSearchModal';
+type MenuKey = QuickAction | 'search';
+const actions:[MenuKey,string][]=[['search','🔎 Search & Recents'],['photo','📷 AI Photo Log'],['barcode','▥ Barcode Scanner'],['quick','⚡ Quick Add Calories'],['manual','✎ Manual Food Log'],['weight','⚖ Update Body Weight']];
 export function QuickActions() {
-  const [open,setOpen]=useState(false); const [action,setAction]=useState<QuickAction|null>(null); const insets=useSafeAreaInsets();
+  const [open,setOpen]=useState(false); const [action,setAction]=useState<MenuKey|null>(null); const insets=useSafeAreaInsets();
   const path=usePathname(); const bottom=insets.bottom+76;
   const turn=useSharedValue(0);
   useEffect(()=>{turn.value=withSpring(open?1:0,SPRING.pop);},[open,turn]);
@@ -35,6 +37,7 @@ export function QuickActions() {
         </View>
       </Animated.View>
     </ThemeRoot></Modal>
-    {action&&<QuickLogModal key={action} action={action} onClose={()=>setAction(null)}/>}
+    {action==='search'&&<FoodSearchModal onClose={()=>setAction(null)}/>}
+    {action&&action!=='search'&&<QuickLogModal key={action} action={action} onClose={()=>setAction(null)}/>}
   </View>;
 }

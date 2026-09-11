@@ -194,7 +194,9 @@ test('CalCamp dashboard mounts real targets and all four training days', async (
   await act(async () => { rendered = create(<DashboardScreen />); });
   assert.ok(textContent().includes('1500 kcal remaining'));
   for (const plan of ['Upper A','Upper B','Lower A','Lower B']) assert.ok(textContent().includes(plan));
-  assert.equal(rendered!.root.findAllByProps({ accessibilityRole: 'progressbar' }).length, 4);
+  // Calories, three macros, and the water tracker.
+  assert.equal(rendered!.root.findAllByProps({ accessibilityRole: 'progressbar' }).length, 5);
+  assert.ok(textContent().includes('cups'));
 });
 
 test('workout templates create actual Lower sessions and removal clears a draft row', async () => {

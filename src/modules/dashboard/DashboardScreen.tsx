@@ -27,7 +27,8 @@ export default function DashboardScreen() {
       })}</View><View className="mt-4"><Action label={session ? 'Continue workout' : 'Open training log'} onPress={() => router.push('/explore')} /></View>
     </View></Reveal>
     <Reveal index={2}><Action label="📈 See your trends" onPress={() => router.push('/trends')} />
-    <Action secondary label="🗓️ Browse past days" onPress={() => router.push('/history')} />
+    <Action secondary label="🗓️ Calendar" onPress={() => router.push('/calendar')} />
+    <Action secondary label="📜 Browse past days" onPress={() => router.push('/history')} />
     <Action label="🍽️ Explore dining & log a meal" onPress={() => router.push('/dining')} />
     <Action label="🚶 Plan a walk" secondary onPress={() => router.push('/walk')} /></Reveal>
   </ScrollView></SafeAreaView>;

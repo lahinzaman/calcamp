@@ -6,6 +6,7 @@ import { useSyncStatus } from '@/store/syncStore';
 import '../modules/sync/background';
 import '@/global.css';
 import { ThemeRoot, HydrateTheme } from '../theme/ThemeRoot';
+import { DayRollover } from '../modules/nutrition/DayRollover';
 import { useThemeStore } from '../theme/store';
 import { palettes } from '../theme/palette';
 import { useFonts } from 'expo-font';
@@ -35,6 +36,7 @@ function AuthenticatedRoutes() {
     <Stack.Protected guard={complete}><Stack.Screen name="walk" options={{ headerShown: true, title: 'Walk', headerBackTitle: 'Today', animation: 'slide_from_right' }} /></Stack.Protected>
     <Stack.Protected guard={complete}><Stack.Screen name="trends" options={{ headerShown: true, title: 'Trends', headerBackTitle: 'Today', animation: 'slide_from_right' }} /></Stack.Protected>
     <Stack.Protected guard={complete}><Stack.Screen name="history" options={{ headerShown: true, title: 'History', headerBackTitle: 'Today', animation: 'slide_from_right' }} /></Stack.Protected>
+    <Stack.Protected guard={complete}><Stack.Screen name="calendar" options={{ headerShown: true, title: 'Calendar', headerBackTitle: 'Today', animation: 'slide_from_right' }} /></Stack.Protected>
     <Stack.Screen name="auth-callback" />
   </Stack>;
 }
@@ -44,7 +46,7 @@ function RootLayout() {
   useEffect(() => { if (loaded || fontError) void SplashScreen.hideAsync(); }, [loaded, fontError]);
   const base = mode === 'light' ? DefaultTheme : DarkTheme;
   const theme = { ...base, colors: { ...base.colors, background: palette.background, card: palette.surface, text: palette.ink, primary: palette.ink, border: palette.border }, fonts: Object.fromEntries(Object.entries(base.fonts).map(([key, font]) => [key, { ...font, fontFamily: key === 'regular' ? 'Manjari' : 'ManjariBold' }])) as typeof base.fonts };
-  return <ThemeRoot><HydrateTheme /><StatusBar style={mode === 'light' ? 'dark' : 'light'} />{(loaded || fontError) && <ThemeProvider value={theme}><TrackingProvider><NotificationLifecycle /><AuthenticatedRoutes /></TrackingProvider></ThemeProvider>}</ThemeRoot>;
+  return <ThemeRoot><HydrateTheme /><StatusBar style={mode === 'light' ? 'dark' : 'light'} />{(loaded || fontError) && <ThemeProvider value={theme}><TrackingProvider><NotificationLifecycle /><DayRollover /><AuthenticatedRoutes /></TrackingProvider></ThemeProvider>}</ThemeRoot>;
 }
 
 export default wrapWithTelemetry(RootLayout);

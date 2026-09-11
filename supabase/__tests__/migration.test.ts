@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { PGlite } from '@electric-sql/pglite';
@@ -8,7 +7,7 @@ const alice = '20000000-0000-4000-8000-000000000001';
 const bob = '20000000-0000-4000-8000-000000000002';
 const MIGRATION = '20260911120000_phase10_food_entries_measurements.sql';
 
-/** Applies against the previous released schema, which is what the live database actually is. */
+/** Applies against a database holding everything except these two tables — the live shape. */
 test('Phase 10 migration applies to the deployed schema and enforces per-user isolation', async (t) => {
   const db = new PGlite();
   try {
@@ -23,8 +22,10 @@ test('Phase 10 migration applies to the deployed schema and enforces per-user is
       grant usage on schema auth to anon, authenticated, service_role;
       grant execute on function auth.uid() to anon, authenticated, service_role;
     `);
-    // main's schema.sql is the shape of the live project before this migration.
-    await db.exec(execFileSync('git', ['show', 'main:supabase/schema.sql'], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }));
+    // Reproduce the live database: the full schema minus exactly what this migration adds.
+    // Dropping is deterministic, where reading an earlier git ref changes meaning once merged.
+    await db.exec(await readFile(new URL('../schema.sql', import.meta.url), 'utf8'));
+    await db.exec('drop table public.food_entries; drop table public.body_measurements;');
     await db.exec(`
       insert into auth.users (id) values ('${alice}'), ('${bob}');
       insert into public.users (id) values ('${alice}'), ('${bob}');

@@ -1,1 +1,1 @@
-export { default } from '../../modules/onboarding/OnboardingFlow';
+export { default } from '../../modules/onboarding/QuizScreen';

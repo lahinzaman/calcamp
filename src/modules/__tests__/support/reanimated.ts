@@ -9,6 +9,7 @@ export const reanimatedMock = {
     Easing: { inOut: (fn: unknown) => fn, out: (fn: unknown) => fn, quad: () => 0, cubic: () => 0 },
     LinearTransition: transition, FadeIn: transition, FadeOut: transition,
     FadeInDown: transition, FadeOutDown: transition, FadeInUp: transition, FadeOutUp: transition,
+    FadeInRight: transition, FadeOutRight: transition, FadeInLeft: transition, FadeOutLeft: transition,
     useReducedMotion: () => false,
     useSharedValue: (value: unknown) => React.useRef({ value }).current,
     useAnimatedStyle: (fn: () => unknown) => fn(),

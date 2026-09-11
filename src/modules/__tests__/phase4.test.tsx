@@ -35,7 +35,8 @@ mock.module('../../api/campus.ts', { namedExports: {
 } });
 mock.module('../auth/social', { namedExports: { authRedirect: () => 'calcamp://auth-callback', signInSocial: async () => {} } });
 const { default: AuthScreen } = require('../auth/AuthScreen') as typeof import('../auth/AuthScreen');
-const { default: OnboardingFlow } = require('../onboarding/OnboardingFlow') as typeof import('../onboarding/OnboardingFlow');
+const { default: QuizScreen } = require('../onboarding/QuizScreen') as typeof import('../onboarding/QuizScreen');
+const { default: ReviewScreen } = require('../onboarding/ReviewScreen') as typeof import('../onboarding/ReviewScreen');
 const { default: GymStatus } = require('../busyness/GymStatus') as typeof import('../busyness/GymStatus');
 const { default: MacroRescue } = require('../dining/MacroRescue') as typeof import('../dining/MacroRescue');
 const { authStore } = require('../../store/authStore') as typeof import('../../store/authStore');
@@ -66,17 +67,49 @@ test('auth screen submits credentials and signup opens onboarding without manufa
   await press('New here? Create an account'); await press('Create account');
   assert.ok(signupInput); assert.equal(navigated.at(-1), '/onboarding'); assert.equal(authStore.getState().session, null);
 });
-test('onboarding branches to advanced and preserves decimal weight input', async () => {
-  await render(<OnboardingFlow />); await press('Advanced · structured training'); await press('Continue');
-  assert.equal(navigated.at(-1), '/onboarding/basics');
-  await act(async () => root!.update(<QueryClientProvider client={cache!}><OnboardingFlow step="basics" /></QueryClientProvider>));
-  await type('Height · feet', '5'); await type('Height · inches', '11'); await type('Body weight · lbs', '180.'); await type('Body weight · lbs', '180.5'); await type('Age in years', '21'); await press('Calculate my starting budget');
-  assert.equal(useOnboardingStore.getState().draft.weight_lbs, 180.5); assert.equal(navigated.at(-1), '/onboarding/advanced');
+test('the quiz asks one question at a time and blocks advancing past an invalid answer', async () => {
+  await render(<QuizScreen />);
+  // Question 1 of N: only the track question is on screen.
+  assert.ok(text().includes('How closely do you want to track?'));
+  assert.ok(!text().includes('What do you want your weight to do?'));
+  await press('Train seriously'); await press('Continue');
+  assert.equal(useOnboardingStore.getState().draft.is_advanced_track, true);
+  assert.ok(text().includes('What do you want your weight to do?'));
+
+  // Choosing a rate-bearing goal reveals questions that a maintainer never sees.
+  await press('Lose fat'); await press('Continue');
+  assert.ok(text().includes('How quickly?'));
+  await press('Steady · 1 lb a week'); await press('Continue');
+  assert.ok(text().includes('goal weight'));
+  // The goal weight question is optional, so Continue passes without an answer.
+  await press('Continue');
+  assert.ok(text().includes('metabolic reference'));
+  await press('Male reference'); await press('Continue');
+
+  // An under-18 age is rejected in place rather than carried forward.
+  await type('Amount · years', '15'); await press('Continue');
+  assert.ok(text().includes('adults 18–100'));
+  assert.ok(text().includes('How old are you?'), 'must stay on the same question');
+  await type('Amount · years', '21'); await press('Continue');
+  assert.ok(text().includes('How tall are you?'));
+  await type('Feet', '5'); await type('Inches', '11'); await press('Continue');
+  await type('Amount · lbs', '180.'); await type('Amount · lbs', '180.5'); await press('Continue');
+  assert.equal(useOnboardingStore.getState().draft.weight_lbs, 180.5);
+  assert.equal(useOnboardingStore.getState().draft.height_inches, 71);
 });
-test('advanced onboarding persists targets and timing within the daily budget', async () => {
-  login(); useOnboardingStore.getState().patch({ height_inches: 71, weight_lbs: 180, lifestyle_survey: {age:21,metabolicSex:"male",composition:"balanced",priority:"energy",recovery:"steady",specializedNutrition:false}, is_advanced_track: true,
+
+test('a maintainer is never asked about rate or goal weight', async () => {
+  await render(<QuizScreen />);
+  await press('Keep it simple'); await press('Continue');
+  await press('Stay where I am'); await press('Continue');
+  // Straight past rate and goal weight to the metabolic reference.
+  assert.ok(text().includes('metabolic reference'));
+  assert.ok(!text().includes('How quickly?'));
+});
+test('the review screen saves the computed plan, not the draft targets', async () => {
+  login(); useOnboardingStore.getState().patch({ height_inches: 71, weight_lbs: 180, lifestyle_survey: {age:21,metabolicSex:"male",composition:"balanced",priority:"energy",recovery:"steady",specializedNutrition:false,goalDirection:"lose",rateLbsPerWeek:1,dietStyle:"balanced"}, is_advanced_track: true,
     training_targets: { caloriesKcal: 2400, proteinG: 160, carbsG: 300, fatG: 60 }, preworkout_fast_carbs: true, preworkout_carbs_g: 30 });
-  await render(<OnboardingFlow step="review" />); await press('Accept budget & enter CalCamp');
+  await render(<ReviewScreen />); await press('Start using CalCamp');
   assert.equal((savedProfile as UserProfile).is_advanced_track, true); assert.equal((savedProfile as UserProfile).preworkout_carbs_g, 30);
   assert.equal(authStore.getState().profile?.onboarding_completed_at, 'now');
 });

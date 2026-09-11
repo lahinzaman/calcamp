@@ -42,10 +42,10 @@ function AuthenticatedRoutes() {
 }
 function RootLayout() {
   const mode = useThemeStore(s => s.mode); const palette = palettes[mode];
-  const [loaded, fontError] = useFonts({ Manjari: require('@expo-google-fonts/manjari/400Regular/Manjari_400Regular.ttf'), ManjariBold: require('@expo-google-fonts/manjari/700Bold/Manjari_700Bold.ttf'), ManjariLight: require('@expo-google-fonts/manjari/100Thin/Manjari_100Thin.ttf') });
+  const [loaded, fontError] = useFonts({ GoogleSans: require('@/assets/fonts/GoogleSans-400.ttf'), GoogleSansMedium: require('@/assets/fonts/GoogleSans-500.ttf'), GoogleSansBold: require('@/assets/fonts/GoogleSans-700.ttf') });
   useEffect(() => { if (loaded || fontError) void SplashScreen.hideAsync(); }, [loaded, fontError]);
   const base = mode === 'light' ? DefaultTheme : DarkTheme;
-  const theme = { ...base, colors: { ...base.colors, background: palette.background, card: palette.surface, text: palette.ink, primary: palette.ink, border: palette.border }, fonts: Object.fromEntries(Object.entries(base.fonts).map(([key, font]) => [key, { ...font, fontFamily: key === 'regular' ? 'Manjari' : 'ManjariBold' }])) as typeof base.fonts };
+  const theme = { ...base, colors: { ...base.colors, background: palette.background, card: palette.surface, text: palette.ink, primary: palette.ink, border: palette.border }, fonts: Object.fromEntries(Object.entries(base.fonts).map(([key, font]) => [key, { ...font, fontFamily: key === 'regular' ? 'GoogleSans' : 'GoogleSansBold' }])) as typeof base.fonts };
   return <ThemeRoot><HydrateTheme /><StatusBar style={mode === 'light' ? 'dark' : 'light'} />{(loaded || fontError) && <ThemeProvider value={theme}><TrackingProvider><NotificationLifecycle /><DayRollover /><AuthenticatedRoutes /></TrackingProvider></ThemeProvider>}</ThemeRoot>;
 }
 

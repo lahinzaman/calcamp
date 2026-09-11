@@ -3,7 +3,6 @@ import { servingLabel } from './serving';
 import { rescueCatalog } from '../../data/rescueCatalog';
 import { NUTRIENT_UNITS, type NutrientKey } from '../../types/nutrition';
 import { foodEmoji } from './foodEmoji';
-import { AnimatedListCell } from '../../theme/motion';
 import { MacroOverview } from '../../components/MacroOverview';
 import { safelyEdit } from '../../components/safelyEdit';
 import { LoadingCards } from '../../components/LoadingCards';
@@ -109,7 +108,7 @@ export default function DiningHallScreen() {
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} className="flex-1 bg-background">
-      <FlashList CellRendererComponent={AnimatedListCell}
+      <FlashList
         data={rows} keyExtractor={(item) => item.id} getItemType={item => item.kind}
         contentContainerStyle={{ padding: 20, paddingBottom: 110, maxWidth: 760, width: '100%', alignSelf: 'center' }}
         refreshing={menu.isRefetching} onRefresh={() => { void menu.refetch(); }}

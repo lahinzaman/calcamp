@@ -3,7 +3,6 @@
   "main": "index.js",
   "version": "1.0.0",
   "dependencies": {
-    "@expo-google-fonts/manjari": "0.4.1",
     "@expo/metro-runtime": "~57.0.15",
     "@expo/ui": "~57.0.16",
     "@lottiefiles/dotlottie-react": "^0.13.5",

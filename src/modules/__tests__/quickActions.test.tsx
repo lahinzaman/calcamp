@@ -6,7 +6,7 @@ import { reanimatedMock } from './support/reanimated';
 Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true,__DEV__:true});
 mock.module('nativewind',{namedExports:{cssInterop:()=>{},vars:(v:unknown)=>v}});
 mock.module('react-native-reanimated', reanimatedMock);
-mock.module('react-native',{namedExports:{View:'View',Text:'Text',TextInput:'TextInput',Pressable:'Pressable',Modal:'Modal',ScrollView:'ScrollView',KeyboardAvoidingView:'KeyboardAvoidingView',Platform:{OS:'web'},Linking:{openSettings:async()=>{}},AppState:{currentState:'active',addEventListener:()=>({remove(){}})}}});
+mock.module('react-native',{namedExports:{View:'View',Text:'Text',TextInput:'TextInput',Pressable:'Pressable',Modal:'Modal',ScrollView:'ScrollView',KeyboardAvoidingView:'KeyboardAvoidingView',Platform:{OS:'web'},StyleSheet:{create:(v:Record<string,unknown>)=>v,absoluteFill:{}},Linking:{openSettings:async()=>{}},AppState:{currentState:'active',addEventListener:()=>({remove(){}})}}});
 mock.module('react-native-safe-area-context',{namedExports:{SafeAreaView:'SafeAreaView',useSafeAreaInsets:()=>({top:0,bottom:34,left:0,right:0})}});
 mock.module('expo-router',{namedExports:{usePathname:()=>'/dining'}});
 let permission=false;let prompts=0;

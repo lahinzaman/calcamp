@@ -9,7 +9,6 @@ import { useAuthStore } from '../../store/authStore';
 import { Action } from '../../components/FormControls';
 import { PROGRAM } from './program';
 import { Choice } from '../../components/FormControls';
-import { AnimatedListCell } from '../../theme/motion';
 import { safelyEdit } from '../../components/safelyEdit';
 import { SyncIndicator } from '../../components/SyncIndicator';
 import { FlashList, useRecyclingState, type FlashListRef } from '@shopify/flash-list';
@@ -79,7 +78,7 @@ const SetRow = memo(function SetRow({ entry, index, previous, onRemove }: { entr
 
 export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSets?: PreviousSets }) {
   const list = useRef<FlashListRef<WorkoutSet>>(null);
-  const remove = useCallback((id: string) => safelyEdit(() => { list.current?.prepareForLayoutAnimationRender(); workoutStore.getState().removeSet(id); }), []);
+  const remove = useCallback((id: string) => safelyEdit(() => workoutStore.getState().removeSet(id)), []);
   const [program, setProgram] = useState(0);
   const owner = useAuthStore(s => s.session?.user.id);
   const [builder,setBuilder] = useState(false); const [routines,setRoutines] = useState<WorkoutRoutine[]>([]);
@@ -137,7 +136,7 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
   };
 
   return <SafeAreaView edges={['top', 'left', 'right']} className="flex-1 bg-background">
-    <FlashList ref={list} CellRendererComponent={AnimatedListCell} key={activeId ?? 'empty'} data={currentSets} keyExtractor={entry => entry.id} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
+    <FlashList ref={list} key={activeId ?? 'empty'} data={currentSets} keyExtractor={entry => entry.id} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
       renderItem={({ item, index }) => <SetRow entry={item} index={index} previous={history[index]} onRemove={remove} />}
       ListHeaderComponent={<>
       <View className="mb-6 flex-row justify-between"><Text className="text-sm font-black tracking-widest text-ink">CALCAMP</Text><Text className="text-xs font-semibold text-ink">TRAINING</Text></View>
@@ -179,7 +178,7 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
       </>}
       </>}
       ListFooterComponent={session ? <>
-        {active && <Pressable accessibilityRole="button" onPress={() => safelyEdit(() => { list.current?.prepareForLayoutAnimationRender(); workoutStore.getState().addSet({ id: localId(), sessionExerciseId: active.id }); })} className="mt-3 items-center rounded-xl bg-raised p-4"><Text className="font-bold text-ink">+ Add set</Text></Pressable>
+        {active && <Pressable accessibilityRole="button" onPress={() => safelyEdit(() => workoutStore.getState().addSet({ id: localId(), sessionExerciseId: active.id }))} className="mt-3 items-center rounded-xl bg-raised p-4"><Text className="font-bold text-ink">+ Add set</Text></Pressable>
         }
         <RestTimerPanel />
         <Pressable accessibilityRole="button" onPress={() => safelyEdit(() => {

@@ -11,7 +11,7 @@ export default function AppTabs() {
     <NativeTabs
       backgroundColor={colors.background}
       indicatorColor={colors.backgroundElement}
-      labelStyle={{ color: colors.text, fontFamily: 'ManjariBold', fontSize: 12 }}>
+      labelStyle={{ color: colors.text, fontFamily: 'GoogleSansBold', fontSize: 12 }}>
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>Today</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon

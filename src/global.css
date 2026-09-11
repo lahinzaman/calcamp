@@ -1,15 +1,15 @@
-@import url('https://fonts.googleapis.com/css2?family=Manjari:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --font-display: 'Manjari', sans-serif;
-  --font-mono: 'Manjari', sans-serif;
-  --font-rounded: 'Manjari', sans-serif;
-  --font-serif: 'Manjari', sans-serif;
-  --font-sans: 'Manjari', sans-serif;
+  --font-display: 'Google Sans', system-ui, sans-serif;
+  --font-mono: 'Google Sans', system-ui, sans-serif;
+  --font-rounded: 'Google Sans', system-ui, sans-serif;
+  --font-serif: 'Google Sans', system-ui, sans-serif;
+  --font-sans: 'Google Sans', system-ui, sans-serif;
   --color-background: 244 245 247;
   --color-surface: 255 255 255;
   --color-raised: 232 235 239;

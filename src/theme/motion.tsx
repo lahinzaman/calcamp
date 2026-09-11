@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type PropsWithChildren } from 'react';
-import { View, type ViewProps, type ViewStyle } from 'react-native';
-import Animated, { Easing, FadeIn, LinearTransition, ReduceMotion, interpolateColor, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withSpring, withTiming } from 'react-native-reanimated';
+import { View, type ViewStyle } from 'react-native';
+import Animated, { Easing, FadeIn, ReduceMotion, interpolateColor, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { useThemeStore } from './store';
 import { palettes } from './palette';
 
@@ -14,13 +14,13 @@ export const SPRING = {
 export const TIMING = { fast: 140, base: 200, slow: 320, reduceMotion: ReduceMotion.System } as const;
 export const ENTER_STAGGER = 55;
 
+/**
+ * Entrance for a list row. Deliberately has NO layout animation: FlashList recycles and
+ * repositions cells as you scroll, and animating those repositions makes rows visibly
+ * slide around mid-scroll. Row-level enter/exit is safe; cell-level layout is not.
+ */
 export function AnimatedRow({ children }: PropsWithChildren) {
-  return <Animated.View layout={LinearTransition.duration(TIMING.base).reduceMotion(ReduceMotion.System)}>{children}</Animated.View>;
-}
-
-/** Preserve FlashList's positioning/onLayout props while animating the positioned cell. */
-export function AnimatedListCell({ index: _index, ...props }: ViewProps & { index?: number }) {
-  return <Animated.View {...props} layout={LinearTransition.duration(TIMING.base).reduceMotion(ReduceMotion.System)} />;
+  return <Animated.View entering={FadeIn.duration(TIMING.fast).reduceMotion(ReduceMotion.System)}>{children}</Animated.View>;
 }
 
 /** Entrance for stacked cards: index drives a short stagger so a screen assembles rather than blinks. */
@@ -34,7 +34,7 @@ export function Reveal({ index = 0, children, style }: PropsWithChildren<{ index
     opacity.value = withDelay(delay, withTiming(1, { duration: TIMING.slow, reduceMotion: ReduceMotion.System }));
   }, [index, reduced, offset, opacity]);
   const motion = useAnimatedStyle(() => ({ opacity: opacity.value, transform: [{ translateY: offset.value }] }));
-  return <Animated.View style={[style, motion]} layout={LinearTransition.duration(TIMING.base).reduceMotion(ReduceMotion.System)}>{children}</Animated.View>;
+  return <Animated.View style={[style, motion]}>{children}</Animated.View>;
 }
 
 /** Counts to a new total instead of snapping, so a log reads as an increase. */

@@ -5,7 +5,7 @@ import { palettes } from './palette';
 function typography(style: TextProps['style'], className?: string) {
   const flat = StyleSheet?.flatten?.(style) ?? {};
   const bold = Number(flat.fontWeight) >= 600 || /font-(bold|semibold|black|extrabold)/.test(className ?? '');
-  return { fontFamily: bold ? 'ManjariBold' : /font-light/.test(className ?? '') ? 'ManjariLight' : 'Manjari', fontWeight: 'normal' as const };
+  return { fontFamily: bold ? 'GoogleSansBold' : /font-(semibold|medium)/.test(className ?? '') ? 'GoogleSansMedium' : 'GoogleSans', fontWeight: 'normal' as const };
 }
 export const Text = forwardRef<NativeText, TextProps>(function CalCampText({ style, ...props }, ref) {
   const mode = useThemeStore(s => s.mode);

@@ -44,13 +44,15 @@ test('feedback and deletion remain functional as standalone account modules', as
   } finally { await act(async () => view?.unmount()); client.clear(); authStore.setState({ session: null }); }
 });
 
-test('Settings only reports real backend and diary state, never synced while offline or queued', async()=>{
+test('Settings exposes appearance, targets and account controls, and never reports synced while offline or queued', async()=>{
  const client=new QueryClient({defaultOptions:{queries:{staleTime:Infinity,retry:false}}});client.setQueryData(['service-health'],true);
  useSyncStatus.setState({ready:true,online:true,queued:0,blocked:0,syncing:false,error:null,lastSyncedAt:Date.now()});
  let view!:ReactTestRenderer;
  try{
   await act(async()=>{view=create(<QueryClientProvider client={client}><SettingsScreen/></QueryClientProvider>);});
-  assert.ok(JSON.stringify(view.toJSON()).includes('Synced'));assert.equal(view.root.findAllByType('Pressable' as React.ElementType).length,0);
+  assert.ok(JSON.stringify(view.toJSON()).includes('Synced'));
+  // Settings owns the controls that were previously orphaned; keep them reachable from here.
+  for(const control of ['Adjust targets','Send feedback','Account','Light','Dark','Gray'])assert.ok(JSON.stringify(view.toJSON()).includes(control),`Settings is missing ${control}`);
   await act(async()=>useSyncStatus.setState({online:false}));assert.ok(JSON.stringify(view.toJSON()).includes('Offline'));assert.ok(!JSON.stringify(view.toJSON()).includes('Synced'));
   await act(async()=>useSyncStatus.setState({online:true,queued:2}));assert.ok(JSON.stringify(view.toJSON()).includes('2 queued'));
  }finally{await act(async()=>view.unmount());client.clear();}

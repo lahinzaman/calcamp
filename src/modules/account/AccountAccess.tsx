@@ -5,7 +5,7 @@ import { Text } from '../../theme/primitives';
 import { Action } from '../../components/FormControls';
 import { DeleteAccountModal } from './DeleteAccountModal';
 import { signOutWithDeviceCleanup } from '../notifications/logout';
-/** Account controls stay reachable from Today while Settings remains status-only. */
+/** Sign-out and deletion, surfaced from Settings. */
 export function AccountAccess() {
   const [open,setOpen]=useState(false); const [deleting,setDeleting]=useState(false); const [error,setError]=useState(false);
   return <><Action secondary label="Account" onPress={()=>setOpen(true)}/>

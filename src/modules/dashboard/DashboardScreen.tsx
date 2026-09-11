@@ -23,7 +23,9 @@ export default function DashboardScreen() {
         return <View key={day.name} className="rounded-2xl bg-raised p-3" style={{ flexBasis: 140, flexGrow: 1 }}><Text className="text-xs">{days[index] === undefined ? `SESSION ${index+1}` : ['SUN','MON','TUE','WED','THU','FRI','SAT'][days[index]]}</Text><Text className="mt-1 font-bold">{day.name}</Text><Text className="text-sm">{day.focus}</Text></View>;
       })}</View><View className="mt-4"><Action label={session ? 'Continue workout' : 'Open training log'} onPress={() => router.push('/explore')} /></View>
     </View></Reveal>
-    <Reveal index={2}><Action label="🍽️ Explore dining & log a meal" onPress={() => router.push('/dining')} />
+    <Reveal index={2}><Action label="📈 See your trends" onPress={() => router.push('/trends')} />
+    <Action secondary label="🗓️ Browse past days" onPress={() => router.push('/history')} />
+    <Action label="🍽️ Explore dining & log a meal" onPress={() => router.push('/dining')} />
     <Action label="🚶 Plan a walk" secondary onPress={() => router.push('/walk')} /></Reveal>
   </ScrollView></SafeAreaView>;
 }

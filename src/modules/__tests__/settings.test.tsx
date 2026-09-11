@@ -4,14 +4,10 @@ import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Session } from '@supabase/supabase-js';
+import { reanimatedMock } from './support/reanimated';
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, __DEV__: true });
 mock.module('nativewind', { namedExports: { cssInterop: () => {}, vars: (value: unknown) => value } });
-const transition = { duration: () => ({ reduceMotion: () => undefined }) };
-mock.module('react-native-reanimated', { defaultExport: { View: 'AnimatedView', createAnimatedComponent: (component: unknown) => component }, namedExports: {
-  ReduceMotion: { System: 'system' }, LinearTransition: transition, FadeInDown: transition, FadeOutUp: transition, useReducedMotion: () => false,
-  useSharedValue: (value: unknown) => React.useRef({ value }).current,
-  useAnimatedStyle: (fn: () => unknown) => fn(), withTiming: (value: unknown) => value,
-} });
+mock.module('react-native-reanimated', reanimatedMock);
 mock.module('react-native', { namedExports: { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1, scale: 3 }), View: 'View', Text: 'Text', Pressable: 'Pressable', TextInput: 'TextInput', ScrollView: 'ScrollView', Modal: 'Modal', KeyboardAvoidingView: 'KeyboardAvoidingView', Platform: { OS: 'ios', Version: '18.0' }, Linking: { openURL: async () => {} } } });
 mock.module('react-native-safe-area-context', { namedExports: { SafeAreaView: 'SafeAreaView' } });
 mock.module('expo-application', { namedExports: { nativeApplicationVersion: '1.0.0', nativeBuildVersion: '5' } });
@@ -48,13 +44,15 @@ test('feedback and deletion remain functional as standalone account modules', as
   } finally { await act(async () => view?.unmount()); client.clear(); authStore.setState({ session: null }); }
 });
 
-test('Settings only reports real backend and diary state, never synced while offline or queued', async()=>{
+test('Settings exposes appearance, targets and account controls, and never reports synced while offline or queued', async()=>{
  const client=new QueryClient({defaultOptions:{queries:{staleTime:Infinity,retry:false}}});client.setQueryData(['service-health'],true);
  useSyncStatus.setState({ready:true,online:true,queued:0,blocked:0,syncing:false,error:null,lastSyncedAt:Date.now()});
  let view!:ReactTestRenderer;
  try{
   await act(async()=>{view=create(<QueryClientProvider client={client}><SettingsScreen/></QueryClientProvider>);});
-  assert.ok(JSON.stringify(view.toJSON()).includes('Synced'));assert.equal(view.root.findAllByType('Pressable' as React.ElementType).length,0);
+  assert.ok(JSON.stringify(view.toJSON()).includes('Synced'));
+  // Settings owns the controls that were previously orphaned; keep them reachable from here.
+  for(const control of ['Adjust targets','Send feedback','Account','Light','Dark','Gray'])assert.ok(JSON.stringify(view.toJSON()).includes(control),`Settings is missing ${control}`);
   await act(async()=>useSyncStatus.setState({online:false}));assert.ok(JSON.stringify(view.toJSON()).includes('Offline'));assert.ok(!JSON.stringify(view.toJSON()).includes('Synced'));
   await act(async()=>useSyncStatus.setState({online:true,queued:2}));assert.ok(JSON.stringify(view.toJSON()).includes('2 queued'));
  }finally{await act(async()=>view.unmount());client.clear();}

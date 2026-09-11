@@ -5,20 +5,19 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { SectionListProps } from 'react-native';
 import type { DailyMenuItem } from '../../types/nutrislice';
+import { reanimatedMock } from './support/reanimated';
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, __DEV__: true });
 // Native host components only are mocked. Screens, hooks, stores, and Query are real.
 mock.module('nativewind', { namedExports: { cssInterop: () => {}, vars: (value: unknown) => value } });
-const transition = { duration: () => ({ reduceMotion: () => undefined }) };
-mock.module('react-native-reanimated', { defaultExport: { View: 'AnimatedView', createAnimatedComponent: (component: unknown) => component }, namedExports: {
-  ReduceMotion: { System: 'system' }, LinearTransition: transition, FadeInDown: transition, FadeOutUp: transition, useReducedMotion: () => false,
-  useSharedValue: (value: unknown) => React.useRef({ value }).current,
-  useAnimatedStyle: (fn: () => unknown) => fn(), withTiming: (value: unknown) => value,
-} });
+mock.module('react-native-reanimated', reanimatedMock);
+// Charts pull in react-native-svg, which needs RN internals these component mocks do not provide.
+mock.module('../workout/VolumeTrend', { namedExports: { VolumeTrend: () => null } });
 mock.module('react-native', { namedExports: {
   useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1, scale: 3 }), View: 'View', Text: 'Text', Pressable: 'Pressable', TextInput: 'TextInput',
   ScrollView: 'ScrollView', Modal: 'Modal', KeyboardAvoidingView: 'KeyboardAvoidingView', ActivityIndicator: 'ActivityIndicator',
   AppState: { addEventListener: () => ({ remove() {} }) }, Platform: { OS: 'web' },
+
   SectionList: (props: SectionListProps<DailyMenuItem, { title: string; data: DailyMenuItem[] }>) => <>
     {props.ListHeaderComponent as React.ReactNode}
     {props.sections.map((section) => <React.Fragment key={section.title}>
@@ -195,10 +194,14 @@ test('CalCamp dashboard mounts real targets and all four training days', async (
   const { default: DashboardScreen } = require('../dashboard/DashboardScreen') as typeof import('../dashboard/DashboardScreen');
   nutritionStore.getState().setDailyTargets({ macros: { caloriesKcal: 2400, proteinG: 150, carbsG: 270, fatG: 80 }, micronutrients: {} });
   nutritionStore.getState().setConsumed({ caloriesKcal: 900, proteinG: 60, carbsG: 110, fatG: 25 });
-  await act(async () => { rendered = create(<DashboardScreen />); });
+  // Today now loads streak history, so the screen needs a query client.
+  const dashboardClient = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
+  await act(async () => { rendered = create(<QueryClientProvider client={dashboardClient}><DashboardScreen /></QueryClientProvider>); });
   assert.ok(textContent().includes('1500 kcal remaining'));
   for (const plan of ['Upper A','Upper B','Lower A','Lower B']) assert.ok(textContent().includes(plan));
-  assert.equal(rendered!.root.findAllByProps({ accessibilityRole: 'progressbar' }).length, 4);
+  // Calories, three macros, and the water tracker.
+  assert.equal(rendered!.root.findAllByProps({ accessibilityRole: 'progressbar' }).length, 5);
+  assert.ok(textContent().includes('cups'));
 });
 
 test('workout templates create actual Lower sessions and removal clears a draft row', async () => {

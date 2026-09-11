@@ -20,6 +20,7 @@ import { SafeAreaView } from '../../theme/SafeArea';
 import { fetchDailyMenu, normalizeMenuDate, NutrisliceError } from '../../api/nutrislice';
 import { DINING_HALLS, type DiningHallSlug } from '../../types/campus';
 import { MEAL_TYPES, type DailyMenuItem } from '../../types/nutrislice';
+import type { MealSlot } from '../../types/foodEntry';
 import type { MacroTotals } from '../../types/nutrition';
 import { nutritionStore, useNutritionStore } from '../../store/nutritionStore';
 import { foodLogAmounts } from './logFood';
@@ -30,8 +31,8 @@ const HALL_LABELS: Record<DiningHallSlug, string> = {
 const display = (value: number | null) => value === null ? '—' : Number(value.toFixed(1)).toString();
 const macroFields = [['caloriesKcal', 'Calories · kcal'], ['proteinG', 'Protein · g'], ['carbsG', 'Carbs · g'], ['fatG', 'Fats · g']] as const;
 
-export function FoodLogSheet({ item, onClose, onLogged }: {
-  item: Pick<DailyMenuItem, 'id'|'name'|'serving'|'macros'|'nutrients'>; onClose: () => void; onLogged: (name: string) => void;
+export function FoodLogSheet({ item, onClose, onLogged, meal }: {
+  item: Pick<DailyMenuItem, 'id'|'name'|'serving'|'macros'|'nutrients'>; onClose: () => void; onLogged: (name: string) => void; meal?: MealSlot;
 }) {
   const [servings, setServings] = useState('1');
   const [fields, setFields] = useState(() => Object.fromEntries(macroFields.map(([key]) => [key, item.macros[key]?.toString() ?? ''])) as Record<keyof MacroTotals, string>);
@@ -40,8 +41,10 @@ export function FoodLogSheet({ item, onClose, onLogged }: {
     try {
       if (!servings.trim() || macroFields.some(([key]) => !fields[key].trim())) throw new Error('Fill in servings and all four macro values. Unknown values are not zero.');
       const macros = Object.fromEntries(macroFields.map(([key]) => [key, Number(fields[key])])) as unknown as MacroTotals;
-      const totals = foodLogAmounts(item, Number(servings), macros);
-      nutritionStore.getState().addConsumed(totals.macros, totals.micros);
+      // Reference values are per single serving so the portion stays editable in the diary.
+      const single = foodLogAmounts(item, 1, macros);
+      nutritionStore.getState().addEntry({ name: item.name, meal, servings: Number(servings), servingLabel: servingLabel(item.serving),
+        referenceMacros: single.macros, referenceMicros: single.micros, source: 'dining' });
       onLogged(item.name);
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Check your portion and macros.'); }
   };

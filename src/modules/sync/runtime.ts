@@ -9,6 +9,20 @@ import { durableStorage } from './storage';
 import { SyncEngine } from './engine';
 import { healthStore } from '../health/useHealthSync';
 import { syncBridge } from './bridge';
+import { rememberFood } from '../foods/savedFoods';
+import { dateKeyOf, detectRecords, recordWorkout, sessionVolume } from '../workout/history';
+import type { FoodEntry } from '../../types/foodEntry';
+
+/** Every logging path feeds recents from one place, so the second log of a food is one tap. */
+function rememberNewFoods(owner: string, next: FoodEntry[], previous: FoodEntry[]) {
+  const seen = new Set(previous.map(entry => entry.id));
+  for (const entry of next) {
+    // Quick adds and water are one-off amounts, not foods worth offering again.
+    if (seen.has(entry.id) || entry.source === 'quick') continue;
+    try { rememberFood(owner, { name: entry.name, servingLabel: entry.servingLabel, macros: entry.referenceMacros, micros: entry.referenceMicros, source: entry.source }); }
+    catch { /* recents are a convenience; never block a log */ }
+  }
+}
 let applying = false;
 const daily = (s: DailyTotals): DailyTotals => ({ date: s.date, consumedMacros: s.consumedMacros, consumedMicros: s.consumedMicros, isAdherent: s.isAdherent, bodyWeightLbs: s.bodyWeightLbs });
 export const syncEngine = new SyncEngine(durableStorage, async (owner, job) => {
@@ -28,6 +42,11 @@ export const syncEngine = new SyncEngine(durableStorage, async (owner, job) => {
     return;
   }
   if (job.kind === 'routine') { await (await import('../../api/routines')).saveRoutine(owner, job.data); return; }
+  if (job.kind === 'food-entry') {
+    const entries = await import('../../api/foodEntries');
+    if (job.data.op === 'delete') await entries.deleteFoodEntry(owner, job.data.entry.id); else await entries.saveFoodEntry(owner, job.data.entry);
+    return;
+  }
   const repository = await getTrackingRepository();
   if (job.kind === 'nutrition') {
     if (!repository.applyNutritionMutation) throw new Error('Update the sync repository.');
@@ -45,7 +64,9 @@ function applySnapshot() {
   applying = true;
   try {
     const date = localDateKey(new Date()); const snapshot = syncEngine.data.days[date];
-    if (snapshot) nutritionStore.setState({ ...snapshot, cloudOwnerId: syncEngine.owner, syncStatus: 'idle', syncError: null });
+    const entries = syncEngine.data.entries?.[date] ?? [];
+    if (snapshot) nutritionStore.setState({ ...snapshot, entries, cloudOwnerId: syncEngine.owner, syncStatus: 'idle', syncError: null });
+    else if (entries.length) nutritionStore.setState({ entries });
     if (syncEngine.data.workout) workoutStore.setState(syncEngine.data.workout);
     workoutStore.setState({ importedWorkouts: syncEngine.data.health.workouts });
   } finally { applying = false; }
@@ -78,11 +99,22 @@ export function activateSync(owner: string | null) {
     if (applying || !syncEngine.owner) return;
     const a = daily(next); const b = daily(previous);
     if (JSON.stringify(a) !== JSON.stringify(b)) syncEngine.recordNutrition(a, b, randomUUID());
+    const before = previous.date === next.date ? previous.entries : [];
+    syncEngine.recordEntries(next.date, next.entries, before);
+    rememberNewFoods(syncEngine.owner, next.entries, before);
   };
   syncBridge.workout = next => {
     if (applying || !syncEngine.owner) return;
     const detached = JSON.parse(JSON.stringify(next));
     const data = { ...syncEngine.data, workout: detached };
+    // Lift history is recorded once per finished session so previous sets and PRs survive a restart.
+    for (const pending of next.pendingWorkouts) {
+      if (data.liftSessions?.includes(pending.workout.session.id)) continue;
+      data.lastRecords = detectRecords(data.lifts ?? {}, pending.workout);
+      data.lifts = recordWorkout(data.lifts ?? {}, pending.workout);
+      data.volumeLog = [...(data.volumeLog ?? []), { date: dateKeyOf(pending.workout.endedAtMs), value: sessionVolume(pending.workout) }].slice(-120);
+      data.liftSessions = [...(data.liftSessions ?? []), pending.workout.session.id].slice(-200);
+    }
     // Draft and all new completed sessions enter the same atomic SQLite write.
     for (const pending of next.pendingWorkouts) {
       const id = `workout:${pending.workout.session.id}`;

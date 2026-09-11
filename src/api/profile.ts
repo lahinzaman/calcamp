@@ -3,6 +3,7 @@ import { durableStorage } from '../modules/sync/storage';
 import { useSyncStatus } from '../store/syncStore';
 import { getSupabase } from './supabase';
 import { validateOnboarding, type OnboardingProfile, type UserProfile } from '../types/profile';
+import type { MacroTotals } from '../types/nutrition';
 const columns = 'id,height_cm,weight_kg,is_advanced_track,activity_level,goal,training_days,training_targets,rest_targets,preworkout_fast_carbs,preworkout_carbs_g,preworkout_minutes,onboarding_completed_at,lifestyle_survey,dynamic_tdee_kcal';
 export async function loadProfile(userId: string): Promise<UserProfile | null> {
   let cached: UserProfile | null = null;
@@ -24,6 +25,23 @@ export async function completeOnboarding(input: OnboardingProfile): Promise<User
   const { data, error } = await client.from('users').upsert({ ...rest, height_cm: inchesToCm(height_inches!), weight_kg: lbsToKg(weight_lbs!), id: auth.user.id,
     onboarding_completed_at: new Date().toISOString() }, { onConflict: 'id' }).select(columns).single();
   if (error) throw new Error('Your profile could not be saved. Check your connection and try again.');
+  durableStorage.set(`profile:${auth.user.id}`, JSON.stringify(data));
+  return fromDatabase(data);
+}
+
+/** Targets stay editable after onboarding; nothing else about the profile is touched. */
+export async function updateTargets(input: { rest_targets: MacroTotals; training_targets: MacroTotals | null; dynamic_tdee_kcal?: number | null }): Promise<UserProfile> {
+  for (const target of [input.rest_targets, input.training_targets]) {
+    if (target && (Object.keys(target).length !== 4 || (['caloriesKcal', 'proteinG', 'carbsG', 'fatG'] as const).some(key => !Number.isFinite(target[key]) || target[key] < 0 || target[key] > 20000) || target.caloriesKcal <= 0)) {
+      throw new Error('Enter a calorie target above 0 and macro amounts between 0 and 20000 g.');
+    }
+  }
+  const client = getSupabase(); const { data: auth, error: authError } = await client.auth.getUser();
+  if (authError || !auth.user) throw new Error('Sign in before changing your targets.');
+  const patch: Record<string, unknown> = { rest_targets: input.rest_targets, training_targets: input.training_targets };
+  if (input.dynamic_tdee_kcal !== undefined) patch.dynamic_tdee_kcal = input.dynamic_tdee_kcal;
+  const { data, error } = await client.from('users').update(patch).eq('id', auth.user.id).select(columns).single();
+  if (error) throw new Error('Your targets could not be saved. Check your connection and try again.');
   durableStorage.set(`profile:${auth.user.id}`, JSON.stringify(data));
   return fromDatabase(data);
 }

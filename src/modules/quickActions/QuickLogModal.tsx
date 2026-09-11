@@ -9,13 +9,13 @@ import { gramsToOz, ozToGrams } from '../../lib/units';
 import { useFoodVision } from '../vision/useFoodVision';
 import { lookupBarcode } from './barcode';
 import type { MacroTotals } from '../../types/nutrition';
-export type QuickAction = 'photo'|'barcode'|'manual'|'weight';
-const names:Record<QuickAction,string>={photo:'AI Photo Log',barcode:'Barcode Scanner',manual:'Manual Food Log',weight:'Update Body Weight'};
+export type QuickAction = 'photo'|'barcode'|'manual'|'weight'|'quick';
+const names:Record<QuickAction,string>={photo:'AI Photo Log',barcode:'Barcode Scanner',manual:'Manual Food Log',weight:'Update Body Weight',quick:'Quick Add Calories'};
 const macroFields=[['caloriesKcal','Calories · kcal'],['proteinG','Protein · g'],['fatG','Fats · g'],['carbsG','Carbs · g']] as const;
 export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>void}) {
   const [permission,requestPermission]=useCameraPermissions(); const camera=useRef<CameraView>(null);
   const [cameraReady,setCameraReady]=useState(false); const [foreground,setForeground]=useState(AppState.currentState==='active');
-  const [editing,setEditing]=useState(action==='manual'||action==='weight');
+  const [editing,setEditing]=useState(action==='manual'||action==='weight'||action==='quick');
   const [name,setName]=useState(''); const [portion,setPortion]=useState(''); const [weight,setWeight]=useState('');
   const [values,setValues]=useState<Record<keyof MacroTotals,string>>({caloriesKcal:'',proteinG:'',fatG:'',carbsG:''});
   const [notice,setNotice]=useState(''); const [error,setError]=useState<string|null>(null); const [busy,setBusy]=useState(false);
@@ -52,9 +52,19 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
       if(!weight.trim()||!Number.isFinite(Number(weight))||Number(weight)<70||Number(weight)>700)throw new Error('Enter a body weight of 70–700 lbs.');
       nutritionStore.getState().setBodyWeightLbs(Number(weight));
     }else{
+      if(action==='quick'){
+        if(!values.caloriesKcal.trim()||!Number.isFinite(Number(values.caloriesKcal))||Number(values.caloriesKcal)<=0||Number(values.caloriesKcal)>20000)throw new Error('Enter the calories for this quick add.');
+        if(macroFields.some(([key])=>values[key].trim()&&(!Number.isFinite(Number(values[key]))||Number(values[key])<0||Number(values[key])>20000)))throw new Error('Macro amounts must be between 0 and 20000 g.');
+        nutritionStore.getState().addEntry({name:name.trim()||'Quick add',servings:1,servingLabel:null,
+          referenceMacros:Object.fromEntries(macroFields.map(([k])=>[k,Number(values[k]||0)])) as unknown as MacroTotals,source:'quick'});
+        locked.current=true;onClose();return;
+      }
       if(!name.trim()||!portion.trim()||!Number.isFinite(Number(portion))||Number(portion)<=0||Number(portion)>352)throw new Error('Enter a food name and portion greater than 0 oz (up to 352 oz).');
       if(macroFields.some(([key])=>!values[key].trim()||!Number.isFinite(Number(values[key]))||Number(values[key])<0||Number(values[key])>20000))throw new Error('Complete all four macro values; unknown values are not zero.');
-      nutritionStore.getState().addConsumed(Object.fromEntries(macroFields.map(([k])=>[k,Number(values[k])])) as unknown as MacroTotals);
+      // The macro fields describe the whole portion entered, so that portion is one serving.
+      nutritionStore.getState().addEntry({name:name.trim(),servings:1,servingLabel:`${Number(portion)} oz`,
+        referenceMacros:Object.fromEntries(macroFields.map(([k])=>[k,Number(values[k])])) as unknown as MacroTotals,
+        source:action==='photo'?'photo':action==='barcode'?'barcode':'manual'});
     }locked.current=true;onClose();}catch(e){setError((e as Error).message);}
   };
   return <Modal visible presentationStyle="pageSheet" animationType="slide" onRequestClose={onClose}><SafeAreaView className="flex-1 bg-background"><KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:24,paddingBottom:60}}>
@@ -66,11 +76,15 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
       {action==='barcode'&&busy&&<Text className="my-3">Looking up the label…</Text>}
       <Action secondary label="Enter food manually" disabled={busy} onPress={()=>setEditing(true)} />
     </>}
-    {editing&&(action==='weight'?<><Text className="mb-4">Saved to today's diary and queued for cloud sync.</Text><Field label="Body weight · lbs" value={weight} onChangeText={setWeight} keyboardType="decimal-pad" /></>:<>
+    {editing&&(action==='quick'?<>
+      <Text className="mb-4">For when you know roughly what it cost you but not the breakdown. Leave a macro blank and it is recorded as zero for this entry.</Text>
+      <Field label="Food name" value={name} onChangeText={setName} maxLength={150} placeholder="Quick add" />
+      {macroFields.map(([key,label])=><Field key={key} label={key==='caloriesKcal'?label:`${label} · optional`} value={values[key]} onChangeText={text=>setValues(s=>({...s,[key]:text}))} keyboardType="decimal-pad" />)}
+    </>:action==='weight'?<><Text className="mb-4">Saved to today's diary and queued for cloud sync.</Text><Field label="Body weight · lbs" value={weight} onChangeText={setWeight} keyboardType="decimal-pad" /></>:<>
       {!!notice&&<Text className="mb-4">{notice}</Text>}<Field label="Food name" value={name} onChangeText={setName} maxLength={150}/><Field label="Portion · oz" value={portion} onChangeText={changePortion} keyboardType="decimal-pad" />
       <Text className="mb-3">Macros for the entire portion above. Changing a manual macro keeps your edited value until you change the portion again.</Text>{macroFields.map(([key,label])=><Field key={key} label={label} value={values[key]} onChangeText={text=>setValues(s=>({...s,[key]:text}))} keyboardType="decimal-pad" />)}
     </>)}
     {error&&<Text accessibilityRole="alert" className="mb-4">{error}</Text>}
-    {editing&&<Action label={action==='weight'?'Save body weight':'Confirm food log'} disabled={busy} onPress={save} />}<Action secondary label="Close quick log" onPress={onClose}/>
+    {editing&&<Action label={action==='weight'?'Save body weight':action==='quick'?'Add calories':'Confirm food log'} disabled={busy} onPress={save} />}<Action secondary label="Close quick log" onPress={onClose}/>
   </ScrollView></KeyboardAvoidingView></SafeAreaView></Modal>;
 }

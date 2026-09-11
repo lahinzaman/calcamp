@@ -11,10 +11,13 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, __DEV__: true });
 // Native host components only are mocked. Screens, hooks, stores, and Query are real.
 mock.module('nativewind', { namedExports: { cssInterop: () => {}, vars: (value: unknown) => value } });
 mock.module('react-native-reanimated', reanimatedMock);
+// Charts pull in react-native-svg, which needs RN internals these component mocks do not provide.
+mock.module('../workout/VolumeTrend', { namedExports: { VolumeTrend: () => null } });
 mock.module('react-native', { namedExports: {
   useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1, scale: 3 }), View: 'View', Text: 'Text', Pressable: 'Pressable', TextInput: 'TextInput',
   ScrollView: 'ScrollView', Modal: 'Modal', KeyboardAvoidingView: 'KeyboardAvoidingView', ActivityIndicator: 'ActivityIndicator',
   AppState: { addEventListener: () => ({ remove() {} }) }, Platform: { OS: 'web' },
+
   SectionList: (props: SectionListProps<DailyMenuItem, { title: string; data: DailyMenuItem[] }>) => <>
     {props.ListHeaderComponent as React.ReactNode}
     {props.sections.map((section) => <React.Fragment key={section.title}>

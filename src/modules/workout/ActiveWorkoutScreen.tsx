@@ -1,4 +1,6 @@
 import { RoutineBuilder } from './RoutineBuilder';
+import { overloadSuggestion, type LiftHistory, type PersonalRecord, type SessionVolumePoint } from './history';
+import { VolumeTrend } from './VolumeTrend';
 import { ExerciseHelp } from './ExerciseHelp';
 import { exerciseById } from './catalog';
 import type { WorkoutRoutine } from './routines';
@@ -80,6 +82,7 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
   const [program, setProgram] = useState(0);
   const owner = useAuthStore(s => s.session?.user.id);
   const [builder,setBuilder] = useState(false); const [routines,setRoutines] = useState<WorkoutRoutine[]>([]);
+  const [lifts,setLifts] = useState<LiftHistory>({}); const [volumeLog,setVolumeLog] = useState<SessionVolumePoint[]>([]); const [records,setRecords] = useState<PersonalRecord[]>([]);
   const [routineError,setRoutineError] = useState<string|null>(null);
   useEffect(() => {
     let active = true; setRoutines([]); setProgram(0); setBuilder(false);
@@ -88,6 +91,7 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
       const {syncEngine} = await import('../sync/runtime');
       if (!active || syncEngine.owner !== owner) return;
       setRoutines(syncEngine.data.routines ?? []);
+      setLifts(syncEngine.data.lifts ?? {}); setVolumeLog(syncEngine.data.volumeLog ?? []); setRecords(syncEngine.data.lastRecords ?? []);
       try {
         const remote = await (await import('../../api/routines')).loadRoutines(owner);
         if (!active || syncEngine.owner !== owner) return;
@@ -116,7 +120,9 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
   const [finished, setFinished] = useState<string | null>(null);
   const active = sequence.find((exercise) => exercise.id === activeId);
   const currentSets = useMemo(() => sets.filter((entry) => entry.sessionExerciseId === activeId), [sets, activeId]);
-  const history = active ? (localHistory[active.exercise.id] ?? previousSets[active.exercise.id] ?? []) : [];
+  const history = active ? (localHistory[active.exercise.id] ?? previousSets[active.exercise.id] ?? lifts[active.exercise.id]?.lastSets ?? []) : [];
+  const suggestion = active ? overloadSuggestion(lifts[active.exercise.id]) : null;
+  const recordNames = records.map(record => ({ ...record, name: exerciseById(record.exerciseId)?.name ?? 'Lift' }));
   const volume = sets.reduce((total, entry) => total + (entry.completedAtMs !== null && !entry.isWarmup ? (entry.weightLbs ?? 0) * (entry.reps ?? 0) : 0), 0);
   const start = () => {
     const actions = workoutStore.getState();
@@ -135,6 +141,10 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
       ListHeaderComponent={<>
       <View className="mb-6 flex-row justify-between"><Text className="text-sm font-black tracking-widest text-ink">CALCAMP</Text><Text className="text-xs font-semibold text-ink">TRAINING</Text></View>
       <SyncIndicator />
+      {!!recordNames.length && <View className="my-3 rounded-2xl bg-surface p-4">
+        <Text className="font-bold">🏆 New personal record{recordNames.length > 1 ? 's' : ''}</Text>
+        {recordNames.map(record => <Text key={`${record.exerciseId}:${record.kind}`} className="mt-2 text-sm text-ink">{record.name} · {record.kind === 'weight' ? 'heaviest set' : 'estimated 1RM'} {Math.round(record.value)} lbs{record.previous ? ` (was ${Math.round(record.previous)})` : ''}</Text>)}
+      </View>}
       <ImportedWorkouts />
       <Text className="text-4xl font-bold tracking-tight text-ink">{session?.name ?? 'Make progress.'}</Text>
       <Text className="mt-2 text-base text-ink">{session ? 'One focused set at a time.' : 'Show up. Log your lifts. Build on last time.'}</Text>
@@ -148,6 +158,7 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
         <View className="mt-4 flex-row flex-wrap">{plans.map((plan, index) => <Choice key={plan.name} label={plan.name} selected={program === index} onPress={() => setProgram(index)} />)}</View>
         <Pressable accessibilityRole="button" onPress={() => safelyEdit(start)} className="mt-6 items-center rounded-2xl bg-accent p-4"><Text className="font-bold text-ink">Start session</Text></Pressable>
         <Action secondary label="Create custom routine" onPress={() => setBuilder(true)} />
+        <VolumeTrend log={volumeLog} />
         {routineError && <Text>{routineError}</Text>}
         <View className="gap-2">{plan.lifts.map(e => <View key={e.id} className="flex-row items-center gap-3"><Text className="flex-1">{e.name}</Text><ExerciseHelp exercise={e} /></View>)}</View>
         {finished && <Text accessibilityRole="alert" className="mt-4 text-sm text-ink">{finished}</Text>}
@@ -158,6 +169,8 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
         </ScrollView>
         {active ? <View className="rounded-3xl bg-surface pt-4">
           <View className="mx-4 flex-row items-center gap-3"><Text className="flex-1 text-xl font-bold">{active.exercise.name}</Text><ExerciseHelp exercise={active.exercise} /></View>
+          {suggestion && <View className="mx-4 mt-3 rounded-2xl bg-surface p-4"><Text className="font-bold">Suggested next set</Text><Text className="mt-1 text-lg font-bold">{suggestion.weightLbs} lbs × {suggestion.reps}</Text><Text className="mt-1 text-sm text-ink">{suggestion.reason}</Text></View>}
+          {!!lifts[active.exercise.id] && <Text className="mx-4 mt-2 text-sm text-ink">Best so far: {Math.round(lifts[active.exercise.id].bestWeightLbs)} lbs · est. 1RM {Math.round(lifts[active.exercise.id].bestOneRepMaxLbs)} lbs · {lifts[active.exercise.id].sessions} session(s) logged.</Text>}
           <Text className="mx-4 mb-5 mt-2 text-sm text-ink">{active.exercise.grip ?? 'Custom grip'} · {active.exercise.equipment ?? 'Custom exercise'} · {active.defaultRestSeconds}s rest</Text>
           <View className="mb-3 flex-row gap-1 px-2">{['Set','Previous','lbs','Reps','RPE','Done'].map((label, index) => <Text key={label} className="text-center text-xs text-ink" style={index === 0 ? { width: 20 } : index === 1 ? { width: 40 } : index === 5 ? { width: 44 } : { flex: 1 }}>{label}</Text>)}</View>
         </View> : <Text className="text-ink">Choose an exercise to begin logging.</Text>}

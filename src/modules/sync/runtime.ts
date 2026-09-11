@@ -10,6 +10,7 @@ import { SyncEngine } from './engine';
 import { healthStore } from '../health/useHealthSync';
 import { syncBridge } from './bridge';
 import { rememberFood } from '../foods/savedFoods';
+import { dateKeyOf, detectRecords, recordWorkout, sessionVolume } from '../workout/history';
 import type { FoodEntry } from '../../types/foodEntry';
 
 /** Every logging path feeds recents from one place, so the second log of a food is one tap. */
@@ -106,6 +107,14 @@ export function activateSync(owner: string | null) {
     if (applying || !syncEngine.owner) return;
     const detached = JSON.parse(JSON.stringify(next));
     const data = { ...syncEngine.data, workout: detached };
+    // Lift history is recorded once per finished session so previous sets and PRs survive a restart.
+    for (const pending of next.pendingWorkouts) {
+      if (data.liftSessions?.includes(pending.workout.session.id)) continue;
+      data.lastRecords = detectRecords(data.lifts ?? {}, pending.workout);
+      data.lifts = recordWorkout(data.lifts ?? {}, pending.workout);
+      data.volumeLog = [...(data.volumeLog ?? []), { date: dateKeyOf(pending.workout.endedAtMs), value: sessionVolume(pending.workout) }].slice(-120);
+      data.liftSessions = [...(data.liftSessions ?? []), pending.workout.session.id].slice(-200);
+    }
     // Draft and all new completed sessions enter the same atomic SQLite write.
     for (const pending of next.pendingWorkouts) {
       const id = `workout:${pending.workout.session.id}`;

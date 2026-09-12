@@ -9,10 +9,20 @@ import { deleteAccount } from './deleteAccount';
 export function DeleteAccountModal({ onClose }: { onClose: () => void }) {
   const owner = useAuthStore(s => s.session?.user.id); const cache = useQueryClient();
   const [confirmation, setConfirmation] = useState(''); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
+  const [remaining, setRemaining] = useState<string | null>(null);
   const deleting = useRef(false);
   const remove = async () => {
     if (!owner || deleting.current || confirmation !== 'DELETE') return; deleting.current = true; setBusy(true); setError(null);
-    try { await deleteAccount(owner); cache.clear(); onClose(); }
+    try {
+      const outcome = await deleteAccount(owner); cache.clear();
+      // Anything the database could not reach is named rather than hidden behind a success.
+      const caveats = [
+        outcome?.identityRemoved === false && 'Your data is erased, but the sign-in itself could not be removed from here. Contact support to finish removing it.',
+        outcome?.providerHistoryPending && 'Food-photo history held by the recognition provider could not be confirmed as purged.',
+      ].filter(Boolean) as string[];
+      if (caveats.length) { setRemaining(caveats.join(' ')); return; }
+      onClose();
+    }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Deletion unavailable. Please retry.'); }
     finally { deleting.current = false; setBusy(false); }
   };
@@ -23,8 +33,9 @@ export function DeleteAccountModal({ onClose }: { onClose: () => void }) {
       <Text className="mb-4 text-ink">Copies you exported to Apple Health or Health Connect remain under your control in those apps. Service backups and logs follow the privacy policy’s retention schedule.</Text>
       <Field label="Type DELETE to confirm" autoCapitalize="characters" autoCorrect={false} editable={!busy} value={confirmation} onChangeText={setConfirmation} />
       {error && <Text accessibilityRole="alert" className="mb-4 text-ink">{error}</Text>}
-      <Action label={busy ? 'Deleting account…' : 'Delete my account'} disabled={busy || confirmation !== 'DELETE'} onPress={() => void remove()} />
-      <Action label="Cancel" secondary disabled={busy} onPress={onClose} />
+      {remaining && <Text accessibilityRole="alert" className="mb-4 text-ink">{remaining}</Text>}
+      {!remaining && <Action label={busy ? 'Deleting account…' : 'Delete my account'} disabled={busy || confirmation !== 'DELETE'} onPress={() => void remove()} />}
+      <Action label={remaining ? 'Done' : 'Cancel'} secondary disabled={busy} onPress={onClose} />
     </ScrollView>
   </SafeAreaView></Modal>;
 }

@@ -1,7 +1,7 @@
 import { breadcrumb } from '../modules/telemetry/events';
 import { durableStorage } from '../modules/sync/storage';
 import { getSupabase } from './supabase';
-import type { CrowdStatus, GymBaseline, GymSlug, GymSummary } from '../types/facilities';
+import type { CrowdStatus, GymBaseline, GymForecast, GymSlug, GymSummary } from '../types/facilities';
 import type { Coordinates, MacroPreference, RescueResponse } from '../types/rescue';
 import type { MacroTotals } from '../types/nutrition';
 async function campusRequest<T>(path: string, signal: AbortSignal, body?: unknown): Promise<T> {
@@ -44,6 +44,17 @@ export async function fetchGymSummary(signal: AbortSignal): Promise<GymSummary[]
   const { data, error } = await getSupabase().rpc('get_gym_busyness').abortSignal(signal);
   if (error) throw new Error('Community reports are unavailable. Please try again.');
   return (data ?? []) as GymSummary[];
+}
+/**
+ * Hour-of-week busyness built from the reports students have already filed. It needs no
+ * third-party provider, so it keeps working when no forecast API key is configured.
+ */
+export async function fetchGymForecast(signal: AbortSignal): Promise<GymForecast[]> {
+  const { data, error } = await getSupabase().rpc('get_gym_forecast').abortSignal(signal);
+  if (error) throw new Error('The community forecast is unavailable. Please try again.');
+  return (data ?? []).map((row: GymForecast) => ({ ...row,
+    forecast_score: row.forecast_score === null ? null : Number(row.forecast_score),
+    sample_count: Number(row.sample_count) })) as GymForecast[];
 }
 export async function submitGymVote(slug: GymSlug, status: CrowdStatus) {
   const client = getSupabase(); const { data, error } = await client.auth.getUser();

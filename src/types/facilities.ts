@@ -8,3 +8,4 @@ export type GymSlug = typeof GYMS[number]['slug'];
 export type CrowdStatus = 'Quiet' | 'Normal' | 'Packed';
 export interface GymBaseline { stale?: boolean; cachedAt?: string; slug: GymSlug; baseline: number | null; checkedAt: string; status: 'available' | 'unavailable' }
 export interface GymSummary { location_slug: GymSlug; vote_count: number; crowd_score: number | null; latest_vote_at: string | null }
+export interface GymForecast { location_slug: GymSlug; forecast_score: number | null; sample_count: number }

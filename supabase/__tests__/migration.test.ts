@@ -3,6 +3,8 @@ import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { PGlite } from '@electric-sql/pglite';
 
+import { EXERCISE_CATALOG } from '../../src/modules/workout/catalog';
+
 const alice = '20000000-0000-4000-8000-000000000001';
 const bob = '20000000-0000-4000-8000-000000000002';
 const MIGRATION = '20260911120000_phase10_food_entries_measurements.sql';
@@ -129,4 +131,85 @@ test('a migrated workout_routines matches a freshly bootstrapped one, column for
     assert.deepEqual(after, before, 'migrated and bootstrapped schemas must agree on column order and types');
     assert.ok(before.some(row => row.column_name === 'exercise_plan'));
   } finally { await fresh.close(); await migrated.close(); }
+});
+
+const DELETE_MIGRATION = '20260912093000_phase13_self_delete_and_gym_forecast.sql';
+const CATALOGUE_MIGRATION = '20260912094000_phase13_exercise_catalogue.sql';
+
+/** Self-service deletion and the community forecast both run in the database, with no backend. */
+test('Phase 13 migration adds self-deletion, an hourly forecast, and the expanded catalogue', async (t) => {
+  const db = new PGlite();
+  try {
+    await db.exec(`
+      create role anon; create role authenticated; create role service_role bypassrls;
+      create schema auth; create table auth.users (id uuid primary key);
+      create function auth.uid() returns uuid language sql stable as
+        $$select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid$$;
+      grant usage on schema auth to anon, authenticated, service_role;
+      grant execute on function auth.uid() to anon, authenticated, service_role;
+    `);
+    await db.exec(await readFile(new URL('../schema.sql', import.meta.url), 'utf8'));
+    // Reproduce the deployed database: everything except what this migration introduces.
+    await db.exec(`
+      drop function public.delete_own_account(); drop function private.delete_own_account();
+      drop function public.get_gym_forecast(); drop function private.gym_hour_forecast();
+      delete from public.exercises where id > '10000000-0000-4000-8000-000000000101';
+    `);
+    await db.exec(`
+      insert into auth.users (id) values ('${alice}'), ('${bob}');
+      insert into public.users (id) values ('${alice}'), ('${bob}');
+    `);
+    await db.exec(await readFile(new URL(`../migrations/${DELETE_MIGRATION}`, import.meta.url), 'utf8'));
+    await db.exec(await readFile(new URL(`../migrations/${CATALOGUE_MIGRATION}`, import.meta.url), 'utf8'));
+    const signIn = async (user: string) => {
+      await db.exec('reset role');
+      await db.query("select set_config('request.jwt.claim.sub', $1, false)", [user]);
+      await db.exec('set role authenticated');
+    };
+
+    await t.test('the expanded catalogue matches what the app ships', async () => {
+      const seeded = (await db.query<{ id: string }>('select id from public.exercises')).rows.map(row => row.id);
+      assert.deepEqual(seeded.slice().sort(), EXERCISE_CATALOG.map(exercise => exercise.id).sort());
+    });
+
+    await t.test('the forecast needs a session and averages only this weekday and hour', async () => {
+      await db.exec('set role anon');
+      await assert.rejects(db.query('select * from public.get_gym_forecast()'));
+      await signIn(alice);
+      // Votes carry server-assigned timestamps, so history is seeded as the table owner.
+      // Same hour last week counts; eight days ago is a different weekday and must not.
+      await db.exec('reset role');
+      await db.exec(`insert into public.gym_busyness_votes(user_id,location_slug,status,created_at) values
+        ('${alice}','werblin','Packed', now()),
+        ('${bob}','werblin','Normal', now() - interval '7 days'),
+        ('${alice}','werblin','Quiet', now() - interval '8 days'),
+        ('${bob}','college-ave','Quiet', now())`);
+      await signIn(alice);
+      const rows = (await db.query<{ location_slug: string; forecast_score: string | null; sample_count: string }>(
+        'select * from public.get_gym_forecast()')).rows;
+      const werblin = rows.find(row => row.location_slug === 'werblin')!;
+      assert.equal(Number(werblin.sample_count), 2);
+      assert.equal(Number(werblin.forecast_score), 75);
+      assert.equal(Number(rows.find(row => row.location_slug === 'college-ave')!.forecast_score), 0);
+      // A gym nobody has reported on reports no samples rather than disappearing.
+      assert.equal(Number(rows.find(row => row.location_slug === 'livingston')!.sample_count), 0);
+    });
+
+    await t.test('deleting your own account erases your rows and leaves everyone else alone', async () => {
+      await signIn(alice);
+      assert.equal((await db.query<{ delete_own_account: boolean }>('select public.delete_own_account()')).rows[0].delete_own_account, true);
+      await db.exec('reset role');
+      assert.equal((await db.query(`select id from public.users where id = '${alice}'`)).rows.length, 0);
+      assert.equal((await db.query(`select id from auth.users where id = '${alice}'`)).rows.length, 0);
+      assert.equal((await db.query(`select id from public.gym_busyness_votes where user_id = '${alice}'`)).rows.length, 0);
+      assert.equal((await db.query(`select id from public.users where id = '${bob}'`)).rows.length, 1);
+    });
+
+    await t.test('deletion refuses to run without a session', async () => {
+      await db.exec('reset role');
+      await db.query("select set_config('request.jwt.claim.sub', '', false)");
+      await db.exec('set role authenticated');
+      await assert.rejects(db.query('select public.delete_own_account()'));
+    });
+  } finally { await db.close(); }
 });

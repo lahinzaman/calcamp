@@ -16,7 +16,7 @@ mock.module('expo-updates', { namedExports: { isEnabled: false, updateId: '8f4a2
 mock.module('expo-crypto', { namedExports: { randomUUID: () => 'retry-id' } });
 mock.module('../notifications/NotificationSettings', { namedExports: { NotificationSettings: () => null } });
 let deleted = 0; let submits = 0; const ids: unknown[] = [];
-mock.module('../account/deleteAccount', { namedExports: { deleteAccount: async (owner: string) => { assert.equal(owner, 'alice'); deleted++; } } });
+mock.module('../account/deleteAccount', { namedExports: { deleteAccount: async (owner: string) => { assert.equal(owner, 'alice'); deleted++; return { identityRemoved: true, providerHistoryPending: false }; } } });
 mock.module('../../api/supabase', { namedExports: { getSupabase: () => ({ rpc: async (_name: string, input: Record<string, unknown>) => {
   submits++; ids.push(input.p_id); assert.equal(input.p_owner, 'alice');
   assert.equal((input.p_context as Record<string, string>).build, '5');

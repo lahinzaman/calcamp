@@ -10,27 +10,33 @@ import { BarChart, LineChart } from '../../components/charts/LineChart';
 import { useAuthStore } from '../../store/authStore';
 import { useNutritionStore } from '../../store/nutritionStore';
 import { loadHistory, shiftDate, type HistoryDay } from '../../api/history';
+import { loadActivity } from '../../api/activityHistory';
+import { loadMeasurements } from '../../api/measurements';
+import {
+  BodyCompositionCard, ConsistencyCard, EnergyBalanceCard, GoalProgressCard,
+  Card, MacroSplitCard, StepsCard, WeeklyAveragesCard,
+} from './AnalyticsCards';
 import { calculateTdee } from '../nutrition/tdee';
 import { MilestonesCard } from '../habits/MilestonesCard';
 import { MeasurementsCard } from './MeasurementsCard';
 import { milestones, summarizeStreak } from '../habits/streaks';
 import { localDateKey } from '../../store/nutritionStore';
 const RANGES = [[28, '4 weeks'], [56, '8 weeks'], [90, '13 weeks']] as const;
-function Card({ title, children, index }: { title: string; children: React.ReactNode; index: number }) {
-  return <Reveal index={index}><View className="mb-4 rounded-3xl border border-border bg-surface p-5">
-    <Text className="mb-3 text-sm font-bold tracking-widest">{title.toUpperCase()}</Text>{children}
-  </View></Reveal>;
-}
 export default function TrendsScreen() {
   const owner = useAuthStore(s => s.session?.user.id);
   const profile = useAuthStore(s => s.profile);
   const targets = useNutritionStore(s => s.dailyTargets?.macros);
   const [days, setDays] = useState<number>(28);
   const today = localDateKey(new Date());
+  const from = shiftDate(today, -(days - 1));
   const history = useQuery({
     enabled: !!owner, queryKey: ['history', owner, days, today],
-    queryFn: () => loadHistory(owner!, shiftDate(today, -(days - 1)), today),
+    queryFn: () => loadHistory(owner!, from, today),
   });
+  const activity = useQuery({ enabled: !!owner, queryKey: ['activity', owner, days, today],
+    queryFn: () => loadActivity(owner!, from, today), staleTime: 300_000 });
+  const measurements = useQuery({ enabled: !!owner, queryKey: ['measurements-range', owner, days, today],
+    queryFn: () => loadMeasurements(owner!, from, today), staleTime: 300_000 });
   const rows: HistoryDay[] = useMemo(() => history.data ?? [], [history.data]);
   // The engine needs a 14–30 day smoothing window regardless of the range on screen.
   const estimate = useMemo(() => {
@@ -40,7 +46,8 @@ export default function TrendsScreen() {
   const weights = rows.filter(r => r.body_weight_lbs !== null);
   const calories = rows.filter(r => r.calories_kcal !== null).map(r => ({ date: r.log_date, value: r.calories_kcal! }));
   const protein = rows.filter(r => r.proteinG !== null).map(r => ({ date: r.log_date, value: r.proteinG! }));
-  const goalWeight = profile?.weight_lbs ?? null;
+  const goalWeight = (profile?.lifestyle_survey as { goalWeightLbs?: number | null } | null | undefined)?.goalWeightLbs ?? null;
+  const latestWeight = weights.length ? weights[weights.length - 1].body_weight_lbs : null;
   const perDay = estimate?.weightChangeLbsPerDay ?? null;
   const averageProtein = protein.length ? protein.reduce((sum, p) => sum + p.value, 0) / protein.length : null;
   return <SafeAreaView edges={['top','left','right']} className="flex-1 bg-background">
@@ -73,23 +80,23 @@ export default function TrendsScreen() {
             <Text className="mt-3 text-sm">Weigh in each morning and mark the day adherent once you have logged everything.</Text>
           </>}
         </Card>
-        {perDay !== null && goalWeight !== null && Math.abs(perDay) > .002 && <Card title="Projection" index={3}>
-          <Text>At the current trend you would reach {Math.round(goalWeight + perDay * 7 * 4)} lbs in about four weeks.</Text>
+        <GoalProgressCard estimate={estimate} goalWeightLbs={goalWeight} index={3} />
+        {perDay !== null && latestWeight !== null && Math.abs(perDay) > .002 && <Card title="Projection" index={4}>
+          <Text>At the current trend you would reach {Math.round(latestWeight + perDay * 7 * 4)} lbs in about four weeks.</Text>
           <Text className="mt-2 text-sm">A projection from recent data, not a promise — it moves as your intake and activity change.</Text>
         </Card>}
-        <Card title="Daily calories" index={4}>
+        <EnergyBalanceCard rows={rows} estimate={estimate} index={5} />
+        <Card title="Daily calories" index={6}>
           <BarChart series={calories} target={targets?.caloriesKcal ?? null} tone="carbs" />
           <Text className="mt-2 text-sm">{calories.length} days logged{targets ? '. The dashed line is your target; bars above it are over.' : '.'}</Text>
         </Card>
-        <MeasurementsCard index={5} />
-        <MilestonesCard items={milestones(summarizeStreak(rows, today), 0)} index={6} />
-        <Card title="Consistency" index={7}>
-          <View className="flex-row flex-wrap gap-5">
-            <View><Text className="text-3xl font-bold">{rows.filter(r => r.is_adherent).length}</Text><Text className="text-sm">Adherent days</Text></View>
-            <View><Text className="text-3xl font-bold">{estimate?.averageIntakeKcal ? Math.round(estimate.averageIntakeKcal) : '—'}</Text><Text className="text-sm">Avg intake kcal</Text></View>
-            <View><Text className="text-3xl font-bold">{averageProtein ? Math.round(averageProtein) : '—'}</Text><Text className="text-sm">Avg protein g</Text></View>
-          </View>
-        </Card>
+        <MacroSplitCard rows={rows} bodyWeightLbs={latestWeight} index={7} />
+        <StepsCard activity={activity.data ?? []} index={8} />
+        <BodyCompositionCard measurements={measurements.data ?? []} weightLbs={latestWeight} index={9} />
+        <WeeklyAveragesCard rows={rows} index={10} />
+        <MeasurementsCard index={11} />
+        <MilestonesCard items={milestones(summarizeStreak(rows, today), 0)} index={12} />
+        <ConsistencyCard rows={rows} windowDays={days} estimate={estimate} averageProtein={averageProtein} index={13} />
       </>}
     </ScrollView>
   </SafeAreaView>;

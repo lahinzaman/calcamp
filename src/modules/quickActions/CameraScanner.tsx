@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { AppState, Linking, StyleSheet, View } from 'react-native';
+import { AppState, Linking, Platform, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import Animated, { FadeIn, FadeOut, ReduceMotion, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from '../../theme/SafeArea';
@@ -10,6 +11,19 @@ import { TIMING } from '../../theme/motion';
 import { haptic } from '../../theme/haptics';
 
 export type ScannerMode = 'photo' | 'barcode';
+/** A preview that has not started by now is not going to without being told why. */
+const READY_TIMEOUT_MS = 6000;
+/**
+ * Browsers hand out a camera only in a secure context. Reaching a dev server over a LAN
+ * address is the usual way to end up here, and it looks identical to a broken camera.
+ */
+export function webCameraProblem(): string | null {
+  if (Platform.OS !== 'web' || typeof globalThis === 'undefined') return null;
+  const scope = globalThis as unknown as { isSecureContext?: boolean; navigator?: { mediaDevices?: unknown } };
+  if (scope.isSecureContext === false) return 'This browser only allows camera access over HTTPS or on localhost. Open the app over HTTPS, or enter this item by hand.';
+  if (scope.navigator && !scope.navigator.mediaDevices) return 'This browser will not give the page a camera. Try a different browser, or enter this item by hand.';
+  return null;
+}
 interface Highlight { x: number; y: number; width: number; height: number; data: string }
 /** Bounds are sometimes an empty rect; a zero-area box would draw in the corner. */
 function toHighlight(result: BarcodeScanningResult): Highlight | null {
@@ -37,17 +51,27 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onClose, onMan
 }) {
   const [permission, requestPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
+  const insets = useSafeAreaInsets();
   const [ready, setReady] = useState(false);
   const [torch, setTorch] = useState(false);
   const [highlight, setHighlight] = useState<Highlight | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [foreground, setForeground] = useState(AppState.currentState === 'active');
+  // Only a real trip to the background should tear the preview down. iOS reports 'inactive'
+  // while a modal presents and while the permission alert is up, and treating that as
+  // backgrounded left the camera unmounted on a screen that never recovered.
+  const [foreground, setForeground] = useState(AppState.currentState !== 'background');
+  const [stalled, setStalled] = useState(false);
   const clearing = useRef<ReturnType<typeof setTimeout> | null>(null);
   const locked = useRef(false);
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', state => setForeground(state === 'active'));
+    const subscription = AppState.addEventListener('change', state => setForeground(state !== 'background'));
     return () => { subscription.remove(); if (clearing.current) clearTimeout(clearing.current); };
   }, []);
+  useEffect(() => {
+    if (!permission?.granted || ready) return;
+    const timer = setTimeout(() => setStalled(true), READY_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [permission?.granted, ready]);
 
   const scanned = (result: BarcodeScanningResult) => {
     if (busy || locked.current) return;
@@ -72,10 +96,14 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onClose, onMan
     finally { locked.current = false; }
   };
 
+  const stalledMessage = webCameraProblem()
+    ?? 'The preview has not started. Close and reopen the scanner, or enter this item by hand.';
+
   if (!permission?.granted) {
     return <SafeAreaView className="flex-1 justify-center bg-background p-6">
       <Text className="mb-3 text-3xl font-bold">Camera access</Text>
       <Text className="mb-6">{mode === 'barcode' ? 'Scanning a package barcode needs the camera.' : 'Estimating a meal from a photo needs the camera.'} Nothing is stored until you confirm the entry.</Text>
+      {!!webCameraProblem() && <Text accessibilityRole="alert" className="mb-4">{webCameraProblem()}</Text>}
       <Action label="Allow camera access" onPress={() => { void requestPermission().catch(() => setError('Camera access is unavailable on this device.')); }} />
       {permission?.canAskAgain === false && <Action secondary label="Open Settings" onPress={() => { void Linking.openSettings().catch(() => setError('Open device Settings to enable the camera.')); }} />}
       <Action secondary label="Enter food manually" onPress={onManual} />
@@ -98,7 +126,7 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onClose, onMan
       <View style={styles.highlightLabel}><Text style={styles.highlightText}>{highlight.data}</Text></View>
     </Animated.View>}
 
-    <SafeAreaView style={styles.chrome} edges={['top', 'bottom', 'left', 'right']}>
+    <View pointerEvents="box-none" style={[styles.chrome, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24, paddingLeft: insets.left, paddingRight: insets.right }]}>
       <View style={styles.topBar}>
         <Pressable accessibilityRole="button" accessibilityLabel="Close camera" onPress={onClose} style={styles.roundButton} weight="firm">
           <Text style={styles.chromeText}>✕</Text>
@@ -113,7 +141,7 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onClose, onMan
       </View>
 
       <View style={styles.bottomBar}>
-        {(notice || error) && <View style={styles.noticePill}><Text style={styles.chromeText}>{error ?? notice}</Text></View>}
+        {(notice || error || stalled) && <View style={styles.noticePill}><Text style={styles.chromeText}>{error ?? notice ?? stalledMessage}</Text></View>}
         {mode === 'photo' && <Pressable accessibilityRole="button" accessibilityLabel="Take food photo" disabled={!ready || busy}
           onPress={() => { void capture(); }} style={[styles.shutter, (!ready || busy) && { opacity: .5 }]} weight="firm">
           <View style={styles.shutterInner} />
@@ -123,13 +151,14 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onClose, onMan
           <Text style={styles.chromeText}>{mode === 'barcode' ? 'Type the barcode instead' : 'Enter food manually'}</Text>
         </Pressable>
       </View>
-    </SafeAreaView>
+    </View>
   </View>;
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
-  chrome: { flex: 1, justifyContent: 'space-between' },
+  // Must stay transparent: this sits directly over the live preview.
+  chrome: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, justifyContent: 'space-between' },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 16, paddingTop: 8 },
   bottomBar: { alignItems: 'center', gap: 14, paddingBottom: 24, paddingHorizontal: 16 },
   roundButton: { height: 48, width: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,.55)' },

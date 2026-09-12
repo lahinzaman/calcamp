@@ -20,7 +20,7 @@ test('unreported nutrients are separated from zero, and limits are distinguished
 
 test('CSV quoting survives commas and quotes in food names', () => {
   assert.equal(toCsv([['a,b', 'say "hi"', null, 3]]), '"a,b","say ""hi""","","3"');
-  const days = daysCsv([{ log_date: '2026-09-10', calories_kcal: 2000, proteinG: 150, carbsG: 200, fatG: 60, body_weight_lbs: 180, is_adherent: true }]);
+  const days = daysCsv([{ log_date: '2026-09-10', calories_kcal: 2000, proteinG: 150, carbsG: 200, fatG: 60, micros: {}, body_weight_lbs: 180, is_adherent: true }]);
   assert.ok(days.startsWith('"date","calories_kcal"'));
   assert.ok(days.includes('"2026-09-10"'));
   assert.ok(days.includes('"yes"'));

@@ -8,7 +8,7 @@ import {
 import type { HistoryDay } from '../../api/history';
 
 const day = (log_date: string, calories_kcal: number | null, over: Partial<HistoryDay> = {}): HistoryDay => ({
-  log_date, calories_kcal, proteinG: 150, carbsG: 200, fatG: 60, is_adherent: true, body_weight_lbs: 180, ...over,
+  log_date, calories_kcal, proteinG: 150, carbsG: 200, fatG: 60, micros: {}, is_adherent: true, body_weight_lbs: 180, ...over,
 });
 
 test('energy balance skips unlogged days instead of scoring them as a total fast', () => {

@@ -19,9 +19,10 @@ function Row({ status }: { status: NutrientStatus }) {
     <ProgressBar value={status.amount} target={status.target} height={6} tone={status.kind === 'limit' ? 'fat' : status.ratio >= 1 ? 'protein' : 'carbs'} />
   </View>;
 }
-export function MicronutrientPanel({ index = 3 }: { index?: number }) {
-  const consumed = useNutritionStore(s => s.consumedMicros);
-  const [open, setOpen] = useState(false);
+export function MicronutrientPanel({ index = 3, micros, startOpen = false }: { index?: number; micros?: Partial<Record<string, number>>; startOpen?: boolean }) {
+  const live = useNutritionStore(s => s.consumedMicros);
+  const consumed = micros ?? live;
+  const [open, setOpen] = useState(startOpen);
   const { tracked, unreported } = nutrientStatuses(consumed);
   const goals = tracked.filter(status => status.kind === 'goal');
   const met = goals.filter(status => status.ratio >= 1).length;

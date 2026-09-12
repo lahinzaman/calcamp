@@ -2,11 +2,14 @@ import { getSupabase } from './supabase';
 import { kgToLbs } from '../lib/units';
 import type { TdeeDailyLog } from '../modules/nutrition/tdee';
 import type { FoodEntry } from '../types/foodEntry';
+import type { MicronutrientTotals } from '../types/nutrition';
 import { rowToFoodEntry } from './foodEntries';
 export interface HistoryDay extends TdeeDailyLog {
   proteinG: number | null;
   carbsG: number | null;
   fatG: number | null;
+  /** Whatever the foods logged that day reported. Absent keys stay absent, never zero. */
+  micros: MicronutrientTotals;
 }
 function check(error: { message: string } | null) { if (error) throw Object.assign(new Error(error.message), error); }
 export function shiftDate(date: string, days: number) {
@@ -17,7 +20,7 @@ export function shiftDate(date: string, days: number) {
 /** Cloud rows for a closed date range, converted to the app's Imperial units. */
 export async function loadHistory(userId: string, from: string, to: string, client = getSupabase()): Promise<HistoryDay[]> {
   const { data, error } = await client.from('daily_nutrition_logs')
-    .select('log_date,calories_kcal,protein_g,carbs_g,fat_g,is_adherent,body_weight_kg')
+    .select('log_date,calories_kcal,protein_g,carbs_g,fat_g,micronutrients,is_adherent,body_weight_kg')
     .eq('user_id', userId).gte('log_date', from).lte('log_date', to).order('log_date');
   check(error);
   return (data ?? []).map(row => ({
@@ -26,6 +29,7 @@ export async function loadHistory(userId: string, from: string, to: string, clie
     proteinG: row.protein_g === null ? null : Number(row.protein_g),
     carbsG: row.carbs_g === null ? null : Number(row.carbs_g),
     fatG: row.fat_g === null ? null : Number(row.fat_g),
+    micros: (row.micronutrients && typeof row.micronutrients === 'object' ? row.micronutrients : {}) as MicronutrientTotals,
     is_adherent: !!row.is_adherent,
     body_weight_lbs: row.body_weight_kg === null ? null : kgToLbs(Number(row.body_weight_kg)),
   }));

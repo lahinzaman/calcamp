@@ -20,9 +20,9 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="dining">
-        <NativeTabs.Trigger.Label>Dining</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="fork.knife" md="restaurant" />
+      <NativeTabs.Trigger name="health">
+        <NativeTabs.Trigger.Label>Health</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="heart.text.square" md="monitor_heart" />
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="explore">
         <NativeTabs.Trigger.Label>Workout</NativeTabs.Trigger.Label>

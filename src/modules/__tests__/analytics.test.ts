@@ -133,3 +133,43 @@ test('every nutrient the panel tracks explains itself and has a sane reference a
   assert.equal(tracked.length + unreported.length, entries.length);
   assert.ok(unreported.every(status => status.amount === 0 && status.why.length > 20));
 });
+
+test('nutrient targets follow sex and age rather than one label figure', async () => {
+  const { DAILY_VALUES, personalDailyValues } = await import('../nutrition/dailyValues');
+  const woman = personalDailyValues({ sex: 'female', age: 22 });
+  const man = personalDailyValues({ sex: 'male', age: 22 });
+  // The flat label value was a man's on every one of these.
+  assert.equal(woman.vitamin_a_mcg_rae!.amount, 700);
+  assert.equal(man.vitamin_a_mcg_rae!.amount, 900);
+  assert.equal(woman.choline_mg!.amount, 425);
+  assert.equal(woman.magnesium_mg!.amount, 310);
+  assert.equal(woman.potassium_mg!.amount, 2600);
+  assert.equal(woman.iron_mg!.amount, 18);
+  // Age bands move where the DRI tables move.
+  assert.equal(personalDailyValues({ sex: 'female', age: 45 }).magnesium_mg!.amount, 320);
+  assert.equal(personalDailyValues({ sex: 'female', age: 45 }).iron_mg!.amount, 8);
+  assert.equal(personalDailyValues({ sex: 'male', age: 45 }).vitamin_b6_mg!.amount, 1.7);
+  // Nutrients with one value for everyone are untouched, as is an unstated sex.
+  assert.equal(woman.vitamin_b12_mcg!.amount, man.vitamin_b12_mcg!.amount);
+  assert.equal(personalDailyValues({ sex: 'unspecified', age: 22 }), DAILY_VALUES);
+  for (const table of [woman, man]) {
+    for (const [key, value] of Object.entries(table)) assert.ok(value!.amount > 0 && value!.why.length > 20, key);
+  }
+});
+
+test('nutrient averages divide by the days that reported a nutrient, not the whole window', async () => {
+  const { nutrientAverages } = await import('../insights/analytics');
+  const rows = [
+    day('2026-09-01', 2000, { micros: { iron_mg: 10, vitamin_c_mg: 60 } }),
+    day('2026-09-02', 2000, { micros: { iron_mg: 20 } }),
+    day('2026-09-03', 2000, { micros: {} }),
+    day('2026-09-04', 2000, { micros: { iron_mg: -5, zinc_mg: Number.NaN } }),
+  ];
+  const averages = nutrientAverages(rows);
+  const iron = averages.find(entry => entry.key === 'iron_mg')!;
+  assert.equal(iron.averageAmount, 15);
+  assert.equal(iron.days, 2, 'the day with no reading and the impossible reading are both skipped');
+  assert.equal(averages.find(entry => entry.key === 'vitamin_c_mg')!.averageAmount, 60);
+  assert.equal(averages.some(entry => entry.key === 'zinc_mg'), false);
+  assert.deepEqual(nutrientAverages([]), []);
+});

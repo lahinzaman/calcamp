@@ -4,7 +4,8 @@ import { Text } from '../../theme/primitives';
 import { Pressable } from '../../theme/Pressable';
 import { ProgressBar, Reveal } from '../../theme/motion';
 import { useNutritionStore } from '../../store/nutritionStore';
-import { GROUP_LABELS, nutrientStatuses, type NutrientGroup, type NutrientStatus } from './dailyValues';
+import { GROUP_LABELS, nutrientStatuses, personalDailyValues, type MetabolicSex, type NutrientGroup, type NutrientStatus } from './dailyValues';
+import { useAuthStore } from '../../store/authStore';
 const ORDER: NutrientGroup[] = ['vitamin', 'mineral', 'macro', 'other'];
 const round = (value: number) => Number(value.toFixed(value < 10 ? 1 : 0));
 function Row({ status, reported }: { status: NutrientStatus; reported: boolean }) {
@@ -24,10 +25,12 @@ function Row({ status, reported }: { status: NutrientStatus; reported: boolean }
 }
 export function MicronutrientPanel({ index = 3, micros, startOpen = false }: { index?: number; micros?: Partial<Record<string, number>>; startOpen?: boolean }) {
   const live = useNutritionStore(s => s.consumedMicros);
+  const survey = useAuthStore(s => s.profile?.lifestyle_survey) as { age?: number | null; metabolicSex?: MetabolicSex } | null | undefined;
   const consumed = micros ?? live;
   const [open, setOpen] = useState(startOpen);
   const [showAll, setShowAll] = useState(false);
-  const { tracked, unreported } = nutrientStatuses(consumed);
+  const reference = { sex: survey?.metabolicSex ?? 'unspecified', age: survey?.age ?? null };
+  const { tracked, unreported } = nutrientStatuses(consumed, personalDailyValues(reference));
   const all = [...tracked, ...unreported];
   const goals = tracked.filter(status => status.kind === 'goal');
   const met = goals.filter(status => status.ratio >= 1).length;
@@ -56,7 +59,9 @@ export function MicronutrientPanel({ index = 3, micros, startOpen = false }: { i
         <Text className="font-bold">{showAll ? 'Hide what was not reported' : `Show ${unreported.length} nutrients nothing reported`}</Text>
         <Text className="mt-1 text-sm">All {all.length} are tracked. Most foods publish only a handful, and an unreported nutrient is unknown, not zero — so it is never counted against you.</Text>
       </Pressable>}
-      <Text className="mt-1 text-sm">Percentages use FDA Daily Values for adults, or an Adequate Intake where no Daily Value exists — a general reference, not medical advice.</Text>
+      <Text className="mt-1 text-sm">{reference.sex === 'unspecified'
+        ? 'Percentages use FDA Daily Values for adults. Add your age and sex in onboarding for targets set to you.'
+        : `Targets are Dietary Reference Intakes for ${reference.sex === 'male' ? 'men' : 'women'}${reference.age === null ? '' : ` aged ${reference.age}`}, or an Adequate Intake where no RDA exists.`} A general reference, not medical advice.</Text>
     </View>}
   </View></Reveal>;
 }

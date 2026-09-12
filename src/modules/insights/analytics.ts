@@ -1,6 +1,7 @@
 import type { HistoryDay } from '../../api/history';
 import type { BodyMeasurement } from '../../api/measurements';
 import type { ActivityDay } from '../../api/activityHistory';
+import type { NutrientKey } from '../../types/nutrition';
 
 /** The conventional energy density of stored body mass. A planning figure, not a law. */
 export const KCAL_PER_LB = 3500;
@@ -124,4 +125,24 @@ export function consistency(rows: readonly HistoryDay[], windowDays: number): Co
     weighInDays: rows.filter(row => row.body_weight_lbs !== null).length,
     loggedPercent: windowDays > 0 ? (loggedDays / windowDays) * 100 : 0,
   };
+}
+
+export interface NutrientAverage { key: NutrientKey; averageAmount: number; days: number }
+/**
+ * Mean intake per nutrient across the days that actually reported it. Dividing by the whole
+ * window would punish you for a database that does not publish selenium, so the divisor is
+ * the days with a reading and the count travels with the number.
+ */
+export function nutrientAverages(rows: readonly HistoryDay[]): NutrientAverage[] {
+  const totals = new Map<NutrientKey, { sum: number; days: number }>();
+  for (const row of rows) {
+    for (const [key, amount] of Object.entries(row.micros ?? {}) as [NutrientKey, number][]) {
+      if (typeof amount !== 'number' || !Number.isFinite(amount) || amount < 0) continue;
+      const entry = totals.get(key) ?? { sum: 0, days: 0 };
+      entry.sum += amount; entry.days += 1;
+      totals.set(key, entry);
+    }
+  }
+  return [...totals].map(([key, entry]) => ({ key, averageAmount: entry.sum / entry.days, days: entry.days }))
+    .sort((a, b) => b.days - a.days || a.key.localeCompare(b.key));
 }

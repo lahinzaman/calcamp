@@ -45,14 +45,65 @@ export const DAILY_VALUES: Partial<Record<NutrientKey, DailyValue>> = {
 export const GROUP_LABELS: Record<NutrientGroup, string> = { macro: 'Fats, fibre & sugar', vitamin: 'Vitamins', mineral: 'Minerals', other: 'Other' };
 export interface NutrientStatus { key: NutrientKey; label: string; why: string; amount: number; target: number; ratio: number; kind: 'goal' | 'limit'; group: NutrientGroup; unit: string }
 /** Missing nutrients are unreported, not zero, so they are listed separately rather than shown at 0%. */
-export function nutrientStatuses(consumed: Partial<Record<NutrientKey, number>>) {
+export function nutrientStatuses(consumed: Partial<Record<NutrientKey, number>>,
+  values: Partial<Record<NutrientKey, DailyValue>> = DAILY_VALUES) {
   const tracked: NutrientStatus[] = [];
   const unreported: NutrientStatus[] = [];
-  for (const [key, value] of Object.entries(DAILY_VALUES) as [NutrientKey, DailyValue][]) {
+  for (const [key, value] of Object.entries(values) as [NutrientKey, DailyValue][]) {
     const amount = consumed[key];
     const status: NutrientStatus = { key, label: value.label, why: value.why, amount: amount ?? 0, target: value.amount,
       ratio: value.amount ? (amount ?? 0) / value.amount : 0, kind: value.kind, group: value.group, unit: NUTRIENT_UNITS[key] };
     (amount === undefined ? unreported : tracked).push(status);
   }
   return { tracked, unreported };
+}
+
+export type MetabolicSex = 'female' | 'male' | 'unspecified';
+export interface NutrientReference { sex: MetabolicSex; age: number | null }
+
+/**
+ * Institute of Medicine Dietary Reference Intakes, which differ by sex and age where the
+ * FDA's single label Daily Value does not. A woman reading this panel was being held to a
+ * man's vitamin A, choline, manganese and potassium; she was also being shown a magnesium
+ * target 100 mg above her own.
+ *
+ * Values are RDA where one exists and Adequate Intake otherwise. Sodium stays the FDA limit.
+ * With no sex on file the FDA Daily Values above are used unchanged, because guessing a sex
+ * from nothing is worse than a general reference.
+ */
+const DRI: Partial<Record<NutrientKey, { male: number; female: number; olderMale?: number; olderFemale?: number }>> = {
+  vitamin_a_mcg_rae: { male: 900, female: 700 },
+  vitamin_c_mg: { male: 90, female: 75 },
+  vitamin_k_mcg: { male: 120, female: 90 },
+  thiamin_b1_mg: { male: 1.2, female: 1.1 },
+  riboflavin_b2_mg: { male: 1.3, female: 1.1 },
+  niacin_b3_mg: { male: 16, female: 14 },
+  vitamin_b6_mg: { male: 1.3, female: 1.3, olderMale: 1.7, olderFemale: 1.5 },
+  choline_mg: { male: 550, female: 425 },
+  calcium_mg: { male: 1000, female: 1000, olderMale: 1000, olderFemale: 1200 },
+  iron_mg: { male: 8, female: 18, olderMale: 8, olderFemale: 8 },
+  magnesium_mg: { male: 400, female: 310, olderMale: 420, olderFemale: 320 },
+  zinc_mg: { male: 11, female: 8 },
+  manganese_mg: { male: 2.3, female: 1.8 },
+  chromium_mcg: { male: 35, female: 25, olderMale: 30, olderFemale: 20 },
+  potassium_mg: { male: 3400, female: 2600 },
+  fluoride_mg: { male: 4, female: 3 },
+  water_g: { male: 3700, female: 2700 },
+};
+/** The DRI tables change band at 31 for magnesium and at 51 for the rest; 31 is the earlier. */
+const OLDER_FROM = 31;
+
+export function personalDailyValues(reference: NutrientReference): Partial<Record<NutrientKey, DailyValue>> {
+  if (reference.sex === 'unspecified') return DAILY_VALUES;
+  const older = reference.age !== null && reference.age >= OLDER_FROM;
+  const adjusted: Partial<Record<NutrientKey, DailyValue>> = { ...DAILY_VALUES };
+  for (const [key, band] of Object.entries(DRI) as [NutrientKey, (typeof DRI)[NutrientKey]][]) {
+    const base = adjusted[key];
+    if (!base || !band) continue;
+    const amount = reference.sex === 'male'
+      ? (older && band.olderMale !== undefined ? band.olderMale : band.male)
+      : (older && band.olderFemale !== undefined ? band.olderFemale : band.female);
+    adjusted[key] = { ...base, amount };
+  }
+  return adjusted;
 }

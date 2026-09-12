@@ -14,7 +14,7 @@ import { loadActivity } from '../../api/activityHistory';
 import { loadMeasurements } from '../../api/measurements';
 import {
   BodyCompositionCard, ConsistencyCard, EnergyBalanceCard, GoalProgressCard,
-  Card, MacroSplitCard, StepsCard, WeeklyAveragesCard,
+  Card, MacroSplitCard, NutrientAveragesCard, StepsCard, WeeklyAveragesCard,
 } from './AnalyticsCards';
 import { calculateTdee } from '../nutrition/tdee';
 import { MilestonesCard } from '../habits/MilestonesCard';
@@ -46,7 +46,8 @@ export default function TrendsScreen() {
   const weights = rows.filter(r => r.body_weight_lbs !== null);
   const calories = rows.filter(r => r.calories_kcal !== null).map(r => ({ date: r.log_date, value: r.calories_kcal! }));
   const protein = rows.filter(r => r.proteinG !== null).map(r => ({ date: r.log_date, value: r.proteinG! }));
-  const goalWeight = (profile?.lifestyle_survey as { goalWeightLbs?: number | null } | null | undefined)?.goalWeightLbs ?? null;
+  const survey = profile?.lifestyle_survey as { goalWeightLbs?: number | null; age?: number | null; metabolicSex?: 'female' | 'male' | 'unspecified' } | null | undefined;
+  const goalWeight = survey?.goalWeightLbs ?? null;
   const latestWeight = weights.length ? weights[weights.length - 1].body_weight_lbs : null;
   const perDay = estimate?.weightChangeLbsPerDay ?? null;
   const averageProtein = protein.length ? protein.reduce((sum, p) => sum + p.value, 0) / protein.length : null;
@@ -91,6 +92,7 @@ export default function TrendsScreen() {
           <Text className="mt-2 text-sm">{calories.length} days logged{targets ? '. The dashed line is your target; bars above it are over.' : '.'}</Text>
         </Card>
         <MacroSplitCard rows={rows} bodyWeightLbs={latestWeight} index={7} />
+        <NutrientAveragesCard rows={rows} sex={survey?.metabolicSex ?? 'unspecified'} age={survey?.age ?? null} index={8} />
         <StepsCard activity={activity.data ?? []} index={8} />
         <BodyCompositionCard measurements={measurements.data ?? []} weightLbs={latestWeight} index={9} />
         <WeeklyAveragesCard rows={rows} index={10} />

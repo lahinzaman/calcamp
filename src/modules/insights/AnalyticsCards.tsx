@@ -8,8 +8,9 @@ import type { ActivityDay } from '../../api/activityHistory';
 import type { TdeeEstimate } from '../nutrition/tdee';
 import {
   bodyComposition, bodyFatSeries, consistency, energyBalance, goalProgress,
-  macroSplit, stepsSummary, weeklyAverages,
+  macroSplit, nutrientAverages, stepsSummary, weeklyAverages,
 } from './analytics';
+import { nutrientStatuses, personalDailyValues, type MetabolicSex } from '../nutrition/dailyValues';
 
 export function Card({ title, children, index }: { title: string; children: React.ReactNode; index: number }) {
   return <Reveal index={index}><View className="mb-4 rounded-3xl border border-border bg-surface p-5">
@@ -149,5 +150,39 @@ export function ConsistencyCard({ rows, windowDays, estimate, averageProtein, in
       <Stat value={averageProtein ? String(Math.round(averageProtein)) : '—'} label="Avg protein g" />
     </View>
     <Text className="mt-3 text-sm">Expenditure is measured from days that have both a weigh-in and a complete log, so the weigh-in count is what limits it.</Text>
+  </Card>;
+}
+
+export function NutrientAveragesCard({ rows, sex, age, index }: {
+  rows: readonly HistoryDay[]; sex: MetabolicSex; age: number | null; index: number;
+}) {
+  const averages = nutrientAverages(rows);
+  if (!averages.length) return null;
+  const values = personalDailyValues({ sex, age });
+  const consumed = Object.fromEntries(averages.map(entry => [entry.key, entry.averageAmount]));
+  const { tracked } = nutrientStatuses(consumed, values);
+  const byKey = new Map(averages.map(entry => [entry.key, entry.days]));
+  const short = tracked.filter(status => status.kind === 'goal' && status.ratio < 0.8).sort((a, b) => a.ratio - b.ratio);
+  const over = tracked.filter(status => status.kind === 'limit' && status.ratio > 1).sort((a, b) => b.ratio - a.ratio);
+  return <Card title="Nutrients over this range" index={index}>
+    <Text className="mb-4 text-sm">Daily averages across the days that reported each nutrient — not across the whole range, which would punish you for a database that does not publish it.</Text>
+    {[['Falling short', short], ['Over a limit', over]].map(([heading, list]) => {
+      const entries = list as typeof tracked;
+      if (!entries.length) return null;
+      return <View key={heading as string} className="mb-4">
+        <Text className="mb-2 text-sm font-bold">{heading as string}</Text>
+        {entries.slice(0, 8).map(status => <View key={status.key} className="mb-3">
+          <View className="mb-1 flex-row flex-wrap items-baseline justify-between gap-2">
+            <Text className="font-semibold" style={{ flexGrow: 1, flexBasis: 120 }}>{status.label}</Text>
+            <Text className="text-sm" style={{ fontVariant: ['tabular-nums'] }}>
+              {Math.round(status.amount * 10) / 10} / {status.target} {status.unit.replace('_', ' ')} · {Math.round(status.ratio * 100)}%
+            </Text>
+          </View>
+          <ProgressBar value={status.amount} target={status.target} height={6} tone={status.kind === 'limit' ? 'fat' : 'carbs'} />
+          <Text className="mt-1 text-xs">{byKey.get(status.key)} {byKey.get(status.key) === 1 ? 'day' : 'days'} reported this</Text>
+        </View>)}
+      </View>;
+    })}
+    {!short.length && !over.length && <Text>Every nutrient with data sits inside its range across this window.</Text>}
   </Card>;
 }

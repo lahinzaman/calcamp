@@ -1,3 +1,3 @@
-import DashboardScreen from '../../modules/dashboard/DashboardScreen';
+import TodayScreen from '../../modules/dashboard/TodayScreen';
 import { ScreenBoundary } from '../../components/ScreenBoundary';
-export default function Dashboard() { return <ScreenBoundary><DashboardScreen /></ScreenBoundary>; }
+export default function Today() { return <ScreenBoundary><TodayScreen /></ScreenBoundary>; }

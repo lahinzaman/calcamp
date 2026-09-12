@@ -191,19 +191,24 @@ test('health connect explains what is shared before it requests access', async (
   assert.equal(rendered!.root.find(node => String(node.type) === 'Modal').props.visible, true); assert.ok(textContent().includes('exported automatically'));
 });
 
-test('CalCamp dashboard mounts real targets and all four training days', async () => {
-  const { default: DashboardScreen } = require('../dashboard/DashboardScreen') as typeof import('../dashboard/DashboardScreen');
+test('Today shows the selected day and switches to another one without leaving the screen', async () => {
+  const { default: TodayScreen } = require('../dashboard/TodayScreen') as typeof import('../dashboard/TodayScreen');
   nutritionStore.getState().setDailyTargets({ macros: { caloriesKcal: 2400, proteinG: 150, carbsG: 270, fatG: 80 }, micronutrients: {} });
   nutritionStore.getState().setConsumed({ caloriesKcal: 900, proteinG: 60, carbsG: 110, fatG: 25 });
-  // Today now loads streak history, so the screen needs a query client.
-  const dashboardClient = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
-  await act(async () => { rendered = create(<QueryClientProvider client={dashboardClient}><DashboardScreen /></QueryClientProvider>); });
+  const todayClient = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
+  await act(async () => { rendered = create(<QueryClientProvider client={todayClient}><TodayScreen /></QueryClientProvider>); });
   // Grouped by locale now ("1,500"), so match the digits without assuming a separator.
   assert.match(textContent(), /1[,.\s\u00a0]?500 kcal remaining/);
-  for (const plan of ['Upper A','Upper B','Lower A','Lower B']) assert.ok(textContent().includes(plan));
   // Calories, three macros, and the water tracker.
   assert.equal(rendered!.root.findAllByProps({ accessibilityRole: 'progressbar' }).length, 5);
   assert.ok(textContent().includes('cups'));
+  // Yesterday is the same screen on another date, not a separate history screen.
+  const yesterday = new Date(Date.now() - 86_400_000);
+  const label = yesterday.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+  await act(async () => { rendered!.root.findAll(node => typeof node.props.accessibilityLabel === 'string'
+    && node.props.accessibilityLabel.startsWith(label))[0].props.onPress(); });
+  assert.ok(textContent().includes('No foods were recorded on this day.'));
+  assert.ok(!textContent().includes('cups'), 'water is only for today');
 });
 
 test('with no routines the training tab sends you to build one instead of offering a preset', async () => {

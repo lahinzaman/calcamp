@@ -20,19 +20,28 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="health">
-        <NativeTabs.Trigger.Label>Health</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="heart.text.square" md="monitor_heart" />
+      <NativeTabs.Trigger name="food">
+        <NativeTabs.Trigger.Label>Food</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="fork.knife" md="restaurant" />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="explore">
-        <NativeTabs.Trigger.Label>Workout</NativeTabs.Trigger.Label>
+
+      <NativeTabs.Trigger name="trends">
+        <NativeTabs.Trigger.Label>Trends</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="chart.line.uptrend.xyaxis" md="trending_up" />
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="train">
+        <NativeTabs.Trigger.Label>Train</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           src={require('@/assets/images/tabIcons/explore.png')}
           renderingMode="template"
         />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="settings"><NativeTabs.Trigger.Label>Settings</NativeTabs.Trigger.Label><NativeTabs.Trigger.Icon sf="gearshape" md="settings" /></NativeTabs.Trigger>
+      <NativeTabs.Trigger name="profile">
+        <NativeTabs.Trigger.Label>Profile</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="person.crop.circle" md="account_circle" />
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }

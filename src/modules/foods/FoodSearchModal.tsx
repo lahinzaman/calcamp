@@ -22,7 +22,12 @@ const TABS: [Tab, string][] = [['search', 'Search'], ['dining', 'Dining halls'],
 const drinkCandidate = (drink: Drink): Candidate => ({ name: drink.name, servingLabel: servingLabelFor(drink),
   macros: drinkMacros(drink), micros: drinkMicros(drink), source: 'custom', note: drinkNote(drink) });
 type Candidate = { name: string; servingLabel: string | null; macros: SearchResult['macros']; micros: SearchResult['micros']; source: SavedFood['source']; note?: string };
-export function FoodSearchModal({ onClose, meal }: { onClose: () => void; meal?: MealSlot }) {
+/**
+ * Everything the app can turn into a diary entry, in one place: the packaged-food search,
+ * campus dining, your own recipes and saved foods, and the drinks catalogue. The + sheet and
+ * the Food tab render the same component so they can never drift apart.
+ */
+export function FoodLibrary({ meal, onDone, footer }: { meal?: MealSlot; onDone: () => void; footer?: React.ReactNode }) {
   const owner = useAuthStore(s => s.session?.user.id) ?? 'anonymous';
   const [tab, setTab] = useState<Tab>('search');
   const [category, setCategory] = useState<DrinkCategory>('beer');
@@ -37,61 +42,68 @@ export function FoodSearchModal({ onClose, meal }: { onClose: () => void; meal?:
   const list = useMemo(() => orderFoods(saved, tab === 'recent' || tab === 'frequent' || tab === 'favorite' ? tab : 'recent'), [saved, tab]);
   // The drinks catalogue is bundled, so it answers instantly and works with no connection.
   const drinkMatches = useMemo(() => tab === 'search' ? searchDrinks(term.trim()) : [], [tab, term]);
-  if (chosen) return <PortionSheet candidate={chosen} meal={meal} owner={owner} onBack={() => setChosen(null)} onDone={onClose} />;
+  return <>
+      <View className="mb-3 flex-row flex-wrap">{TABS.map(([value, label]) => <Choice key={value} label={label} selected={tab === value} onPress={() => setTab(value)} />)}</View>
+      {tab === 'search' && <>
+        <Field label="Search foods & drinks" value={term} onChangeText={setTerm} autoCorrect={false} placeholder="Greek yogurt, chicken breast, Tito's, Bud Light…" />
+        {!!drinkMatches.length && <>
+          <Text className="mb-2 text-sm font-bold tracking-widest">DRINKS</Text>
+          {drinkMatches.map(drink => <Row key={`drink:${drink.name}`} title={drink.name}
+            subtitle={`${drinkMacros(drink).caloriesKcal} kcal · ${servingLabelFor(drink)}`}
+            onPress={() => setChosen(drinkCandidate(drink))} />)}
+          <Text className="mb-4 mt-1 text-xs">Drink energy is calculated from ABV and published carbohydrate, not read off a label.</Text>
+        </>}
+        {results.isPending && query.trim().length >= 2 && <LoadingCards label="Searching…" />}
+        {results.isError && <Text accessibilityRole="alert" className="mb-3">Food search is unavailable right now. Try again, or add the food by hand.</Text>}
+        {results.data?.length === 0 && !drinkMatches.length && <Text className="mb-3">Nothing matched “{query}”. Try fewer words, or scan the barcode instead.</Text>}
+        {!!results.data?.length && <Text className="mb-2 text-sm font-bold tracking-widest">PACKAGED FOODS</Text>}
+        {results.data?.map(result => <Row key={result.key} title={result.name} subtitle={`${result.brand ? `${result.brand} · ` : ''}${Math.round(result.macros.caloriesKcal)} kcal per ${result.servingLabel}`}
+          onPress={() => setChosen({ name: result.name, servingLabel: result.servingLabel, macros: result.macros, micros: result.micros, source: 'custom' })} />)}
+      </>}
+      {tab === 'recipe' && <>
+        {!recipes.length && <Text className="mb-4">No recipes yet. Build one from foods you have already logged and it becomes a single tap.</Text>}
+        {recipes.map(recipe => { const single = perServing(recipe); return <Row key={recipe.id} title={recipe.name}
+          subtitle={`${Math.round(single.macros.caloriesKcal)} kcal per serving · makes ${recipe.yieldServings} · ${recipe.items.length} ingredients`}
+          onRemove={() => { setRecipes(deleteRecipe(owner, recipe.id)); haptic('warning'); }}
+          onPress={() => setChosen({ name: recipe.name, servingLabel: 'serving', macros: single.macros, micros: single.micros, source: 'recipe' })} />; })}
+        <Action secondary label="Create a recipe" onPress={() => setBuilding('new')} />
+      </>}
+      {tab === 'dining' && <DiningPicker meal={meal} onLogged={onDone} />}
+      {tab === 'drinks' && <>
+        <Text className="mb-3">Beer, wine, spirits and the rest, with the alcohol counted. Energy is calculated from ABV — a label always wins over this estimate.</Text>
+        <View className="mb-3 flex-row flex-wrap">{DRINK_CATEGORIES.map(([value, label]) => <Choice key={value} label={label}
+          selected={category === value} onPress={() => setCategory(value)} />)}</View>
+        {drinksInCategory(category).map(drink => <Row key={drink.name} title={drink.name}
+          subtitle={`${drinkMacros(drink).caloriesKcal} kcal · ${servingLabelFor(drink)}`}
+          onPress={() => setChosen(drinkCandidate(drink))} />)}
+      </>}
+      {(tab === 'recent' || tab === 'frequent' || tab === 'favorite') && <>
+        {!list.length && <Text className="mb-4">{tab === 'favorite' ? 'No favourites yet. Star a food after logging it and it lands here.' : 'Nothing logged yet. Foods you log appear here so the second time is one tap.'}</Text>}
+        {list.map(food => <Row key={food.key} title={food.name}
+          subtitle={`${Math.round(food.macros.caloriesKcal)} kcal${food.servingLabel ? ` per ${food.servingLabel}` : ''} · logged ${food.uses}×`}
+          starred={food.favorite}
+          onStar={() => { setSaved(toggleFavorite(owner, food.key)); haptic('selection'); }}
+          onRemove={() => { setSaved(forgetFood(owner, food.key)); haptic('warning'); }}
+          onPress={() => setChosen({ name: food.name, servingLabel: food.servingLabel, macros: food.macros, micros: food.micros, source: food.source })} />)}
+      </>}
+    {footer}
+    {building && <RecipeBuilder owner={owner} existing={building === 'new' ? undefined : building}
+      onClose={() => setBuilding(null)} onSaved={setRecipes} />}
+    {chosen && <PortionSheet candidate={chosen} meal={meal} owner={owner} onBack={() => setChosen(null)} onDone={onDone} />}
+  </>;
+}
+
+export function FoodSearchModal({ onClose, meal }: { onClose: () => void; meal?: MealSlot }) {
   return <Modal visible presentationStyle="pageSheet" animationType="slide" onRequestClose={onClose}>
     <SafeAreaView className="flex-1 bg-background"><KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24, paddingBottom: 60 }}>
         <Text className="mb-4 text-3xl font-bold">Add a food</Text>
-        <View className="mb-3 flex-row flex-wrap">{TABS.map(([value, label]) => <Choice key={value} label={label} selected={tab === value} onPress={() => setTab(value)} />)}</View>
-        {tab === 'search' && <>
-          <Field label="Search foods & drinks" value={term} onChangeText={setTerm} autoCorrect={false} placeholder="Greek yogurt, chicken breast, Tito's, Bud Light…" />
-          {!!drinkMatches.length && <>
-            <Text className="mb-2 text-sm font-bold tracking-widest">DRINKS</Text>
-            {drinkMatches.map(drink => <Row key={`drink:${drink.name}`} title={drink.name}
-              subtitle={`${drinkMacros(drink).caloriesKcal} kcal · ${servingLabelFor(drink)}`}
-              onPress={() => setChosen(drinkCandidate(drink))} />)}
-            <Text className="mb-4 mt-1 text-xs">Drink energy is calculated from ABV and published carbohydrate, not read off a label.</Text>
-          </>}
-          {results.isPending && query.trim().length >= 2 && <LoadingCards label="Searching…" />}
-          {results.isError && <Text accessibilityRole="alert" className="mb-3">Food search is unavailable right now. Try again, or add the food by hand.</Text>}
-          {results.data?.length === 0 && !drinkMatches.length && <Text className="mb-3">Nothing matched “{query}”. Try fewer words, or scan the barcode instead.</Text>}
-          {!!results.data?.length && <Text className="mb-2 text-sm font-bold tracking-widest">PACKAGED FOODS</Text>}
-          {results.data?.map(result => <Row key={result.key} title={result.name} subtitle={`${result.brand ? `${result.brand} · ` : ''}${Math.round(result.macros.caloriesKcal)} kcal per ${result.servingLabel}`}
-            onPress={() => setChosen({ name: result.name, servingLabel: result.servingLabel, macros: result.macros, micros: result.micros, source: 'custom' })} />)}
-        </>}
-        {tab === 'recipe' && <>
-          {!recipes.length && <Text className="mb-4">No recipes yet. Build one from foods you have already logged and it becomes a single tap.</Text>}
-          {recipes.map(recipe => { const single = perServing(recipe); return <Row key={recipe.id} title={recipe.name}
-            subtitle={`${Math.round(single.macros.caloriesKcal)} kcal per serving · makes ${recipe.yieldServings} · ${recipe.items.length} ingredients`}
-            onRemove={() => { setRecipes(deleteRecipe(owner, recipe.id)); haptic('warning'); }}
-            onPress={() => setChosen({ name: recipe.name, servingLabel: 'serving', macros: single.macros, micros: single.micros, source: 'recipe' })} />; })}
-          <Action secondary label="Create a recipe" onPress={() => setBuilding('new')} />
-        </>}
-        {tab === 'dining' && <DiningPicker meal={meal} onLogged={onClose} />}
-        {tab === 'drinks' && <>
-          <Text className="mb-3">Beer, wine, spirits and the rest, with the alcohol counted. Energy is calculated from ABV — a label always wins over this estimate.</Text>
-          <View className="mb-3 flex-row flex-wrap">{DRINK_CATEGORIES.map(([value, label]) => <Choice key={value} label={label}
-            selected={category === value} onPress={() => setCategory(value)} />)}</View>
-          {drinksInCategory(category).map(drink => <Row key={drink.name} title={drink.name}
-            subtitle={`${drinkMacros(drink).caloriesKcal} kcal · ${servingLabelFor(drink)}`}
-            onPress={() => setChosen(drinkCandidate(drink))} />)}
-        </>}
-        {(tab === 'recent' || tab === 'frequent' || tab === 'favorite') && <>
-          {!list.length && <Text className="mb-4">{tab === 'favorite' ? 'No favourites yet. Star a food after logging it and it lands here.' : 'Nothing logged yet. Foods you log appear here so the second time is one tap.'}</Text>}
-          {list.map(food => <Row key={food.key} title={food.name}
-            subtitle={`${Math.round(food.macros.caloriesKcal)} kcal${food.servingLabel ? ` per ${food.servingLabel}` : ''} · logged ${food.uses}×`}
-            starred={food.favorite}
-            onStar={() => { setSaved(toggleFavorite(owner, food.key)); haptic('selection'); }}
-            onRemove={() => { setSaved(forgetFood(owner, food.key)); haptic('warning'); }}
-            onPress={() => setChosen({ name: food.name, servingLabel: food.servingLabel, macros: food.macros, micros: food.micros, source: food.source })} />)}
-        </>}
-        <Action secondary label="Close" onPress={onClose} />
-        {building && <RecipeBuilder owner={owner} existing={building === 'new' ? undefined : building}
-          onClose={() => setBuilding(null)} onSaved={setRecipes} />}
+        <FoodLibrary meal={meal} onDone={onClose} footer={<Action secondary label="Close" onPress={onClose} />} />
       </ScrollView>
     </KeyboardAvoidingView></SafeAreaView>
   </Modal>;
 }
+
 function Row({ title, subtitle, onPress, starred, onStar, onRemove }: { title: string; subtitle: string; onPress: () => void; starred?: boolean; onStar?: () => void; onRemove?: () => void }) {
   return <View className="mb-2 flex-row items-center gap-2">
     <Pressable accessibilityRole="button" accessibilityLabel={title} onPress={onPress} weight="subtle" className="flex-1 flex-row items-center gap-3 rounded-2xl bg-surface px-4 py-3">

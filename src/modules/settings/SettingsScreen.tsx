@@ -46,7 +46,7 @@ export default function SettingsScreen() {
   return <SafeAreaView edges={['top','left','right']} className="flex-1 bg-background">
     <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 110, maxWidth: 760, width: '100%', alignSelf: 'center' }}>
       <Reveal index={0}><Text className="mb-5 text-4xl font-bold">Settings</Text></Reveal>
-      <Section title="Backend & database" index={1}>
+      <Section title="Service status" index={1}>
         <Text accessibilityLiveRegion="polite" className="text-3xl font-bold">{label}</Text>
       </Section>
       <Section title="Daily targets" index={2}>

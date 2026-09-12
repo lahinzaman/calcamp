@@ -58,9 +58,9 @@ export default function TrendsScreen() {
         <Text className="mb-4">Single days are noisy. These are the lines that actually move.</Text>
         <View className="mb-4 flex-row flex-wrap">{RANGES.map(([value, label]) => <Choice key={value} label={label} selected={days === value} onPress={() => setDays(value)} />)}</View>
       </Reveal>
-      {history.isPending && <LoadingCards label="Loading your history…" />}
+      {history.isLoading && <LoadingCards label="Loading your history…" />}
       {history.isError && <Card title="History unavailable" index={1}><Text>We could not reach your cloud diary. Your device data is unaffected — try again when connected.</Text></Card>}
-      {!history.isPending && !history.isError && <>
+      {!history.isLoading && !history.isError && <>
         <Card title="Weight trend" index={1}>
           <LineChart unit=" lbs" tone="protein"
             raw={weights.map(r => ({ date: r.log_date, value: r.body_weight_lbs! }))}

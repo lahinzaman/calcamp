@@ -33,7 +33,7 @@ export function RecipeBuilder({ owner, existing, onClose, onSaved }: { owner: st
         <Text className="mb-2 mt-2 font-bold">Ingredients</Text>
         {!items.length && <Text className="mb-3 text-sm">Add ingredients from foods you have logged before.</Text>}
         {items.map((item, index) => <View key={`${item.name}-${index}`} className="mb-2 flex-row items-center gap-2">
-          <View className="flex-1"><Text className="font-bold" numberOfLines={1}>{item.name}</Text><Text className="text-sm">{Math.round(item.macros.caloriesKcal * item.servings)} kcal</Text></View>
+          <View className="flex-1"><Text className="font-bold" numberOfLines={2}>{item.name}</Text><Text className="text-sm">{Math.round(item.macros.caloriesKcal * item.servings)} kcal</Text></View>
           <Pressable accessibilityRole="button" accessibilityLabel={`Less ${item.name}`} weight="subtle"
             onPress={() => setItems(current => current.map((entry, i) => i === index ? { ...entry, servings: Math.max(.25, Number((entry.servings - .5).toFixed(2))) } : entry))}
             className="h-12 w-12 items-center justify-center rounded-full bg-raised"><Text className="font-bold">−</Text></Pressable>
@@ -60,7 +60,7 @@ export function RecipeBuilder({ owner, existing, onClose, onSaved }: { owner: st
             {!pantry.length && <Text className="mb-4">Log a few foods first — they become available here as ingredients.</Text>}
             {pantry.map(food => <Pressable key={food.key} accessibilityRole="button" accessibilityLabel={food.name} onPress={() => add(food)}
               weight="subtle" className="mb-2 rounded-2xl bg-surface px-4 py-3">
-              <Text className="font-bold" numberOfLines={1}>{food.name}</Text>
+              <Text className="font-bold" numberOfLines={2}>{food.name}</Text>
               <Text className="text-sm">{Math.round(food.macros.caloriesKcal)} kcal{food.servingLabel ? ` per ${food.servingLabel}` : ''}</Text>
             </Pressable>)}
             <Action secondary label="Close" onPress={() => setPicking(false)} />

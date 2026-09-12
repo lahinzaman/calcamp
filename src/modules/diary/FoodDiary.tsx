@@ -17,7 +17,7 @@ function EntryRow({ entry, onEdit, onRemove }: { entry: FoodEntry; onEdit: (entr
       <Pressable accessibilityRole="button" accessibilityLabel={`Edit ${entry.name}`} onPress={() => onEdit(entry)} weight="subtle" className="flex-1 flex-row items-center gap-3 rounded-2xl bg-surface px-4 py-3">
         <Text className="text-2xl">{foodEmoji(entry.name)}</Text>
         <View className="flex-1">
-          <Text className="font-bold" numberOfLines={1}>{entry.name}</Text>
+          <Text className="font-bold" numberOfLines={2}>{entry.name}</Text>
           <Text className="text-sm">{Number(entry.servings.toFixed(2))} × {entry.servingLabel ?? 'serving'} · P {Math.round(entry.macros.proteinG)} · C {Math.round(entry.macros.carbsG)} · F {Math.round(entry.macros.fatG)}</Text>
         </View>
         <Text className="text-lg font-bold">{Math.round(entry.macros.caloriesKcal)}</Text>

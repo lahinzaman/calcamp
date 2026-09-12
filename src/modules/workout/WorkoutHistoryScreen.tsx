@@ -94,7 +94,7 @@ export default function WorkoutHistoryScreen() {
         </View>}
         {records.map(record => <View key={record.exerciseId} className="mb-3 rounded-3xl border border-border bg-surface p-5">
           <View className="mb-2 flex-row items-baseline justify-between gap-3">
-            <Text className="flex-1 font-bold" numberOfLines={1}>{record.name}</Text>
+            <Text className="flex-1 font-bold" numberOfLines={2}>{record.name}</Text>
             <Text className="text-sm">{record.sessions} session{record.sessions === 1 ? '' : 's'}</Text>
           </View>
           <Text className="mb-3 text-sm">{record.muscle} · last trained {dayLabel(new Date(record.lastPerformedMs).toISOString().slice(0, 10))}</Text>

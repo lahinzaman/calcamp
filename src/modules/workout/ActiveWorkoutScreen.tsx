@@ -1,4 +1,5 @@
 import { RoutineBuilder } from './RoutineBuilder';
+import { router } from 'expo-router';
 import { SessionTimer } from './SessionTimer';
 import { routineExercises } from './routines';
 import { haptic } from '../../theme/haptics';
@@ -170,6 +171,7 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
         <Pressable accessibilityRole="button" onPress={() => safelyEdit(start)} className="mt-6 items-center rounded-2xl bg-accent p-4"><Text className="font-bold text-ink">Start session</Text></Pressable>
         <Action secondary label="Create another routine" onPress={() => setBuilder(true)} />
         </>}
+        <Action secondary label="📅 Training history & records" onPress={() => router.push('/workouts')} />
         <VolumeTrend log={volumeLog} />
         {routineError && <Text>{routineError}</Text>}
         <View className="gap-2">{(plan?.lifts ?? []).map(e => <View key={e.id} className="flex-row items-center gap-3"><Text className="flex-1">{e.name}</Text><ExerciseHelp exercise={e} /></View>)}</View>

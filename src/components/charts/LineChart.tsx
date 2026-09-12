@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { View } from 'react-native';
-import Svg, { Circle, Line, Path } from 'react-native-svg';
+import { Svg, Circle, Line, Path } from 'react-native-svg';
 import { Text } from '../../theme/primitives';
 import { useThemeStore } from '../../theme/store';
 import { palettes } from '../../theme/palette';

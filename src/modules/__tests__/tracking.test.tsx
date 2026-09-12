@@ -6,17 +6,20 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { SectionListProps } from 'react-native';
 import type { DailyMenuItem } from '../../types/nutrislice';
 import { reanimatedMock } from './support/reanimated';
+import { svgMock } from './support/svg';
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, __DEV__: true });
 // Native host components only are mocked. Screens, hooks, stores, and Query are real.
 mock.module('nativewind', { namedExports: { cssInterop: () => {}, vars: (value: unknown) => value } });
 mock.module('react-native-reanimated', reanimatedMock);
+mock.module('react-native-svg', svgMock);
+mock.module('expo-router', { namedExports: { router: { push: () => {} }, usePathname: () => '/', Stack: 'Stack', Link: 'Link' } });
 // Charts pull in react-native-svg, which needs RN internals these component mocks do not provide.
 mock.module('../workout/VolumeTrend', { namedExports: { VolumeTrend: () => null } });
 mock.module('react-native', { namedExports: {
   useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1, scale: 3 }), View: 'View', Text: 'Text', Pressable: 'Pressable', TextInput: 'TextInput',
   ScrollView: 'ScrollView', Modal: 'Modal', KeyboardAvoidingView: 'KeyboardAvoidingView', ActivityIndicator: 'ActivityIndicator',
-  AppState: { addEventListener: () => ({ remove() {} }) }, Platform: { OS: 'web' },
+  AppState: { addEventListener: () => ({ remove() {} }) }, Platform: { OS: 'web', select: (spec: Record<string, unknown>) => spec.web ?? spec.native ?? spec.default },
 
   SectionList: (props: SectionListProps<DailyMenuItem, { title: string; data: DailyMenuItem[] }>) => <>
     {props.ListHeaderComponent as React.ReactNode}
@@ -190,14 +193,14 @@ test('walk screen mounts, keeps manual steps usable and explains health sharing 
 });
 
 test('CalCamp dashboard mounts real targets and all four training days', async () => {
-  mock.module('expo-router', { namedExports: { router: { push: () => {} } } });
   const { default: DashboardScreen } = require('../dashboard/DashboardScreen') as typeof import('../dashboard/DashboardScreen');
   nutritionStore.getState().setDailyTargets({ macros: { caloriesKcal: 2400, proteinG: 150, carbsG: 270, fatG: 80 }, micronutrients: {} });
   nutritionStore.getState().setConsumed({ caloriesKcal: 900, proteinG: 60, carbsG: 110, fatG: 25 });
   // Today now loads streak history, so the screen needs a query client.
   const dashboardClient = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
   await act(async () => { rendered = create(<QueryClientProvider client={dashboardClient}><DashboardScreen /></QueryClientProvider>); });
-  assert.ok(textContent().includes('1500 kcal remaining'));
+  // Grouped by locale now ("1,500"), so match the digits without assuming a separator.
+  assert.match(textContent(), /1[,.\s\u00a0]?500 kcal remaining/);
   for (const plan of ['Upper A','Upper B','Lower A','Lower B']) assert.ok(textContent().includes(plan));
   // Calories, three macros, and the water tracker.
   assert.equal(rendered!.root.findAllByProps({ accessibilityRole: 'progressbar' }).length, 5);

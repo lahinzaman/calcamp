@@ -1,27 +1,31 @@
 import { View } from 'react-native';
 import { Text } from '../theme/primitives';
-import { Pop, ProgressBar, Reveal, useCountUp } from '../theme/motion';
+import { ProgressBar, Reveal, useCountUp } from '../theme/motion';
+import { CalorieRing } from './charts/CalorieRing';
 import { useNutritionStore } from '../store/nutritionStore';
-function MacroCell({ label, consumed, target, tone }: { label: string; consumed: number; target: number | undefined; tone: 'protein' | 'carbs' | 'fat' }) {
-  const shown = useCountUp(consumed);
-  return <View style={{ flexGrow: 1, flexBasis: 120 }}>
-    <Text className="font-bold">{label}</Text>
-    <Text className="mb-2 text-sm">{Math.round(shown)} / {target ?? '—'} g</Text>
-    <ProgressBar value={consumed} target={target ?? 0} tone={tone} />
+import type { MacroTotals } from '../types/nutrition';
+const MACROS = [['Protein', 'proteinG', 'protein'], ['Carbs', 'carbsG', 'carbs'], ['Fat', 'fatG', 'fat']] as const;
+function MacroColumn({ label, consumed, target, tone }: { label: string; consumed: number; target: number | null; tone: 'protein' | 'carbs' | 'fat' }) {
+  const shown = useCountUp(Math.round(consumed));
+  const left = target === null ? null : Math.round(target - consumed);
+  return <View style={{ flexGrow: 1, flexBasis: 96 }}>
+    <View className="mb-1 flex-row items-baseline justify-between">
+      <Text className="text-sm font-bold">{label}</Text>
+      <Text className="text-sm" style={{ fontVariant: ['tabular-nums'] }}>{shown}<Text className="text-sm">{target === null ? ' g' : `/${Math.round(target)} g`}</Text></Text>
+    </View>
+    <ProgressBar value={consumed} target={target ?? 0} tone={tone} height={10} />
+    {left !== null && <Text className="mt-1 text-xs">{left >= 0 ? `${left} g left` : `${Math.abs(left)} g over`}</Text>}
   </View>;
 }
 export function MacroOverview() {
-  const consumed = useNutritionStore(s => s.consumedMacros); const targets = useNutritionStore(s => s.dailyTargets?.macros);
-  const calories = useCountUp(consumed.caloriesKcal);
-  const remaining = targets ? targets.caloriesKcal - consumed.caloriesKcal : 0;
-  return <Reveal style={{ marginVertical: 20 }}><View className="rounded-3xl border border-border bg-surface p-5">
-    <Text className="text-sm font-bold">DAILY ENERGY</Text>
-    <Pop trigger={consumed.caloriesKcal}>
-      <View className="my-3 flex-row flex-wrap items-baseline gap-2"><Text className="text-4xl leading-[52px] font-bold">{Math.round(calories)}</Text><Text>{targets ? `/ ${targets.caloriesKcal} kcal` : 'kcal logged'}</Text></View>
-    </Pop>
-    <ProgressBar value={consumed.caloriesKcal} target={targets?.caloriesKcal ?? 0} height={10} />
-    <Text className="mb-4 mt-3">{targets ? remaining < 0 ? `${Math.round(-remaining)} kcal above target` : `${Math.round(remaining)} kcal remaining` : 'Set daily targets in your profile to see progress.'}</Text>
-    <View className="flex-row flex-wrap gap-4">{([['Protein','proteinG','protein'],['Carbs','carbsG','carbs'],['Fat','fatG','fat']] as const).map(([label,key,tone]) =>
-      <MacroCell key={key} label={label} consumed={consumed[key]} target={targets?.[key]} tone={tone} />)}</View>
+  const consumed = useNutritionStore(s => s.consumedMacros);
+  const targets = useNutritionStore(s => s.dailyTargets?.macros) as MacroTotals | undefined;
+  return <Reveal index={0}><View className="my-5 rounded-3xl border border-border bg-surface p-5">
+    <Text className="mb-3 text-sm font-bold tracking-widest">DAILY ENERGY</Text>
+    <CalorieRing consumed={consumed.caloriesKcal} target={targets?.caloriesKcal ?? null} />
+    {!targets && <Text className="mt-3 text-center text-sm">Set daily targets in Settings to see progress against a goal.</Text>}
+    <View className="mt-5 flex-row flex-wrap gap-4">
+      {MACROS.map(([label, key, tone]) => <MacroColumn key={key} label={label} consumed={consumed[key]} target={targets?.[key] ?? null} tone={tone} />)}
+    </View>
   </View></Reveal>;
 }

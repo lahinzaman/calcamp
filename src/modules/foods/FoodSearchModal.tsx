@@ -10,6 +10,7 @@ import { haptic } from '../../theme/haptics';
 import { nutritionStore } from '../../store/nutritionStore';
 import { useAuthStore } from '../../store/authStore';
 import { searchFoods, type SearchResult } from '../../api/foodSearch';
+import { QUALITY_LABELS, UsdaRateLimited, searchUsdaFoods } from '../../api/usda';
 import { MEAL_LABELS, MEAL_SLOTS, mealForHour, scaleMacros, type MealSlot } from '../../types/foodEntry';
 import { orderFoods, readSavedFoods, rememberFood, toggleFavorite, forgetFood, type SavedFood } from './savedFoods';
 import { foodEmoji } from '../dining/foodEmoji';
@@ -37,7 +38,11 @@ export function FoodLibrary({ meal, onDone, footer }: { meal?: MealSlot; onDone:
   const [recipes, setRecipes] = useState<Recipe[]>(() => readRecipes(owner));
   const [building, setBuilding] = useState<Recipe | 'new' | null>(null);
   useEffect(() => { const id = setTimeout(() => setQuery(term), 400); return () => clearTimeout(id); }, [term]);
-  const results = useQuery({ enabled: tab === 'search' && query.trim().length >= 2, queryKey: ['food-search', query],
+  const enabled = tab === 'search' && query.trim().length >= 2;
+  // USDA first: it is the only source that publishes a full micronutrient profile.
+  const usda = useQuery({ enabled, queryKey: ['usda-search', query],
+    queryFn: ({ signal }) => searchUsdaFoods(query, signal), retry: false, staleTime: 300_000 });
+  const results = useQuery({ enabled, queryKey: ['food-search', query],
     queryFn: ({ signal }) => searchFoods(query, signal), retry: false, staleTime: 300000 });
   const list = useMemo(() => orderFoods(saved, tab === 'recent' || tab === 'frequent' || tab === 'favorite' ? tab : 'recent'), [saved, tab]);
   // The drinks catalogue is bundled, so it answers instantly and works with no connection.
@@ -53,11 +58,18 @@ export function FoodLibrary({ meal, onDone, footer }: { meal?: MealSlot; onDone:
             onPress={() => setChosen(drinkCandidate(drink))} />)}
           <Text className="mb-4 mt-1 text-xs">Drink energy is calculated from ABV and published carbohydrate, not read off a label.</Text>
         </>}
-        {results.isPending && query.trim().length >= 2 && <LoadingCards label="Searching…" />}
-        {results.isError && <Text accessibilityRole="alert" className="mb-3">Food search is unavailable right now. Try again, or add the food by hand.</Text>}
-        {results.data?.length === 0 && !drinkMatches.length && <Text className="mb-3">Nothing matched “{query}”. Try fewer words, or scan the barcode instead.</Text>}
-        {!!results.data?.length && <Text className="mb-2 text-sm font-bold tracking-widest">PACKAGED FOODS</Text>}
-        {results.data?.map(result => <Row key={result.key} title={result.name} subtitle={`${result.brand ? `${result.brand} · ` : ''}${Math.round(result.macros.caloriesKcal)} kcal per ${result.servingLabel}`}
+        {(results.isLoading || usda.isLoading) && <LoadingCards label="Searching…" />}
+        {usda.error instanceof UsdaRateLimited && <Text className="mb-3 text-sm">{usda.error.message}</Text>}
+        {!!usda.data?.length && <>
+          <Text className="mb-2 text-sm font-bold tracking-widest">USDA FOOD DATA</Text>
+          {usda.data.map(result => <Row key={result.key} title={result.name}
+            subtitle={`${result.brand ? `${result.brand} · ` : ''}${Math.round(result.macros.caloriesKcal)} kcal per ${result.servingLabel} · ${Object.keys(result.micros).length} nutrients · ${QUALITY_LABELS[(result.quality ?? 'reference') as 'lab']}`}
+            onPress={() => setChosen({ name: result.name, servingLabel: result.servingLabel, macros: result.macros, micros: result.micros, source: 'custom' })} />)}
+        </>}
+        {results.isError && !usda.data?.length && <Text accessibilityRole="alert" className="mb-3">Food search is unavailable right now. Try again, or add the food by hand.</Text>}
+        {results.data?.length === 0 && !usda.data?.length && !drinkMatches.length && <Text className="mb-3">Nothing matched “{query}”. Try fewer words, or scan the barcode instead.</Text>}
+        {!!results.data?.length && <Text className="mb-2 mt-2 text-sm font-bold tracking-widest">PACKAGED FOODS · CROWD-SOURCED</Text>}
+        {results.data?.map(result => <Row key={result.key} title={result.name} subtitle={`${result.brand ? `${result.brand} · ` : ''}${Math.round(result.macros.caloriesKcal)} kcal per ${result.servingLabel} · ${Object.keys(result.micros).length} nutrients`}
           onPress={() => setChosen({ name: result.name, servingLabel: result.servingLabel, macros: result.macros, micros: result.micros, source: 'custom' })} />)}
       </>}
       {tab === 'recipe' && <>

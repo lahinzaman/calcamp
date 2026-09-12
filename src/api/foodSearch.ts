@@ -3,6 +3,8 @@ export interface SearchResult {
   key: string; name: string; brand: string | null;
   /** Values for one serving of `servingLabel`. */
   macros: MacroTotals; micros: MicronutrientTotals; servingLabel: string;
+  /** Where the numbers come from, so the list can say how much to trust a row. */
+  quality?: 'lab' | 'reference' | 'brand' | 'crowd';
 }
 const NUM = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
 /** Open Food Facts reports per 100 g; a product without all four macros is unusable, not zero. */
@@ -20,7 +22,7 @@ export function parseSearchProducts(value: unknown): SearchResult[] {
       const amount = NUM(nutriments[source]);
       if (amount !== null) micros[key] = key === 'sodium_mg' ? amount * 1000 : amount;
     }
-    results.push({ key: String(product.code ?? name), name, brand: typeof product.brands === 'string' && product.brands ? product.brands.split(',')[0].trim() : null,
+    results.push({ key: String(product.code ?? name), name, quality: 'crowd', brand: typeof product.brands === 'string' && product.brands ? product.brands.split(',')[0].trim() : null,
       macros: { caloriesKcal: calories, proteinG: protein, carbsG: carbs, fatG: fat }, micros, servingLabel: '3.53 oz (100 g)' });
   }
   return results;

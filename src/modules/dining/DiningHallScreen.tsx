@@ -23,6 +23,9 @@ import type { MealSlot } from '../../types/foodEntry';
 import type { MacroTotals } from '../../types/nutrition';
 import { nutritionStore, useNutritionStore } from '../../store/nutritionStore';
 import { foodLogAmounts } from './logFood';
+import { MenuControls } from './MenuControls';
+import { EMPTY_FILTERS, filterMenu, groupByStation, proteinDensity, stationsOf, type MenuFilterState } from './menuFilters';
+import { FoodSearchModal } from '../foods/FoodSearchModal';
 
 const HALL_LABELS: Record<DiningHallSlug, string> = {
   'busch-dining-hall': 'Busch', 'livingston-dining-commons': 'Livingston', 'the-atrium': 'Atrium', 'neilson-dining-hall': 'Neilson',
@@ -59,9 +62,9 @@ export function FoodLogSheet({ item, onClose, onLogged, meal }: {
           <TextInput accessibilityLabel="Number of servings" keyboardType="decimal-pad" value={servings} onChangeText={setServings} className="rounded-xl border border-border bg-background p-4 text-3xl font-bold text-ink" />
           <View className="mt-4 flex-row flex-wrap gap-3">
             {macroFields.map(([key, label]) => (
-              <View key={key} style={{ width: '46%' }}>
+              <View key={key} style={{ flexGrow: 1, flexBasis: 140 }}>
                 <Text className="mb-2 text-sm font-medium text-ink">{label}</Text>
-                <TextInput accessibilityLabel={label} keyboardType="decimal-pad" placeholder="Required" value={fields[key]} onChangeText={(value) => setFields((current) => ({ ...current, [key]: value }))} className="rounded-xl border border-border bg-background p-4 text-3xl font-bold text-ink" />
+                <TextInput accessibilityLabel={label} keyboardType="decimal-pad" placeholder="Required" value={fields[key]} onChangeText={(value) => setFields((current) => ({ ...current, [key]: value }))} className="rounded-xl border border-border bg-background p-4 text-2xl font-bold text-ink" />
               </View>
             ))}
           </View>
@@ -84,6 +87,11 @@ export default function DiningHallScreen() {
   const [date, setDate] = useState(() => normalizeMenuDate(new Date()));
   const [selected, setSelected] = useState<DailyMenuItem | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [filters, setFilters] = useState<MenuFilterState>(EMPTY_FILTERS);
+  const [searchingFoods, setSearchingFoods] = useState(false);
+  const consumed = useNutritionStore(state => state.consumedMacros.caloriesKcal);
+  const calorieTarget = useNutritionStore(state => state.dailyTargets?.macros.caloriesKcal ?? null);
+  const remainingKcal = calorieTarget === null ? null : Math.max(0, calorieTarget - consumed);
   useEffect(() => {
     if (nutritionStore.getState().activeDiningHall === null) nutritionStore.getState().setActiveDiningHall('busch-dining-hall');
     const update = () => { setDate(normalizeMenuDate(new Date())); safelyEdit(() => nutritionStore.getState().syncToday()); };
@@ -91,7 +99,7 @@ export default function DiningHallScreen() {
     const listener = AppState.addEventListener('change', (state) => { if (state === 'active') update(); });
     return () => { clearInterval(id); listener.remove(); };
   }, []);
-  useEffect(() => { setSelected(null); setNotice(null); }, [hall, date]);
+  useEffect(() => { setSelected(null); setNotice(null); setFilters(EMPTY_FILTERS); }, [hall, date, period]);
   const menu = useQuery({
     enabled: period !== 'takeout',
     queryKey: ['nutrislice', hall, date],
@@ -99,12 +107,21 @@ export default function DiningHallScreen() {
       signal, fallbackBaseUrl: process.env.EXPO_PUBLIC_NUTRISLICE_PROXY_URL || process.env.EXPO_PUBLIC_BACKEND_URL || undefined,
     }),
   });
-  const rows = useMemo<DiningRow[]>(() => menu.isPending || (menu.isError && !menu.data) ? [] : MEAL_TYPES.filter(meal => meal === period).flatMap(meal => {
-    const foods = (menu.data ?? []).filter(item => item.meal === meal);
-    return [{ kind: 'heading' as const, id: `heading:${meal}`, meal, count: foods.length },
-      ...foods.map(food => ({ kind: 'food' as const, id: `${meal}:${food.id}`, food })),
-      ...(!foods.length ? [{ kind: 'empty' as const, id: `empty:${meal}` }] : [])];
-  }), [menu.data, menu.isPending, menu.isError, period]);
+  const mealFoods = useMemo(() => menu.isPending || (menu.isError && !menu.data) ? []
+    : (menu.data ?? []).filter(item => MEAL_TYPES.some(meal => meal === period && item.meal === meal)), [menu.data, menu.isPending, menu.isError, period]);
+  const stations = useMemo(() => stationsOf(mealFoods), [mealFoods]);
+  const matches = useMemo(() => filterMenu(mealFoods, filters, remainingKcal), [mealFoods, filters, remainingKcal]);
+  const rows = useMemo<DiningRow[]>(() => {
+    if (!mealFoods.length) return menu.isPending || menu.isError ? [] : [{ kind: 'empty', id: `empty:${period}` }];
+    if (!matches.length) return [{ kind: 'none', id: 'none' }];
+    // Grouping is the default because that is how the hall is physically laid out; any other
+    // sort is a deliberate question ("most protein"), and grouping would fight the answer.
+    if (filters.sort !== 'station') return matches.map(food => ({ kind: 'food' as const, id: `${period}:${food.id}`, food }));
+    return groupByStation(matches).flatMap(group => [
+      { kind: 'station' as const, id: `station:${group.station}`, station: group.station, count: group.items.length },
+      ...group.items.map(food => ({ kind: 'food' as const, id: `${period}:${food.id}`, food })),
+    ]);
+  }, [mealFoods, matches, filters.sort, menu.isPending, menu.isError, period]);
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} className="flex-1 bg-background">
@@ -124,6 +141,12 @@ export default function DiningHallScreen() {
           <Dropdown label="Meal period" value={period} options={[{value:'breakfast',label:'Breakfast'},{value:'lunch',label:'Lunch'},{value:'dinner',label:'Dinner'},{value:'takeout',label:'Takeout'}] as const} onChange={value=>{setSelected(null);setPeriod(value);}} />
           {period !== 'takeout' && <Dropdown key={period} label="Dining hall" value={hall} options={(Object.keys(DINING_HALLS) as DiningHallSlug[]).map(value=>({value,label:DINING_HALLS[value]}))} onChange={value=>nutritionStore.getState().setActiveDiningHall(value)} />}
           <Text className="mb-3 text-sm text-ink">{period === 'takeout' ? 'Published takeout references' : DINING_HALLS[hall]} · Nutrition per listed serving</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Add a saved food or recipe" onPress={() => setSearchingFoods(true)}
+            className="mb-4 min-h-12 flex-row items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3">
+            <Text className="flex-1 font-bold text-ink">Saved foods, recipes & food database</Text><Text className="text-ink">＋</Text>
+          </Pressable>
+          {period !== 'takeout' && !!menu.data?.length && <MenuControls filters={filters} onChange={setFilters} stations={stations}
+            shown={matches.length} total={mealFoods.length} remainingKcal={remainingKcal} />}
           {notice && <Text accessibilityRole="alert" className="mb-3 rounded-xl bg-raised p-3 text-sm text-ink">{notice}</Text>}
 
           {period !== 'takeout' && menu.error instanceof NutrisliceError && !!menu.error.fallbackMeals?.length && <View className="mb-4 rounded-2xl bg-raised p-4">
@@ -133,20 +156,31 @@ export default function DiningHallScreen() {
           </View>}
           {period !== 'takeout' && menu.isError && <View className="rounded-2xl bg-raised p-4"><Text accessibilityRole="alert" className="font-semibold text-ink">Menu unavailable</Text><Text className="mt-1 text-sm text-ink">{menu.data ? 'Showing the last loaded menu. Pull to refresh.' : 'We could not reach campus dining. Please try again.'}</Text><Pressable accessibilityRole="button" onPress={() => { void menu.refetch(); }} className="mt-3 py-2"><Text className="font-bold text-ink">Retry menu</Text></Pressable></View>}
         </>}
-        renderItem={({ item }) => item.kind === 'food' ? <FoodRow item={item.food} onSelect={setSelected} /> : item.kind === 'empty' ? <Text className="mb-3 text-sm text-ink">No menu published for this meal.</Text>
-          : <View className="mb-3 mt-6 flex-row items-center justify-between"><Text className="text-2xl font-bold capitalize text-ink">{item.meal}</Text><Text className="text-xs text-ink">{item.count} items</Text></View>}
+        renderItem={({ item }) => item.kind === 'food' ? <FoodRow item={item.food} onSelect={setSelected} />
+          : item.kind === 'empty' ? <Text className="mb-3 text-sm text-ink">No menu published for this meal.</Text>
+          : item.kind === 'none' ? <Text className="mb-3 text-sm text-ink">Nothing on this menu matches. Clear a filter, or search for a shorter word.</Text>
+          : <View className="mb-3 mt-6 flex-row items-end justify-between gap-3">
+              <Text className="flex-1 text-xl font-bold text-ink">{item.station}</Text>
+              <Text className="text-xs text-ink">{item.count} {item.count === 1 ? 'dish' : 'dishes'}</Text>
+            </View>}
       />
+      {searchingFoods && <FoodSearchModal onClose={() => setSearchingFoods(false)} />}
       {selected && <FoodLogSheet key={selected.id} item={selected} onClose={() => setSelected(null)} onLogged={(name) => { setSelected(null); setNotice(`${name} added to your diary.`); }} />}
     </SafeAreaView>
   );
 }
 
- type DiningRow = { kind: 'heading'; id: string; meal: string; count: number } | { kind: 'empty'; id: string } | { kind: 'food'; id: string; food: DailyMenuItem };
+ type DiningRow = { kind: 'station'; id: string; station: string; count: number } | { kind: 'empty'; id: string }
+  | { kind: 'none'; id: string } | { kind: 'food'; id: string; food: DailyMenuItem };
 const FoodRow = memo(function FoodRow({ item, onSelect }: { item: DailyMenuItem; onSelect: (item: DailyMenuItem) => void }) {
+  const density = proteinDensity(item);
   return <View className="mb-3 rounded-2xl border border-border bg-surface p-4">
           <Pressable accessibilityRole="button" accessibilityLabel={`Food details for ${item.name}`} onPress={() => onSelect(item)} className="flex-row items-start gap-3"><Text accessibilityElementsHidden importantForAccessibility="no" className="text-3xl leading-[40px]">{foodEmoji(item.name)}</Text><Text className="flex-1 text-base font-semibold text-ink">{item.name}</Text></Pressable>
-          <Text className="mt-1 text-xs text-ink">{servingLabel(item.serving)} · {display(item.macros.caloriesKcal)} kcal</Text>
-          <View className="mt-4 flex-row items-center justify-between gap-2"><Text className="flex-1 text-xs font-medium text-ink">P {display(item.macros.proteinG)}g   C {display(item.macros.carbsG)}g   F {display(item.macros.fatG)}g</Text><Pressable accessibilityRole="button" accessibilityLabel={`Log ${item.name} to diary`} onPress={() => onSelect(item)} className="min-h-12 justify-center rounded-xl bg-raised px-3 py-3 active:bg-raised"><Text className="text-xs font-bold text-ink">Log to Diary +</Text></Pressable></View>
+          <Text className="mt-1 text-xs text-ink">{servingLabel(item.serving)} · {display(item.macros.caloriesKcal)} kcal{density !== null ? ` · ${density.toFixed(1)} g protein per 100 kcal` : ''}</Text>
+          <View className="mt-4 flex-row flex-wrap items-center justify-between gap-2">
+            <Text className="text-xs font-medium text-ink" style={{ flexGrow: 1, flexBasis: 150 }}>P {display(item.macros.proteinG)}g   C {display(item.macros.carbsG)}g   F {display(item.macros.fatG)}g</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel={`Log ${item.name} to diary`} onPress={() => onSelect(item)} className="min-h-12 justify-center rounded-xl bg-raised px-3 py-3 active:bg-raised"><Text className="text-xs font-bold text-ink">Log to Diary +</Text></Pressable>
+          </View>
         </View>;
 });
 

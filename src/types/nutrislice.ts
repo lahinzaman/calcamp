@@ -49,6 +49,8 @@ export interface NutrisliceMenuItem {
   food: NutrisliceFood | null;
   is_section_title?: boolean;
   is_station_header?: boolean;
+  /** Station name, carried by the header rows that separate the stations. */
+  text?: string | null;
   serving_size?: string | null;
   serving_size_amount?: number | null;
   serving_size_unit?: string | null;
@@ -73,6 +75,8 @@ export interface DailyMenuItem {
   diningHall: DiningHallSlug;
   date: string;
   meal: MealType;
+  /** The station this food is served at, from the header row above it. */
+  station: string | null;
   menuItemId: number;
   foodId: number;
   name: string;

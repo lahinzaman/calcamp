@@ -60,7 +60,7 @@ test('Brzycki matches the formula and declines unsupported or singular inputs', 
 
 test('food logging scales portions and micros with correct units, leaving unknown nutrients absent', () => {
   const item: DailyMenuItem = {
-    id: 'rice', diningHall: 'busch-dining-hall', date: '2026-09-08', meal: 'lunch', menuItemId: 1, foodId: 1,
+    id: 'rice', diningHall: 'busch-dining-hall', date: '2026-09-08', meal: 'lunch', station: 'ENTREES', menuItemId: 1, foodId: 1,
     name: 'Rice', serving: { amount: 1, unit: 'cup', label: '1 cup' },
     macros: { caloriesKcal: 200, proteinG: 4, carbsG: 45, fatG: 0 },
     nutrients: { mg_sodium: 50, g_fiber: null, mg_vitamin_d: 0.01, iu_vitamin_a: 100 },

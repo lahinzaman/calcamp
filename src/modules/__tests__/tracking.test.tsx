@@ -63,7 +63,7 @@ test('dining screen mounts, changes hall, and logs corrected food into the real 
   client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
   const date = normalizeMenuDate(new Date());
   const item: DailyMenuItem = {
-    id: 'rice', diningHall: 'busch-dining-hall', date, meal: 'lunch', menuItemId: 1, foodId: 1, name: 'Rice',
+    id: 'rice', diningHall: 'busch-dining-hall', date, meal: 'lunch', station: 'ENTREES', menuItemId: 1, foodId: 1, name: 'Rice',
     serving: { amount: 1, unit: 'cup', label: '1 cup' },
     macros: { caloriesKcal: null, proteinG: 4, carbsG: 45, fatG: 0 }, nutrients: { g_fiber: 2 },
   };

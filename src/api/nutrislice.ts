@@ -137,7 +137,7 @@ function parseMenuItem(value: unknown): NutrisliceMenuItem {
   for (const key of ['is_section_title', 'is_station_header'] as const) {
     if (value[key] !== undefined && typeof value[key] !== 'boolean') invalidResponse(`Invalid ${key}.`);
   }
-  for (const key of ['serving_size', 'serving_size_unit'] as const) {
+  for (const key of ['serving_size', 'serving_size_unit', 'text'] as const) {
     if (value[key] !== undefined && !nullableString(value[key])) invalidResponse(`Invalid ${key}.`);
   }
   if (value.serving_size_amount !== undefined && !nullableNumber(value.serving_size_amount)) {
@@ -149,6 +149,7 @@ function parseMenuItem(value: unknown): NutrisliceMenuItem {
     food: value.food === null ? null : parseFood(value.food),
     is_section_title: value.is_section_title as boolean | undefined,
     is_station_header: value.is_station_header as boolean | undefined,
+    text: value.text as string | null | undefined,
     serving_size: value.serving_size as string | null | undefined,
     serving_size_amount: value.serving_size_amount as number | null | undefined,
     serving_size_unit: value.serving_size_unit as string | null | undefined,
@@ -225,7 +226,13 @@ async function fetchJson(url: string, options: FetchDailyMenuOptions): Promise<u
   }
 }
 
-function normalizeItem(item: NutrisliceMenuItem, diningHall: DiningHallSlug, date: string, meal: MealType): DailyMenuItem | null {
+/** Header rows carry the station name; a row is a header when it has no food of its own. */
+export function stationName(item: NutrisliceMenuItem): string | null {
+  if (!item.is_section_title && !item.is_station_header) return null;
+  const text = item.text?.trim();
+  return text ? text : null;
+}
+function normalizeItem(item: NutrisliceMenuItem, diningHall: DiningHallSlug, date: string, meal: MealType, station: string | null): DailyMenuItem | null {
   const food = item.food;
   if (!food || item.is_section_title || item.is_station_header) return null;
   const nutrients: NutrisliceNutritionInfo = { ...food.rounded_nutrition_info };
@@ -236,7 +243,7 @@ function normalizeItem(item: NutrisliceMenuItem, diningHall: DiningHallSlug, dat
   const parsedAmount = sourceAmount?.trim() ? Number(sourceAmount) : null;
   return {
     id: `${diningHall}:${date}:${meal}:${item.id}`,
-    diningHall, date, meal, menuItemId: item.id, foodId: food.id, name: food.name,
+    diningHall, date, meal, station, menuItemId: item.id, foodId: food.id, name: food.name,
     serving: {
       amount: item.serving_size_amount ?? (nonnegativeNumber(parsedAmount) ? parsedAmount : null),
       unit: item.serving_size_unit ?? food.serving_size_info?.serving_size_unit ?? null,
@@ -261,6 +268,7 @@ function parseProxyMenu(value: unknown, diningHall: DiningHallSlug, date: string
       || !identifier(item.menuItemId) || !identifier(item.foodId)
       || typeof item.id !== 'string' || !item.id
       || typeof item.name !== 'string' || !item.name.trim()
+      || !nullableString(item.station ?? null)
       || !record(item.serving) || !nullableNumber(item.serving.amount)
       || !nullableString(item.serving.unit) || !nullableString(item.serving.label)
       || !record(item.macros)
@@ -273,6 +281,7 @@ function parseProxyMenu(value: unknown, diningHall: DiningHallSlug, date: string
       ...(item.dataFreshness === 'stale' ? { dataFreshness: 'stale' as const } : {}),
       ...(typeof item.cachedAt === 'string' ? { cachedAt: item.cachedAt } : {}),
       id: item.id, diningHall, date, meal: item.meal as MealType,
+      station: (item.station as string | null | undefined) ?? null,
       menuItemId: item.menuItemId, foodId: item.foodId, name: item.name,
       serving: {
         amount: item.serving.amount, unit: item.serving.unit, label: item.serving.label,
@@ -325,9 +334,15 @@ export async function fetchDailyMenu(
       const week = parseNutrisliceWeek(await fetchJson(url, { ...options, signal: controller.signal }));
       const days = week.days.filter((entry) => entry.date === calendarDate);
       if (days.length !== 1) invalidResponse('The menu response must contain exactly one requested calendar day.');
-      return days[0].menu_items
-        .map((item) => normalizeItem(item, diningHall, calendarDate, meal))
-        .filter((item): item is DailyMenuItem => item !== null);
+      // Stations are implied by position: a header row names the station for the rows below it.
+      let station: string | null = null;
+      const foods: DailyMenuItem[] = [];
+      for (const item of days[0].menu_items) {
+        if (item.is_section_title || item.is_station_header) { station = stationName(item); continue; }
+        const food = normalizeItem(item, diningHall, calendarDate, meal, station);
+        if (food) foods.push(food);
+      }
+      return foods;
     }));
     return results.flat();
   } catch (error) {

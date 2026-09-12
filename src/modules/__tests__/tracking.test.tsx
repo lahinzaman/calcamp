@@ -184,10 +184,9 @@ test('sync indicator renders queued, syncing and acknowledged states', async () 
   await act(async () => useSyncStatus.setState({ ready: false, lastSyncedAt: null }));
 });
 
-test('walk screen mounts, keeps manual steps usable and explains health sharing before requesting access', async () => {
-  const { default: StepRouterScreen } = require('../routing/StepRouterScreen') as typeof import('../routing/StepRouterScreen');
-  await act(async () => { rendered = create(<StepRouterScreen />); });
-  await act(async () => findLabel('Manual step count').props.onChangeText('10000')); assert.ok(textContent().includes('Step goal reached.'));
+test('health connect explains what is shared before it requests access', async () => {
+  const { HealthConnectCard } = require('../health/HealthConnectCard') as typeof import('../health/HealthConnectCard');
+  await act(async () => { rendered = create(<HealthConnectCard />); });
   await act(async () => findLabel('Connect or refresh health').props.onPress());
   assert.equal(rendered!.root.find(node => String(node.type) === 'Modal').props.visible, true); assert.ok(textContent().includes('exported automatically'));
 });

@@ -46,10 +46,9 @@ for (const variant of ['development', 'preview', 'production']) {
   for (const permission of ['ACCESS_BACKGROUND_LOCATION', 'POST_NOTIFICATIONS']) assert.ok(permissions.includes(`android.permission.${permission}`));
   assert.equal(manifest.application[0].$['android:usesCleartextTraffic'], String(variant === 'development'));
   assert.ok(manifest.application[0]['activity-alias'].some(a => a.$['android:name'] === 'ViewPermissionUsageActivity'));
-  assert.ok(config.plugins.some(p => (Array.isArray(p) ? p[0] : p) === '@rnmapbox/maps'));
   assert.ok(config.ios.bundleIdentifier); assert.ok(config.android.package);
   const metadata = manifest.application[0]['meta-data'];
   assert.equal(metadata.find(m => m.$['android:name'] === 'expo.modules.updates.ENABLED').$['android:value'], 'true');
   assert.equal(metadata.find(m => m.$['android:name'] === 'expo.modules.updates.EXPO_UPDATE_URL').$['android:value'], config.updates.url);
-  console.log(`${variant}: OTA fingerprint, channel, native permissions, HealthKit, Health Connect, Mapbox, background scheduling, SQLite, camera/barcodes without microphone permission, and transport policy verified.`);
+  console.log(`${variant}: OTA fingerprint, channel, native permissions, HealthKit, Health Connect, background scheduling, SQLite, camera/barcodes without microphone permission, and transport policy verified.`);
 }

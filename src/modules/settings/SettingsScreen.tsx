@@ -10,6 +10,7 @@ import { THEMES } from '../../theme/palette';
 import { useSyncStatus } from '../../store/syncStore';
 import { useAuthStore } from '../../store/authStore';
 import { NotificationSettings } from '../notifications/NotificationSettings';
+import { HealthConnectCard } from '../health/HealthConnectCard';
 import { UpdateControls } from '../updates/UpdateControls';
 import { FeedbackModal } from '../feedback/FeedbackModal';
 import { AccountAccess } from '../account/AccountAccess';
@@ -57,6 +58,7 @@ export default function SettingsScreen() {
         <View className="flex-row flex-wrap">{THEMES.map(theme => <Choice key={theme} label={theme[0].toUpperCase() + theme.slice(1)} selected={theme === mode} onPress={() => useThemeStore.getState().setMode(theme)} />)}</View>
       </Section>
       <Section title="Notifications" index={4}><NotificationSettings /></Section>
+      <Section title="Apple Health & Health Connect" index={5}><HealthConnectCard /></Section>
       <Reveal index={5}><UpdateControls /></Reveal>
       <Section title="Your data" index={6}><ExportControls /></Section>
       <Section title="Help & account" index={7}>

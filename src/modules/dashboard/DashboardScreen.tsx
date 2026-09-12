@@ -30,7 +30,6 @@ export default function DashboardScreen() {
     <Reveal index={2}><Action label="📈 See your trends" onPress={() => router.push('/trends')} />
     <Action label="🍽️ Food log & calendar" onPress={() => router.push('/calendar')} />
     <Action secondary label="📜 Browse past days" onPress={() => router.push('/history')} />
-    <Action secondary label="🍽️ Browse the full campus menu" onPress={() => router.push('/dining')} />
-    <Action label="🚶 Plan a walk" secondary onPress={() => router.push('/walk')} /></Reveal>
+    <Action secondary label="🍽️ Browse the full campus menu" onPress={() => router.push('/dining')} /></Reveal>
   </ScrollView></SafeAreaView>;
 }

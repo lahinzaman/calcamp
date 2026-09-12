@@ -49,7 +49,6 @@
         }
       ],
       "react-native-health-connect",
-      "@rnmapbox/maps",
       [
         "expo-build-properties",
         {

@@ -19,6 +19,7 @@ import { foodEmoji } from '../dining/foodEmoji';
 import { EntryEditor } from '../diary/EntryEditor';
 import { FoodSearchModal } from '../foods/FoodSearchModal';
 import { MicronutrientPanel } from '../nutrition/MicronutrientPanel';
+import { mealTargets, readSplitId, splitById } from '../nutrition/mealTargets';
 import { TargetReviewCard } from '../nutrition/TargetReviewCard';
 import { StreakCard } from '../habits/StreakCard';
 import {
@@ -57,6 +58,7 @@ function EntryLine({ entry, onEdit }: { entry: FoodEntry; onEdit?: (entry: FoodE
  */
 export default function TodayScreen() {
   const owner = useAuthStore(s => s.session?.user.id);
+  const split = useMemo(() => splitById(readSplitId(owner ?? 'anonymous')).split, [owner]);
   const targets = useNutritionStore(s => s.dailyTargets?.macros);
   const liveMacros = useNutritionStore(s => s.consumedMacros);
   const liveMicros = useNutritionStore(s => s.consumedMicros);
@@ -85,6 +87,7 @@ export default function TodayScreen() {
   const micros = isToday ? liveMicros : day?.micros ?? {};
   const status = dayStatus(isToday ? liveMacros.caloriesKcal : day?.calories_kcal, targets?.caloriesKcal ?? null);
   const energyFromMacros = macros ? macros.proteinG * 4 + macros.carbsG * 4 + macros.fatG * 9 : 0;
+  const perMeal = useMemo(() => mealTargets(targets, split), [targets, split]);
 
   const copyDay = () => {
     for (const entry of dayEntries) nutritionStore.getState().addEntry({ name: entry.name, meal: entry.meal, servings: entry.servings,
@@ -217,7 +220,9 @@ export default function TodayScreen() {
             return <View key={slot} className="mb-4">
               <View className="mb-2 flex-row items-baseline justify-between gap-3">
                 <Text className="flex-1 text-sm font-bold">{MEAL_LABELS[slot]}</Text>
-                <Text className="text-sm">{Math.round(calories)} kcal</Text>
+                <Text className="text-sm" style={{ fontVariant: ['tabular-nums'] }}>
+                  {Math.round(calories)}{perMeal[slot] ? ` / ${Math.round(perMeal[slot]!.caloriesKcal)}` : ''} kcal
+                </Text>
               </View>
               {items.map(entry => <EntryLine key={entry.id} entry={entry} onEdit={isToday ? setEditing : undefined} />)}
             </View>;

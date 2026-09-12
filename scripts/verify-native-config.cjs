@@ -11,7 +11,9 @@ for (const variant of ['development', 'preview', 'production']) {
   const android = config._internal.modResults.android;
   assert.equal(config.name, variant === 'production' ? 'CalCamp' : `CalCamp ${variant === 'development' ? 'Dev' : 'Preview'}`);
   assert.equal(ios.infoPlist.CFBundleDisplayName, config.name);
-  assert.deepEqual(ios.infoPlist.UIAppFonts, ['Manjari_100Thin.ttf', 'Manjari_400Regular.ttf', 'Manjari_700Bold.ttf']);
+  // Google Sans is loaded at runtime by useFonts, so nothing should be embedded natively —
+  // least of all the Manjari files this app no longer ships.
+  assert.equal(ios.infoPlist.UIAppFonts, undefined);
   const authScheme = variant === 'production' ? 'calcamp' : `calcamp-${variant}`;
   assert.ok(ios.infoPlist.CFBundleURLTypes.some(type => type.CFBundleURLSchemes.includes(authScheme)));
   assert.equal(android.strings.resources.string.find(entry => entry.$.name === 'app_name')._, config.name);

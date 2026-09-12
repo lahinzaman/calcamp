@@ -118,8 +118,9 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onClose, onMan
           onPress={() => { void capture(); }} style={[styles.shutter, (!ready || busy) && { opacity: .5 }]} weight="firm">
           <View style={styles.shutterInner} />
         </Pressable>}
-        <Pressable accessibilityRole="button" accessibilityLabel="Enter food manually" onPress={onManual} style={styles.manualPill} weight="firm">
-          <Text style={styles.chromeText}>Enter food manually</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel={mode === 'barcode' ? 'Type the barcode instead' : 'Enter food manually'}
+          onPress={onManual} style={styles.manualPill} weight="firm">
+          <Text style={styles.chromeText}>{mode === 'barcode' ? 'Type the barcode instead' : 'Enter food manually'}</Text>
         </Pressable>
       </View>
     </SafeAreaView>

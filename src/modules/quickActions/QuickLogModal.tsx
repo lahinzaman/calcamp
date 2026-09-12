@@ -24,6 +24,7 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
   const [name,setName]=useState(''); const [portion,setPortion]=useState(''); const [weight,setWeight]=useState('');
   const [values,setValues]=useState<Record<keyof MacroTotals,string>>({caloriesKcal:'',proteinG:'',fatG:'',carbsG:''});
   const [notice,setNotice]=useState(''); const [error,setError]=useState<string|null>(null); const [busy,setBusy]=useState(false);
+  const [code,setCode]=useState('');
   const locked=useRef(false); const alive=useRef(true); const request=useRef<AbortController|null>(null); const vision=useFoodVision();
   const [reference,setReference]=useState<{grams:number;macros:MacroTotals}|null>(null);
   useEffect(()=>()=>{alive.current=false;request.current?.abort();},[]);
@@ -72,13 +73,22 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
         source:action==='photo'?'photo':action==='barcode'?'barcode':'manual'});
     }locked.current=true;onClose();}catch(e){setError((e as Error).message);}
   };
-  if(!editing&&(action==='photo'||action==='barcode'))return <Modal visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+  // One Modal for the life of this screen. presentationStyle cannot be changed on a modal
+  // that is already presented, and swapping between two of them races iOS's dismissal.
+  const scanner=action==='photo'||action==='barcode';
+  if(scanner&&!editing)return <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose} statusBarTranslucent>
     <CameraScanner mode={action==='photo'?'photo':'barcode'} busy={busy} notice={error}
       onBarcode={code=>{void scan(code);}} onCapture={base64=>{void capture(base64);}}
       onManual={()=>{setError(null);setEditing(true);}} onClose={onClose} />
   </Modal>;
-  return <Modal visible presentationStyle="pageSheet" animationType="slide" onRequestClose={onClose}><SafeAreaView className="flex-1 bg-background"><KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:24,paddingBottom:60}}>
+  return <Modal visible presentationStyle={scanner?'fullScreen':'pageSheet'} animationType="slide" onRequestClose={onClose}><SafeAreaView className="flex-1 bg-background"><KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:24,paddingBottom:60}}>
     <Text className="mb-5 text-3xl font-bold">{names[action]}</Text>
+    {action==='barcode'&&!reference&&<>
+      <Text className="mb-3">Scanner not cooperating, or the code is damaged? Type the digits printed under the barcode.</Text>
+      <Field label="Barcode number" value={code} onChangeText={setCode} keyboardType="number-pad" maxLength={14} />
+      <Action label={busy?'Looking up…':'Look up this barcode'} disabled={busy||!code.trim()} onPress={()=>{void scan(code.trim());}} />
+      <Action secondary label="Back to the scanner" disabled={busy} onPress={()=>{setError(null);setEditing(false);}} />
+    </>}
     {editing&&(action==='quick'?<>
       <Text className="mb-4">For when you know roughly what it cost you but not the breakdown. Leave a macro blank and it is recorded as zero for this entry.</Text>
       <Field label="Food name" value={name} onChangeText={setName} maxLength={150} placeholder="Quick add" />

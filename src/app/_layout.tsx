@@ -36,7 +36,7 @@ function AuthenticatedRoutes() {
     <Stack.Protected guard={complete}><Stack.Screen name="walk" options={{ headerShown: true, title: 'Walk', headerBackTitle: 'Today', animation: 'slide_from_right' }} /></Stack.Protected>
     <Stack.Protected guard={complete}><Stack.Screen name="trends" options={{ headerShown: true, title: 'Trends', headerBackTitle: 'Today', animation: 'slide_from_right' }} /></Stack.Protected>
     <Stack.Protected guard={complete}><Stack.Screen name="history" options={{ headerShown: true, title: 'History', headerBackTitle: 'Today', animation: 'slide_from_right' }} /></Stack.Protected>
-    <Stack.Protected guard={complete}><Stack.Screen name="calendar" options={{ headerShown: true, title: 'Calendar', headerBackTitle: 'Today', animation: 'slide_from_right' }} /></Stack.Protected>
+    <Stack.Protected guard={complete}><Stack.Screen name="calendar" options={{ headerShown: true, title: 'Food log', headerBackTitle: 'Today', animation: 'slide_from_right' }} /></Stack.Protected>
     <Stack.Protected guard={complete}><Stack.Screen name="workouts" options={{ headerShown: true, title: 'Training history', headerBackTitle: 'Training', animation: 'slide_from_right' }} /></Stack.Protected>
     <Stack.Screen name="auth-callback" />
   </Stack>;

@@ -11,7 +11,7 @@ import { haptic } from '../../theme/haptics';
 import { QuickLogModal, type QuickAction } from './QuickLogModal';
 import { FoodSearchModal } from '../foods/FoodSearchModal';
 type MenuKey = QuickAction | 'search';
-const actions:[MenuKey,string][]=[['search','🔎 Search & Recents'],['photo','📷 AI Photo Log'],['barcode','▥ Barcode Scanner'],['quick','⚡ Quick Add Calories'],['manual','✎ Manual Food Log'],['weight','⚖ Update Body Weight']];
+const actions:[MenuKey,string][]=[['search','🔎 Search the food database'],['photo','📷 AI Photo Log'],['barcode','▥ Barcode Scanner'],['quick','⚡ Quick Add Calories'],['manual','✎ Manual Food Log'],['weight','⚖ Update Body Weight']];
 export function QuickActions() {
   const [open,setOpen]=useState(false); const [pending,setPending]=useState<MenuKey|null>(null);
   const [action,setAction]=useState<MenuKey|null>(null); const insets=useSafeAreaInsets();

@@ -19,7 +19,7 @@ export default function DashboardScreen() {
   const date = useNutritionStore(s => s.date); const session = useWorkoutStore(s => s.activeSession);
   const profile = useAuthStore(s => s.profile);
   return <SafeAreaView edges={['top','left','right','bottom']} className="flex-1 bg-background"><ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 110, maxWidth: 760, width: '100%', alignSelf: 'center' }}>
-    <Reveal index={0}><Text className="text-sm font-bold tracking-widest">CALCAMP</Text><Text className="mt-3 text-4xl leading-[52px] font-bold">Your daily picture.</Text><Text className="mt-1">{date} · Nutrition & training, together</Text></Reveal>
+    <Reveal index={0}><Text className="text-sm font-bold tracking-widest">CALCAMP</Text><Text className="mt-3 text-4xl font-bold">Your daily picture.</Text><Text className="mt-1">{date} · Nutrition & training, together</Text></Reveal>
     <SyncIndicator /><StreakCard /><TargetReviewCard /><MacroOverview /><MicronutrientPanel /><WaterTracker /><FoodDiary />
     <Reveal index={1}><View className="mb-5 rounded-3xl bg-surface p-5"><Text className="text-xl font-bold">4-day Upper / Lower</Text><Text className="mb-4 mt-1">{session ? `In progress · ${session.name}` : 'A clear plan. One session at a time.'}</Text>
       <View className="flex-row flex-wrap gap-3">{DEFAULT_UPPER_LOWER.map((day,index) => {
@@ -28,7 +28,7 @@ export default function DashboardScreen() {
       })}</View><View className="mt-4"><Action label={session ? 'Continue workout' : 'Open training log'} onPress={() => router.push('/explore')} /></View>
     </View></Reveal>
     <Reveal index={2}><Action label="📈 See your trends" onPress={() => router.push('/trends')} />
-    <Action secondary label="🗓️ Calendar" onPress={() => router.push('/calendar')} />
+    <Action label="🍽️ Food log & calendar" onPress={() => router.push('/calendar')} />
     <Action secondary label="📜 Browse past days" onPress={() => router.push('/history')} />
     <Action label="🍽️ Explore dining & log a meal" onPress={() => router.push('/dining')} />
     <Action label="🚶 Plan a walk" secondary onPress={() => router.push('/walk')} /></Reveal>

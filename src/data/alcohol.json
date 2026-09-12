@@ -1,0 +1,2682 @@
+[
+{
+"name": "Tito's Handmade Vodka vodka",
+"brand": "Tito's Handmade Vodka",
+"category": "vodka",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Grey Goose vodka",
+"brand": "Grey Goose",
+"category": "vodka",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Absolut vodka",
+"brand": "Absolut",
+"category": "vodka",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Smirnoff No. 21 vodka",
+"brand": "Smirnoff No. 21",
+"category": "vodka",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Ketel One vodka",
+"brand": "Ketel One",
+"category": "vodka",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Belvedere vodka",
+"brand": "Belvedere",
+"category": "vodka",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Ciroc vodka",
+"brand": "Ciroc",
+"category": "vodka",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "New Amsterdam vodka",
+"brand": "New Amsterdam",
+"category": "vodka",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Svedka vodka",
+"brand": "Svedka",
+"category": "vodka",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Skyy vodka",
+"brand": "Skyy",
+"category": "vodka",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Stolichnaya vodka",
+"brand": "Stolichnaya",
+"category": "vodka",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Pinnacle vodka",
+"brand": "Pinnacle",
+"category": "vodka",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Burnett's vodka",
+"brand": "Burnett's",
+"category": "vodka",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Popov vodka",
+"brand": "Popov",
+"category": "vodka",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Platinum 7X vodka",
+"brand": "Platinum 7X",
+"category": "vodka",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Deep Eddy vodka",
+"brand": "Deep Eddy",
+"category": "vodka",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Three Olives vodka",
+"brand": "Three Olives",
+"category": "vodka",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Russian Standard vodka",
+"brand": "Russian Standard",
+"category": "vodka",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Chopin vodka",
+"brand": "Chopin",
+"category": "vodka",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Luksusowa vodka",
+"brand": "Luksusowa",
+"category": "vodka",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Sobieski vodka",
+"brand": "Sobieski",
+"category": "vodka",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Wheatley vodka",
+"brand": "Wheatley",
+"category": "vodka",
+"abv": 41,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Reyka vodka",
+"brand": "Reyka",
+"category": "vodka",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "UV Vodka vodka",
+"brand": "UV Vodka",
+"category": "vodka",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Tanqueray gin",
+"brand": "Tanqueray",
+"category": "gin",
+"abv": 47.3,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Bombay Sapphire gin",
+"brand": "Bombay Sapphire",
+"category": "gin",
+"abv": 47,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Beefeater gin",
+"brand": "Beefeater",
+"category": "gin",
+"abv": 44,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Hendrick's gin",
+"brand": "Hendrick's",
+"category": "gin",
+"abv": 44,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Gordon's gin",
+"brand": "Gordon's",
+"category": "gin",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Seagram's gin",
+"brand": "Seagram's",
+"category": "gin",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "New Amsterdam gin",
+"brand": "New Amsterdam",
+"category": "gin",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Aviation gin",
+"brand": "Aviation",
+"category": "gin",
+"abv": 42,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Plymouth gin",
+"brand": "Plymouth",
+"category": "gin",
+"abv": 41.2,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Monkey 47 gin",
+"brand": "Monkey 47",
+"category": "gin",
+"abv": 47,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Sipsmith gin",
+"brand": "Sipsmith",
+"category": "gin",
+"abv": 41.6,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Tanqueray No. Ten gin",
+"brand": "Tanqueray No. Ten",
+"category": "gin",
+"abv": 47.3,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Bacardi Superior rum",
+"brand": "Bacardi Superior",
+"category": "rum",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Bacardi Gold rum",
+"brand": "Bacardi Gold",
+"category": "rum",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Captain Morgan Original Spiced rum",
+"brand": "Captain Morgan Original Spiced",
+"category": "rum",
+"abv": 35,
+"servingMl": 44.36,
+"carbsG": null,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Captain Morgan White rum",
+"brand": "Captain Morgan White",
+"category": "rum",
+"abv": 35,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Malibu Coconut rum",
+"brand": "Malibu Coconut",
+"category": "rum",
+"abv": 21,
+"servingMl": 44.36,
+"carbsG": null,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Kraken Black Spiced rum",
+"brand": "Kraken Black Spiced",
+"category": "rum",
+"abv": 47,
+"servingMl": 44.36,
+"carbsG": null,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Mount Gay Eclipse rum",
+"brand": "Mount Gay Eclipse",
+"category": "rum",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Myers's Original Dark rum",
+"brand": "Myers's Original Dark",
+"category": "rum",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Sailor Jerry Spiced rum",
+"brand": "Sailor Jerry Spiced",
+"category": "rum",
+"abv": 46,
+"servingMl": 44.36,
+"carbsG": null,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Appleton Estate Signature rum",
+"brand": "Appleton Estate Signature",
+"category": "rum",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Don Q Cristal rum",
+"brand": "Don Q Cristal",
+"category": "rum",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Goslings Black Seal rum",
+"brand": "Goslings Black Seal",
+"category": "rum",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Flor de Ca\u00f1a 4 rum",
+"brand": "Flor de Ca\u00f1a 4",
+"category": "rum",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Plantation 3 Stars rum",
+"brand": "Plantation 3 Stars",
+"category": "rum",
+"abv": 41.2,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Ron Zacapa 23 rum",
+"brand": "Ron Zacapa 23",
+"category": "rum",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": null,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Wray & Nephew Overproof rum",
+"brand": "Wray & Nephew Overproof",
+"category": "rum",
+"abv": 63,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Jose Cuervo Especial Silver tequila",
+"brand": "Jose",
+"category": "tequila",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Jose Cuervo Especial Gold tequila",
+"brand": "Jose",
+"category": "tequila",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Patr\u00f3n Silver tequila",
+"brand": "Patr\u00f3n",
+"category": "tequila",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Patr\u00f3n Reposado tequila",
+"brand": "Patr\u00f3n",
+"category": "tequila",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Don Julio Blanco tequila",
+"brand": "Don",
+"category": "tequila",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Don Julio 1942 tequila",
+"brand": "Don",
+"category": "tequila",
+"abv": 38,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Casamigos Blanco tequila",
+"brand": "Casamigos",
+"category": "tequila",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Espol\u00f2n Blanco tequila",
+"brand": "Espol\u00f2n",
+"category": "tequila",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Herradura Silver tequila",
+"brand": "Herradura",
+"category": "tequila",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Milagro Silver tequila",
+"brand": "Milagro",
+"category": "tequila",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Hornitos Plata tequila",
+"brand": "Hornitos",
+"category": "tequila",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "1800 Silver tequila",
+"brand": "1800",
+"category": "tequila",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Teremana Blanco tequila",
+"brand": "Teremana",
+"category": "tequila",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Cazadores Blanco tequila",
+"brand": "Cazadores",
+"category": "tequila",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "El Jimador Silver tequila",
+"brand": "El",
+"category": "tequila",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Sauza Silver tequila",
+"brand": "Sauza",
+"category": "tequila",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Del Maguey Vida mezcal",
+"brand": "Del",
+"category": "tequila",
+"abv": 42,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Montelobos mezcal",
+"brand": "Montelobos",
+"category": "tequila",
+"abv": 43.2,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Clase Azul Reposado tequila",
+"brand": "Clase",
+"category": "tequila",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Jack Daniel's Old No. 7 whiskey",
+"brand": "Jack",
+"category": "whiskey",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Jim Beam White Label whiskey",
+"brand": "Jim",
+"category": "whiskey",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Maker's Mark whiskey",
+"brand": "Maker's",
+"category": "whiskey",
+"abv": 45,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Bulleit Bourbon whiskey",
+"brand": "Bulleit",
+"category": "whiskey",
+"abv": 45,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Bulleit Rye whiskey",
+"brand": "Bulleit",
+"category": "whiskey",
+"abv": 45,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Buffalo Trace whiskey",
+"brand": "Buffalo",
+"category": "whiskey",
+"abv": 45,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Woodford Reserve whiskey",
+"brand": "Woodford",
+"category": "whiskey",
+"abv": 45.2,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Knob Creek whiskey",
+"brand": "Knob",
+"category": "whiskey",
+"abv": 50,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Wild Turkey 101 whiskey",
+"brand": "Wild",
+"category": "whiskey",
+"abv": 50.5,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Four Roses Yellow Label whiskey",
+"brand": "Four",
+"category": "whiskey",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Evan Williams Black whiskey",
+"brand": "Evan",
+"category": "whiskey",
+"abv": 43,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Elijah Craig Small Batch whiskey",
+"brand": "Elijah",
+"category": "whiskey",
+"abv": 47,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Eagle Rare 10 whiskey",
+"brand": "Eagle",
+"category": "whiskey",
+"abv": 45,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Old Forester 86 whiskey",
+"brand": "Old",
+"category": "whiskey",
+"abv": 43,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Basil Hayden whiskey",
+"brand": "Basil",
+"category": "whiskey",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Angel's Envy whiskey",
+"brand": "Angel's",
+"category": "whiskey",
+"abv": 43.3,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Michter's US*1 Bourbon whiskey",
+"brand": "Michter's",
+"category": "whiskey",
+"abv": 45.7,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Jameson Irish Whiskey whiskey",
+"brand": "Jameson",
+"category": "whiskey",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Tullamore D.E.W. whiskey",
+"brand": "Tullamore",
+"category": "whiskey",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Bushmills Original whiskey",
+"brand": "Bushmills",
+"category": "whiskey",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Redbreast 12 whiskey",
+"brand": "Redbreast",
+"category": "whiskey",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Johnnie Walker Red Label whiskey",
+"brand": "Johnnie",
+"category": "whiskey",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Johnnie Walker Black Label whiskey",
+"brand": "Johnnie",
+"category": "whiskey",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Chivas Regal 12 whiskey",
+"brand": "Chivas",
+"category": "whiskey",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Dewar's White Label whiskey",
+"brand": "Dewar's",
+"category": "whiskey",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Glenfiddich 12 whiskey",
+"brand": "Glenfiddich",
+"category": "whiskey",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Glenlivet 12 whiskey",
+"brand": "Glenlivet",
+"category": "whiskey",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Macallan 12 Sherry Oak whiskey",
+"brand": "Macallan",
+"category": "whiskey",
+"abv": 43,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Laphroaig 10 whiskey",
+"brand": "Laphroaig",
+"category": "whiskey",
+"abv": 43,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Lagavulin 16 whiskey",
+"brand": "Lagavulin",
+"category": "whiskey",
+"abv": 43,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Crown Royal whiskey",
+"brand": "Crown",
+"category": "whiskey",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Canadian Club whiskey",
+"brand": "Canadian",
+"category": "whiskey",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Seagram's 7 Crown whiskey",
+"brand": "Seagram's",
+"category": "whiskey",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Suntory Toki whiskey",
+"brand": "Suntory",
+"category": "whiskey",
+"abv": 43,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Hibiki Harmony whiskey",
+"brand": "Hibiki",
+"category": "whiskey",
+"abv": 43,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Rittenhouse Rye whiskey",
+"brand": "Rittenhouse",
+"category": "whiskey",
+"abv": 50,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Sazerac Rye whiskey",
+"brand": "Sazerac",
+"category": "whiskey",
+"abv": 45,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Templeton Rye whiskey",
+"brand": "Templeton",
+"category": "whiskey",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "High West Double Rye whiskey",
+"brand": "High",
+"category": "whiskey",
+"abv": 46,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Hennessy VS cognac",
+"brand": "Hennessy",
+"category": "spirit",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Hennessy VSOP cognac",
+"brand": "Hennessy",
+"category": "spirit",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "R\u00e9my Martin VSOP cognac",
+"brand": "R\u00e9my",
+"category": "spirit",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Courvoisier VS cognac",
+"brand": "Courvoisier",
+"category": "spirit",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Martell VS cognac",
+"brand": "Martell",
+"category": "spirit",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "E&J VS brandy",
+"brand": "E&J",
+"category": "spirit",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Christian Brothers brandy",
+"brand": "Christian",
+"category": "spirit",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Korbel brandy",
+"brand": "Korbel",
+"category": "spirit",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Grey Goose VX",
+"brand": "Grey",
+"category": "spirit",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Everclear 151",
+"brand": "Everclear",
+"category": "spirit",
+"abv": 75.5,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Everclear 190",
+"brand": "Everclear",
+"category": "spirit",
+"abv": 95,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Bacardi 151",
+"brand": "Bacardi",
+"category": "spirit",
+"abv": 75.5,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Soju (Jinro Chamisul)",
+"brand": "Soju",
+"category": "spirit",
+"abv": 16.9,
+"servingMl": 44.36,
+"carbsG": null,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Sake (junmai)",
+"brand": "Sake",
+"category": "spirit",
+"abv": 15,
+"servingMl": 44.36,
+"carbsG": null,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Pisco",
+"brand": "Pisco",
+"category": "spirit",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Cacha\u00e7a (Leblon)",
+"brand": "Cacha\u00e7a",
+"category": "spirit",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Absinthe (Lucid)",
+"brand": "Absinthe",
+"category": "spirit",
+"abv": 62,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Ouzo",
+"brand": "Ouzo",
+"category": "spirit",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": null,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Grappa",
+"brand": "Grappa",
+"category": "spirit",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Fireball Cinnamon Whisky",
+"brand": "Fireball",
+"category": "liqueur",
+"abv": 33,
+"servingMl": 44.36,
+"carbsG": 11,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "J\u00e4germeister",
+"brand": "J\u00e4germeister",
+"category": "liqueur",
+"abv": 35,
+"servingMl": 44.36,
+"carbsG": 7.9,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Baileys Irish Cream",
+"brand": "Baileys",
+"category": "liqueur",
+"abv": 17,
+"servingMl": 44.36,
+"carbsG": 9.7,
+"fatG": 4.9,
+"proteinG": 1.0
+},
+{
+"name": "Kahl\u00faa",
+"brand": "Kahl\u00faa",
+"category": "liqueur",
+"abv": 20,
+"servingMl": 44.36,
+"carbsG": 22,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Rumple Minze",
+"brand": "Rumple",
+"category": "liqueur",
+"abv": 50,
+"servingMl": 44.36,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Peppermint Schnapps (DeKuyper)",
+"brand": "Peppermint",
+"category": "liqueur",
+"abv": 30,
+"servingMl": 44.36,
+"carbsG": 9,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Southern Comfort",
+"brand": "Southern",
+"category": "liqueur",
+"abv": 35,
+"servingMl": 44.36,
+"carbsG": 8,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Amaretto Disaronno",
+"brand": "Amaretto",
+"category": "liqueur",
+"abv": 28,
+"servingMl": 44.36,
+"carbsG": 17,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Cointreau",
+"brand": "Cointreau",
+"category": "liqueur",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 5,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Grand Marnier",
+"brand": "Grand",
+"category": "liqueur",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 10,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Triple Sec (DeKuyper)",
+"brand": "Triple",
+"category": "liqueur",
+"abv": 15,
+"servingMl": 44.36,
+"carbsG": 12,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Blue Cura\u00e7ao",
+"brand": "Blue",
+"category": "liqueur",
+"abv": 20,
+"servingMl": 44.36,
+"carbsG": 15,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Midori Melon",
+"brand": "Midori",
+"category": "liqueur",
+"abv": 20,
+"servingMl": 44.36,
+"carbsG": 17,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Peach Schnapps (DeKuyper)",
+"brand": "Peach",
+"category": "liqueur",
+"abv": 15,
+"servingMl": 44.36,
+"carbsG": 14,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Apple Pucker",
+"brand": "Apple",
+"category": "liqueur",
+"abv": 15,
+"servingMl": 44.36,
+"carbsG": 15,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Malibu Original",
+"brand": "Malibu",
+"category": "liqueur",
+"abv": 21,
+"servingMl": 44.36,
+"carbsG": 12,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Campari",
+"brand": "Campari",
+"category": "liqueur",
+"abv": 20.5,
+"servingMl": 44.36,
+"carbsG": 12,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Aperol",
+"brand": "Aperol",
+"category": "liqueur",
+"abv": 11,
+"servingMl": 44.36,
+"carbsG": 17,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Chambord",
+"brand": "Chambord",
+"category": "liqueur",
+"abv": 16.5,
+"servingMl": 44.36,
+"carbsG": 15,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Frangelico",
+"brand": "Frangelico",
+"category": "liqueur",
+"abv": 20,
+"servingMl": 44.36,
+"carbsG": 16,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "St-Germain Elderflower",
+"brand": "St-Germain",
+"category": "liqueur",
+"abv": 20,
+"servingMl": 44.36,
+"carbsG": 15,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Amaro Montenegro",
+"brand": "Amaro",
+"category": "liqueur",
+"abv": 23,
+"servingMl": 44.36,
+"carbsG": 14,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Fernet-Branca",
+"brand": "Fernet-Branca",
+"category": "liqueur",
+"abv": 39,
+"servingMl": 44.36,
+"carbsG": 6,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Sambuca (Romana)",
+"brand": "Sambuca",
+"category": "liqueur",
+"abv": 38,
+"servingMl": 44.36,
+"carbsG": 17,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Limoncello",
+"brand": "Limoncello",
+"category": "liqueur",
+"abv": 28,
+"servingMl": 44.36,
+"carbsG": 18,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Irish Cream (Carolans)",
+"brand": "Irish",
+"category": "liqueur",
+"abv": 17,
+"servingMl": 44.36,
+"carbsG": 10,
+"fatG": 4.5,
+"proteinG": 1.0
+},
+{
+"name": "RumChata",
+"brand": "RumChata",
+"category": "liqueur",
+"abv": 13.75,
+"servingMl": 44.36,
+"carbsG": 10,
+"fatG": 2.5,
+"proteinG": 0.6
+},
+{
+"name": "Screwball Peanut Butter Whiskey",
+"brand": "Screwball",
+"category": "liqueur",
+"abv": 35,
+"servingMl": 44.36,
+"carbsG": 9,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Skrewball",
+"brand": "Skrewball",
+"category": "liqueur",
+"abv": 35,
+"servingMl": 44.36,
+"carbsG": 9,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Jack Daniel's Tennessee Honey",
+"brand": "Jack",
+"category": "liqueur",
+"abv": 35,
+"servingMl": 44.36,
+"carbsG": 8,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Jim Beam Apple",
+"brand": "Jim",
+"category": "liqueur",
+"abv": 32,
+"servingMl": 44.36,
+"carbsG": 8,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Crown Royal Apple",
+"brand": "Crown",
+"category": "liqueur",
+"abv": 35,
+"servingMl": 44.36,
+"carbsG": 8,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Crown Royal Peach",
+"brand": "Crown",
+"category": "liqueur",
+"abv": 35,
+"servingMl": 44.36,
+"carbsG": 8,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Ole Smoky Apple Pie Moonshine",
+"brand": "Ole",
+"category": "liqueur",
+"abv": 20,
+"servingMl": 44.36,
+"carbsG": 14,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "99 Bananas",
+"brand": "99",
+"category": "liqueur",
+"abv": 49,
+"servingMl": 44.36,
+"carbsG": 12,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Hpnotiq",
+"brand": "Hpnotiq",
+"category": "liqueur",
+"abv": 17,
+"servingMl": 44.36,
+"carbsG": 15,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Aliz\u00e9 Bleu",
+"brand": "Aliz\u00e9",
+"category": "liqueur",
+"abv": 16,
+"servingMl": 44.36,
+"carbsG": 15,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Chartreuse Green",
+"brand": "Chartreuse",
+"category": "liqueur",
+"abv": 55,
+"servingMl": 44.36,
+"carbsG": 10,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "B\u00e9n\u00e9dictine",
+"brand": "B\u00e9n\u00e9dictine",
+"category": "liqueur",
+"abv": 40,
+"servingMl": 44.36,
+"carbsG": 14,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Bud Light beer",
+"brand": "Bud Light",
+"category": "beer",
+"abv": 4.2,
+"servingMl": 354.88,
+"carbsG": 6.6,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Budweiser beer",
+"brand": "Budweiser",
+"category": "beer",
+"abv": 5,
+"servingMl": 354.88,
+"carbsG": 10.6,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Bud Light Platinum beer",
+"brand": "Bud Light Platinum",
+"category": "beer",
+"abv": 6,
+"servingMl": 354.88,
+"carbsG": 4.4,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Michelob Ultra beer",
+"brand": "Michelob Ultra",
+"category": "beer",
+"abv": 4.2,
+"servingMl": 354.88,
+"carbsG": 2.6,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Coors Light beer",
+"brand": "Coors Light",
+"category": "beer",
+"abv": 4.2,
+"servingMl": 354.88,
+"carbsG": 5,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Coors Banquet beer",
+"brand": "Coors Banquet",
+"category": "beer",
+"abv": 5,
+"servingMl": 354.88,
+"carbsG": 11.7,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Miller Lite beer",
+"brand": "Miller Lite",
+"category": "beer",
+"abv": 4.2,
+"servingMl": 354.88,
+"carbsG": 3.2,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Miller High Life beer",
+"brand": "Miller High Life",
+"category": "beer",
+"abv": 4.6,
+"servingMl": 354.88,
+"carbsG": 12.2,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Busch Light beer",
+"brand": "Busch Light",
+"category": "beer",
+"abv": 4.1,
+"servingMl": 354.88,
+"carbsG": 3.2,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Busch beer",
+"brand": "Busch",
+"category": "beer",
+"abv": 4.5,
+"servingMl": 354.88,
+"carbsG": 10,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Natural Light beer",
+"brand": "Natural Light",
+"category": "beer",
+"abv": 4.2,
+"servingMl": 354.88,
+"carbsG": 3.2,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Natural Ice beer",
+"brand": "Natural Ice",
+"category": "beer",
+"abv": 5.9,
+"servingMl": 354.88,
+"carbsG": 8.9,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Keystone Light beer",
+"brand": "Keystone Light",
+"category": "beer",
+"abv": 4.1,
+"servingMl": 354.88,
+"carbsG": 5,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Pabst Blue Ribbon beer",
+"brand": "Pabst Blue Ribbon",
+"category": "beer",
+"abv": 4.7,
+"servingMl": 354.88,
+"carbsG": 12,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Rolling Rock beer",
+"brand": "Rolling Rock",
+"category": "beer",
+"abv": 4.5,
+"servingMl": 354.88,
+"carbsG": 10,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Yuengling Traditional Lager beer",
+"brand": "Yuengling Traditional Lager",
+"category": "beer",
+"abv": 4.5,
+"servingMl": 354.88,
+"carbsG": 12,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Corona Extra beer",
+"brand": "Corona Extra",
+"category": "beer",
+"abv": 4.6,
+"servingMl": 354.88,
+"carbsG": 14,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Corona Premier beer",
+"brand": "Corona Premier",
+"category": "beer",
+"abv": 4,
+"servingMl": 354.88,
+"carbsG": 2.6,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Modelo Especial beer",
+"brand": "Modelo Especial",
+"category": "beer",
+"abv": 4.4,
+"servingMl": 354.88,
+"carbsG": 14,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Modelo Negra beer",
+"brand": "Modelo Negra",
+"category": "beer",
+"abv": 5.4,
+"servingMl": 354.88,
+"carbsG": 13,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Pacifico beer",
+"brand": "Pacifico",
+"category": "beer",
+"abv": 4.4,
+"servingMl": 354.88,
+"carbsG": 12,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Dos Equis Lager beer",
+"brand": "Dos Equis Lager",
+"category": "beer",
+"abv": 4.2,
+"servingMl": 354.88,
+"carbsG": 11,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Tecate beer",
+"brand": "Tecate",
+"category": "beer",
+"abv": 4.5,
+"servingMl": 354.88,
+"carbsG": 12,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Heineken beer",
+"brand": "Heineken",
+"category": "beer",
+"abv": 5,
+"servingMl": 354.88,
+"carbsG": 11.4,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Heineken 0.0 beer",
+"brand": "Heineken 0.0",
+"category": "beer",
+"abv": 0,
+"servingMl": 354.88,
+"carbsG": 12,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Stella Artois beer",
+"brand": "Stella Artois",
+"category": "beer",
+"abv": 5,
+"servingMl": 354.88,
+"carbsG": 11,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Peroni Nastro Azzurro beer",
+"brand": "Peroni Nastro Azzurro",
+"category": "beer",
+"abv": 5.1,
+"servingMl": 354.88,
+"carbsG": 9.6,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Beck's beer",
+"brand": "Beck's",
+"category": "beer",
+"abv": 5,
+"servingMl": 354.88,
+"carbsG": 10,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Amstel Light beer",
+"brand": "Amstel Light",
+"category": "beer",
+"abv": 3.5,
+"servingMl": 354.88,
+"carbsG": 5,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Guinness Draught beer",
+"brand": "Guinness Draught",
+"category": "beer",
+"abv": 4.2,
+"servingMl": 354.88,
+"carbsG": 10,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Newcastle Brown Ale beer",
+"brand": "Newcastle Brown Ale",
+"category": "beer",
+"abv": 4.7,
+"servingMl": 354.88,
+"carbsG": 13,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Blue Moon Belgian White beer",
+"brand": "Blue Moon Belgian White",
+"category": "beer",
+"abv": 5.4,
+"servingMl": 354.88,
+"carbsG": 13,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Shock Top Belgian White beer",
+"brand": "Shock Top Belgian White",
+"category": "beer",
+"abv": 5.2,
+"servingMl": 354.88,
+"carbsG": 16,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Sam Adams Boston Lager beer",
+"brand": "Sam Adams Boston Lager",
+"category": "beer",
+"abv": 5,
+"servingMl": 354.88,
+"carbsG": 18,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Sam Adams Summer Ale beer",
+"brand": "Sam Adams Summer Ale",
+"category": "beer",
+"abv": 5.3,
+"servingMl": 354.88,
+"carbsG": 15,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Sierra Nevada Pale Ale beer",
+"brand": "Sierra Nevada Pale Ale",
+"category": "beer",
+"abv": 5.6,
+"servingMl": 354.88,
+"carbsG": 14,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Lagunitas IPA beer",
+"brand": "Lagunitas IPA",
+"category": "beer",
+"abv": 6.2,
+"servingMl": 354.88,
+"carbsG": 16,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Dogfish Head 60 Minute IPA beer",
+"brand": "Dogfish Head 60 Minute IPA",
+"category": "beer",
+"abv": 6,
+"servingMl": 354.88,
+"carbsG": 17,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Founders All Day IPA beer",
+"brand": "Founders All Day IPA",
+"category": "beer",
+"abv": 4.7,
+"servingMl": 354.88,
+"carbsG": 13,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Bell's Two Hearted IPA beer",
+"brand": "Bell's Two Hearted IPA",
+"category": "beer",
+"abv": 7,
+"servingMl": 354.88,
+"carbsG": 18,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Goose Island IPA beer",
+"brand": "Goose Island IPA",
+"category": "beer",
+"abv": 5.9,
+"servingMl": 354.88,
+"carbsG": 17,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Voodoo Ranger Imperial IPA beer",
+"brand": "Voodoo Ranger Imperial IPA",
+"category": "beer",
+"abv": 9,
+"servingMl": 354.88,
+"carbsG": 16,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Blue Moon LightSky beer",
+"brand": "Blue Moon LightSky",
+"category": "beer",
+"abv": 4,
+"servingMl": 354.88,
+"carbsG": 3.6,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Landshark Lager beer",
+"brand": "Landshark Lager",
+"category": "beer",
+"abv": 4.7,
+"servingMl": 354.88,
+"carbsG": 12,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Red Stripe beer",
+"brand": "Red Stripe",
+"category": "beer",
+"abv": 4.7,
+"servingMl": 354.88,
+"carbsG": 12,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Sapporo Premium beer",
+"brand": "Sapporo Premium",
+"category": "beer",
+"abv": 4.9,
+"servingMl": 354.88,
+"carbsG": 10,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Asahi Super Dry beer",
+"brand": "Asahi Super Dry",
+"category": "beer",
+"abv": 5,
+"servingMl": 354.88,
+"carbsG": 10,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Tsingtao beer",
+"brand": "Tsingtao",
+"category": "beer",
+"abv": 4.7,
+"servingMl": 354.88,
+"carbsG": 11,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Hoegaarden beer",
+"brand": "Hoegaarden",
+"category": "beer",
+"abv": 4.9,
+"servingMl": 354.88,
+"carbsG": 11,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Leffe Blonde beer",
+"brand": "Leffe Blonde",
+"category": "beer",
+"abv": 6.6,
+"servingMl": 354.88,
+"carbsG": 15,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Guinness Extra Stout beer",
+"brand": "Guinness Extra Stout",
+"category": "beer",
+"abv": 5.6,
+"servingMl": 354.88,
+"carbsG": 17,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "White Claw Hard Seltzer",
+"brand": "White",
+"category": "seltzer",
+"abv": 5,
+"servingMl": 354.88,
+"carbsG": 2,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Truly Hard Seltzer",
+"brand": "Truly",
+"category": "seltzer",
+"abv": 5,
+"servingMl": 354.88,
+"carbsG": 2,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Bud Light Seltzer",
+"brand": "Bud",
+"category": "seltzer",
+"abv": 5,
+"servingMl": 354.88,
+"carbsG": 2,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Michelob Ultra Organic Seltzer",
+"brand": "Michelob",
+"category": "seltzer",
+"abv": 4,
+"servingMl": 354.88,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Topo Chico Hard Seltzer",
+"brand": "Topo",
+"category": "seltzer",
+"abv": 4.7,
+"servingMl": 354.88,
+"carbsG": 2,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Vizzy Hard Seltzer",
+"brand": "Vizzy",
+"category": "seltzer",
+"abv": 5,
+"servingMl": 354.88,
+"carbsG": 2,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Bon & Viv Spiked Seltzer",
+"brand": "Bon",
+"category": "seltzer",
+"abv": 4.5,
+"servingMl": 354.88,
+"carbsG": 2,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Corona Hard Seltzer",
+"brand": "Corona",
+"category": "seltzer",
+"abv": 4.5,
+"servingMl": 354.88,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Nutrl Vodka Seltzer",
+"brand": "Nutrl",
+"category": "seltzer",
+"abv": 4.5,
+"servingMl": 354.88,
+"carbsG": 0,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "High Noon Vodka Seltzer",
+"brand": "High",
+"category": "seltzer",
+"abv": 4.5,
+"servingMl": 354.88,
+"carbsG": 2.4,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Smirnoff Ice",
+"brand": "Smirnoff",
+"category": "seltzer",
+"abv": 4.5,
+"servingMl": 354.88,
+"carbsG": 31,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Mike's Hard Lemonade",
+"brand": "Mike's",
+"category": "seltzer",
+"abv": 5,
+"servingMl": 354.88,
+"carbsG": 32,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Twisted Tea Original",
+"brand": "Twisted",
+"category": "seltzer",
+"abv": 5,
+"servingMl": 354.88,
+"carbsG": 26.4,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Truly Margarita Style",
+"brand": "Truly",
+"category": "seltzer",
+"abv": 5,
+"servingMl": 354.88,
+"carbsG": 5,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Cutwater Tequila Margarita",
+"brand": "Cutwater",
+"category": "seltzer",
+"abv": 12.5,
+"servingMl": 354.88,
+"carbsG": 15,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "BuzzBallz Chillers",
+"brand": "BuzzBallz",
+"category": "seltzer",
+"abv": 15,
+"servingMl": 354.88,
+"carbsG": 29,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Four Loko Original",
+"brand": "Four",
+"category": "seltzer",
+"abv": 14,
+"servingMl": 354.88,
+"carbsG": 32,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Bud Light Lime-A-Rita",
+"brand": "Bud",
+"category": "seltzer",
+"abv": 8,
+"servingMl": 354.88,
+"carbsG": 24,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Loverboy Spritz",
+"brand": "Loverboy",
+"category": "seltzer",
+"abv": 4.2,
+"servingMl": 354.88,
+"carbsG": 2,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Surfside Iced Tea + Vodka",
+"brand": "Surfside",
+"category": "seltzer",
+"abv": 4.5,
+"servingMl": 354.88,
+"carbsG": 2,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Cabernet Sauvignon wine",
+"brand": null,
+"category": "wine",
+"abv": 13.5,
+"servingMl": 147.87,
+"carbsG": 3.8,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Merlot wine",
+"brand": null,
+"category": "wine",
+"abv": 13.5,
+"servingMl": 147.87,
+"carbsG": 3.7,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Pinot Noir wine",
+"brand": null,
+"category": "wine",
+"abv": 13,
+"servingMl": 147.87,
+"carbsG": 3.4,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Malbec wine",
+"brand": null,
+"category": "wine",
+"abv": 13.5,
+"servingMl": 147.87,
+"carbsG": 3.8,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Syrah / Shiraz wine",
+"brand": null,
+"category": "wine",
+"abv": 14,
+"servingMl": 147.87,
+"carbsG": 3.8,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Zinfandel wine",
+"brand": null,
+"category": "wine",
+"abv": 14.5,
+"servingMl": 147.87,
+"carbsG": 4.2,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Chardonnay wine",
+"brand": null,
+"category": "wine",
+"abv": 13.5,
+"servingMl": 147.87,
+"carbsG": 3.2,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Sauvignon Blanc wine",
+"brand": null,
+"category": "wine",
+"abv": 12.5,
+"servingMl": 147.87,
+"carbsG": 3,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Pinot Grigio wine",
+"brand": null,
+"category": "wine",
+"abv": 12.5,
+"servingMl": 147.87,
+"carbsG": 3,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Riesling wine",
+"brand": null,
+"category": "wine",
+"abv": 11,
+"servingMl": 147.87,
+"carbsG": 5.5,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Moscato wine",
+"brand": null,
+"category": "wine",
+"abv": 8,
+"servingMl": 147.87,
+"carbsG": 11,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Ros\u00e9 wine",
+"brand": null,
+"category": "wine",
+"abv": 12,
+"servingMl": 147.87,
+"carbsG": 3.5,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Prosecco",
+"brand": null,
+"category": "wine",
+"abv": 11,
+"servingMl": 147.87,
+"carbsG": 2.5,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Champagne (brut)",
+"brand": null,
+"category": "wine",
+"abv": 12,
+"servingMl": 147.87,
+"carbsG": 1.6,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Cava (brut)",
+"brand": null,
+"category": "wine",
+"abv": 11.5,
+"servingMl": 147.87,
+"carbsG": 1.8,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Port (tawny)",
+"brand": null,
+"category": "wine",
+"abv": 20,
+"servingMl": 147.87,
+"carbsG": 12,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Sherry (fino)",
+"brand": null,
+"category": "wine",
+"abv": 15,
+"servingMl": 147.87,
+"carbsG": 1.5,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Vermouth (sweet)",
+"brand": null,
+"category": "wine",
+"abv": 16,
+"servingMl": 147.87,
+"carbsG": 15,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Vermouth (dry)",
+"brand": null,
+"category": "wine",
+"abv": 18,
+"servingMl": 147.87,
+"carbsG": 3,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Yellow Tail Shiraz wine",
+"brand": null,
+"category": "wine",
+"abv": 13.5,
+"servingMl": 147.87,
+"carbsG": 4,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Barefoot Pinot Grigio wine",
+"brand": null,
+"category": "wine",
+"abv": 12.5,
+"servingMl": 147.87,
+"carbsG": 4,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Josh Cellars Cabernet wine",
+"brand": null,
+"category": "wine",
+"abv": 13.5,
+"servingMl": 147.87,
+"carbsG": 4,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Franzia Chillable Red wine",
+"brand": null,
+"category": "wine",
+"abv": 10.5,
+"servingMl": 147.87,
+"carbsG": 5,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Andr\u00e9 Brut wine",
+"brand": null,
+"category": "wine",
+"abv": 11,
+"servingMl": 147.87,
+"carbsG": 3,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Cook's Brut wine",
+"brand": null,
+"category": "wine",
+"abv": 11,
+"servingMl": 147.87,
+"carbsG": 3,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Sutter Home White Zinfandel wine",
+"brand": null,
+"category": "wine",
+"abv": 10,
+"servingMl": 147.87,
+"carbsG": 6,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Draft light lager, 16 oz pour",
+"brand": null,
+"category": "beer",
+"abv": 4.2,
+"servingMl": 473.18,
+"carbsG": 8.8,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Draft IPA, 16 oz pour",
+"brand": null,
+"category": "beer",
+"abv": 6.5,
+"servingMl": 473.18,
+"carbsG": 20,
+"fatG": 0,
+"proteinG": 0
+},
+{
+"name": "Draft stout, 16 oz pour",
+"brand": null,
+"category": "beer",
+"abv": 5,
+"servingMl": 473.18,
+"carbsG": 17,
+"fatG": 0,
+"proteinG": 0
+}
+]

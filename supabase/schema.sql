@@ -727,15 +727,18 @@ create table public.workout_routines (
   user_id uuid not null references public.users(id) on delete cascade,
   name text not null check (length(trim(name)) between 1 and 80),
   exercise_ids uuid[] not null check (cardinality(exercise_ids) between 1 and 30),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  exercise_plan jsonb check (exercise_plan is null or (jsonb_typeof(exercise_plan) = 'array' and jsonb_array_length(exercise_plan) between 1 and 30)),
+  times_per_week smallint check (times_per_week is null or times_per_week between 1 and 7)
 );
 create index workout_routines_owner_idx on public.workout_routines(user_id);
 alter table public.workout_routines enable row level security;
 revoke all on public.workout_routines from public, anon, authenticated;
-grant select, insert, delete on public.workout_routines to authenticated;
+grant select, insert, update, delete on public.workout_routines to authenticated;
 grant all on public.workout_routines to service_role;
 create policy routines_select on public.workout_routines for select to authenticated using (user_id = (select auth.uid()));
 create policy routines_insert on public.workout_routines for insert to authenticated with check (user_id = (select auth.uid()));
+create policy routines_update on public.workout_routines for update to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
 create policy routines_delete on public.workout_routines for delete to authenticated using (user_id = (select auth.uid()));
 -- Invoker visibility prevents referencing another user's private exercise.
 create function public.validate_routine_exercises() returns trigger language plpgsql security invoker set search_path = '' as $$

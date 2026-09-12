@@ -1,4 +1,7 @@
 import { RoutineBuilder } from './RoutineBuilder';
+import { SessionTimer } from './SessionTimer';
+import { routineExercises } from './routines';
+import { haptic } from '../../theme/haptics';
 import { overloadSuggestion, type LiftHistory, type PersonalRecord, type SessionVolumePoint } from './history';
 import { VolumeTrend } from './VolumeTrend';
 import { PlateCalculator } from './PlateCalculator';
@@ -7,7 +10,6 @@ import { exerciseById } from './catalog';
 import type { WorkoutRoutine } from './routines';
 import { useAuthStore } from '../../store/authStore';
 import { Action } from '../../components/FormControls';
-import { PROGRAM } from './program';
 import { Choice } from '../../components/FormControls';
 import { safelyEdit } from '../../components/safelyEdit';
 import { SyncIndicator } from '../../components/SyncIndicator';
@@ -100,7 +102,7 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
       } catch { if(active) setRoutineError('Showing routines saved on this device. Cloud routines will load when connected.'); }
     })(); return () => { active = false; };
   }, [owner]);
-  const plans = [...PROGRAM, ...routines.map(r=>({name:r.name,focus:'Custom routine',lifts:r.exerciseIds.map(exerciseById).filter(e=>!!e)}))];
+  const plans = routines.map(r=>({name:r.name,focus:`${routineExercises(r).length} exercises · ${r.timesPerWeek ?? 1}× a week`,routine:r,lifts:r.exerciseIds.map(exerciseById).filter(e=>!!e)}));
   const plan = plans[program] ?? plans[0];
   const saveRoutine = async (routine: WorkoutRoutine) => {
     const { syncEngine } = await import('../sync/runtime');
@@ -125,14 +127,18 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
   const recordNames = records.map(record => ({ ...record, name: exerciseById(record.exerciseId)?.name ?? 'Lift' }));
   const volume = sets.reduce((total, entry) => total + (entry.completedAtMs !== null && !entry.isWarmup ? (entry.weightLbs ?? 0) * (entry.reps ?? 0) : 0), 0);
   const start = () => {
+    if (!plan) return;
     const actions = workoutStore.getState();
+    const detail = routineExercises(plan.routine);
     actions.startSession({ id: localId(), name: plan.name });
-    for (const exercise of plan.lifts) {
+    for (const entry of detail) {
+      const exercise = exerciseById(entry.exerciseId);
+      if (!exercise) continue;
       const id = localId();
-      actions.addExercise({ id, exercise, defaultRestSeconds: 120 });
-      for (let set = 0; set < 3; set++) actions.addSet({ id: localId(), sessionExerciseId: id });
+      actions.addExercise({ id, exercise, defaultRestSeconds: entry.restSeconds });
+      for (let set = 0; set < entry.sets; set++) actions.addSet({ id: localId(), sessionExerciseId: id });
     }
-    setFinished(null);
+    setFinished(null); haptic('success');
   };
 
   return <SafeAreaView edges={['top', 'left', 'right']} className="flex-1 bg-background">
@@ -152,17 +158,24 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
       {syncError && <Text accessibilityRole="alert" className="mt-3 text-sm text-ink">{syncError}</Text>}
       {syncStatus === 'saved' && <Text className="mt-3 text-sm text-ink">Workouts saved to Supabase.</Text>}
       {!session ? <View className="mt-8 rounded-3xl bg-background p-6">
+        {!plans.length ? <>
+          <Text className="text-2xl font-bold text-ink">Build your first routine</Text>
+          <Text className="mt-3 leading-6 text-ink">CalCamp does not ship a template, because the split that works is the one you will actually run. Pick your exercises, set your own sets and rest, and we will check the weekly volume as you go.</Text>
+          <Action label="Create a routine" onPress={() => setBuilder(true)} />
+        </> : <>
         <Text className="text-xs font-bold uppercase tracking-widest text-ink">Ready when you are</Text>
-        <Text className="mt-4 text-2xl font-bold text-ink">{plan.name} · Hypertrophy</Text>
-        <Text className="mt-3 leading-6 text-ink">Choose your session. Three editable sets per lift; enter your own weights, reps and RPE.</Text>
+        <Text className="mt-4 text-2xl font-bold text-ink">{plan.name}</Text>
+        <Text className="mt-3 leading-6 text-ink">{plan.focus}. Sets, rest and rep ranges come from the routine — change them any time.</Text>
         <View className="mt-4 flex-row flex-wrap">{plans.map((plan, index) => <Choice key={plan.name} label={plan.name} selected={program === index} onPress={() => setProgram(index)} />)}</View>
         <Pressable accessibilityRole="button" onPress={() => safelyEdit(start)} className="mt-6 items-center rounded-2xl bg-accent p-4"><Text className="font-bold text-ink">Start session</Text></Pressable>
-        <Action secondary label="Create custom routine" onPress={() => setBuilder(true)} />
+        <Action secondary label="Create another routine" onPress={() => setBuilder(true)} />
+        </>}
         <VolumeTrend log={volumeLog} />
         {routineError && <Text>{routineError}</Text>}
-        <View className="gap-2">{plan.lifts.map(e => <View key={e.id} className="flex-row items-center gap-3"><Text className="flex-1">{e.name}</Text><ExerciseHelp exercise={e} /></View>)}</View>
+        <View className="gap-2">{(plan?.lifts ?? []).map(e => <View key={e.id} className="flex-row items-center gap-3"><Text className="flex-1">{e.name}</Text><ExerciseHelp exercise={e} /></View>)}</View>
         {finished && <Text accessibilityRole="alert" className="mt-4 text-sm text-ink">{finished}</Text>}
       </View> : <>
+        <SessionTimer startedAtMs={session.startedAtMs} volumeLbs={volume} sets={sets.filter(entry => entry.completedAtMs !== null).length} />
         <View className="my-6 flex-row gap-3"><View className="flex-1 rounded-2xl bg-surface p-4"><Text className="text-xs text-ink">Completed sets</Text><Text className="mt-2 text-2xl font-bold text-ink">{sets.filter((entry) => entry.completedAtMs !== null).length}</Text></View><View className="flex-1 rounded-2xl bg-surface p-4"><Text className="text-xs text-ink">Volume · lbs × reps</Text><Text className="mt-2 text-2xl font-bold text-ink">{Number(volume.toFixed(1))}</Text></View></View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-5" contentContainerStyle={{ gap: 8 }}>
           {sequence.map((entry, index) => <View key={entry.id} className="flex-row items-center gap-2"><Pressable accessibilityRole="tab" accessibilityLabel={entry.exercise.name} accessibilityState={{ selected: entry.id === activeId }} onPress={() => safelyEdit(() => workoutStore.getState().setActiveExercise(entry.id))} className={entry.id === activeId ? 'rounded-xl bg-background px-4 py-3' : 'rounded-xl bg-surface px-4 py-3'}><Text className={entry.id === activeId ? 'text-sm font-semibold text-ink' : 'text-sm font-semibold text-ink'}>{index + 1}. {entry.exercise.name}</Text></Pressable><ExerciseHelp exercise={entry.exercise} /></View>)}

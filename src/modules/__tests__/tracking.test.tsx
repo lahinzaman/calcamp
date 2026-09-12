@@ -204,11 +204,34 @@ test('CalCamp dashboard mounts real targets and all four training days', async (
   assert.ok(textContent().includes('cups'));
 });
 
-test('workout templates create actual Lower sessions and removal clears a draft row', async () => {
+test('with no routines the training tab sends you to build one instead of offering a preset', async () => {
   await act(async () => { rendered = create(<ActiveWorkoutScreen />); });
-  const press = (label: string) => rendered!.root.findAllByType('Pressable' as React.ElementType).find(node => node.findAllByType('Text' as React.ElementType).some(text => text.props.children === label))!.props.onPress();
-  await act(async () => press('Lower B')); await act(async () => press('Start session'));
-  assert.equal(workoutStore.getState().activeSession?.name, 'Lower B'); assert.equal(workoutStore.getState().sets.length, 9);
-  assert.equal(workoutStore.getState().exerciseSequence[0].exercise.name, 'Romanian Deadlift');
-  await act(async () => findLabel('Remove set 1').props.onPress()); assert.equal(workoutStore.getState().sets.length, 8);
+  const text = JSON.stringify(rendered!.toJSON());
+  assert.ok(text.includes('Build your first routine'));
+  assert.ok(text.includes('Create a routine'));
+  // Built-in programmes are gone; there is nothing to start until the user makes one.
+  assert.ok(!text.includes('Start session'));
+  assert.ok(!text.includes('Lower B'));
+});
+
+test('starting a routine builds the sets and rest it specifies, and removal clears a draft row', async () => {
+  const { EXERCISE_CATALOG } = require('../workout/catalog') as typeof import('../workout/catalog');
+  const squat = EXERCISE_CATALOG.find(e => e.primaryMuscle === 'quadriceps')!;
+  const curl = EXERCISE_CATALOG.find(e => e.primaryMuscle === 'biceps')!;
+  const routine = { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', name: 'Leg day', exerciseIds: [squat.id, curl.id],
+    timesPerWeek: 2, exercises: [
+      { exerciseId: squat.id, sets: 4, restSeconds: 180, repLow: 5, repHigh: 8 },
+      { exerciseId: curl.id, sets: 2, restSeconds: 60, repLow: 10, repHigh: 15 }] };
+  workoutStore.getState().startSession({ id: 'session-1', name: routine.name });
+  for (const entry of routine.exercises) {
+    const id = `ex-${entry.exerciseId}`;
+    workoutStore.getState().addExercise({ id, exercise: EXERCISE_CATALOG.find(e => e.id === entry.exerciseId)!, defaultRestSeconds: entry.restSeconds });
+    for (let set = 0; set < entry.sets; set++) workoutStore.getState().addSet({ id: `${id}-${set}`, sessionExerciseId: id });
+  }
+  // Four squat sets plus two curl sets, with each exercise carrying its own rest.
+  assert.equal(workoutStore.getState().sets.length, 6);
+  assert.equal(workoutStore.getState().exerciseSequence[0].defaultRestSeconds, 180);
+  assert.equal(workoutStore.getState().exerciseSequence[1].defaultRestSeconds, 60);
+  workoutStore.getState().removeSet(workoutStore.getState().sets[0].id);
+  assert.equal(workoutStore.getState().sets.length, 5);
 });

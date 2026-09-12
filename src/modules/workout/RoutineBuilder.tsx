@@ -1,22 +1,161 @@
-import { useState } from 'react';
-import { Modal, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { KeyboardAvoidingView, Modal, Platform, ScrollView, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import { randomUUID } from 'expo-crypto';
 import { SafeAreaView } from '../../theme/SafeArea';
 import { Text } from '../../theme/primitives';
-import { Action, Field } from '../../components/FormControls';
 import { Pressable } from '../../theme/Pressable';
-import { EXERCISE_CATALOG } from './catalog';
+import { Action, Choice, Field } from '../../components/FormControls';
+import { ProgressBar } from '../../theme/motion';
+import { haptic } from '../../theme/haptics';
+import { useAuthStore } from '../../store/authStore';
+import { EXERCISE_CATALOG, exerciseById } from './catalog';
 import { ExerciseHelp } from './ExerciseHelp';
-import { validateRoutine, type WorkoutRoutine } from './routines';
-export function RoutineBuilder({ onClose, onSave }: {onClose:()=>void; onSave:(routine:WorkoutRoutine)=>Promise<void>}) {
-  const [name,setName] = useState(''); const [search,setSearch] = useState(''); const [ids,setIds] = useState<string[]>([]);
-  const [error,setError] = useState<string|null>(null); const [busy,setBusy] = useState(false);
-  const [id] = useState(randomUUID);
-  const selected = ids.map(id => EXERCISE_CATALOG.find(e=>e.id===id)!);
-  return <Modal visible presentationStyle="pageSheet" animationType="slide" onRequestClose={onClose}><SafeAreaView className="flex-1 bg-background">
-    <FlashList data={EXERCISE_CATALOG.filter(e => `${e.name} ${e.primaryMuscle} ${e.equipment}`.toLowerCase().includes(search.toLowerCase()))} keyExtractor={e=>e.id} keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:20,paddingBottom:60}}
-      ListHeaderComponent={<><Text className="mb-4 text-3xl font-bold">Create a routine</Text><Field label="Routine name" value={name} onChangeText={setName} maxLength={80} /><Text className="mb-3">Tap exercises in your preferred order. Tap a selected exercise to remove it.</Text>{selected.map((e,i)=><Text key={e.id} className="mb-1">{i+1}. {e.name}</Text>)}<View className="mt-4"><Field label="Search 101 exercises" value={search} onChangeText={setSearch} /></View><Action label={busy ? 'Saving…' : `Save routine · ${ids.length} exercises`} disabled={busy} onPress={()=>{if(busy)return;setError(null);void (async()=>{try{const routine={id,name:name.trim(),exerciseIds:ids};validateRoutine(routine);setBusy(true);await onSave(routine);onClose();}catch(e){setError((e as Error).message);}finally{setBusy(false);}})();}} /><Action secondary label="Cancel routine" onPress={onClose} />{error&&<Text accessibilityRole="alert">{error}</Text>}</>}
-      renderItem={({item:e})=><View className="mb-2 flex-row items-center gap-2"><Pressable accessibilityRole="checkbox" accessibilityState={{checked:ids.includes(e.id)}} onPress={()=>setIds(current=>current.includes(e.id)?current.filter(id=>id!==e.id):current.length<30?[...current,e.id]:current)} className="flex-1 rounded-xl bg-surface p-4"><Text className="font-bold">{ids.includes(e.id)?'✓ ':''}{e.name}</Text><Text className="text-sm">{e.primaryMuscle} · {e.equipment}</Text></Pressable><ExerciseHelp exercise={e} /></View>} />
-  </SafeAreaView></Modal>;
+import { defaultRoutineExercise, validateRoutine, REST_CHOICES, type WorkoutRoutine } from './routines';
+import { EXPERIENCE_LEVELS, EXPERIENCE_NOTES, MUSCLE_LABELS, WEEKLY_SET_TARGETS, volumeAdvice, weeklyVolume, type ExperienceLevel, type RoutineExercise } from './volume';
+import { readExperience, writeExperience } from './experience';
+const newId = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(16)}-0000-4000-8000-000000000000`.slice(0, 36);
+const restLabel = (seconds: number) => seconds >= 60 ? `${Math.round(seconds / 60 * 10) / 10} min` : `${seconds}s`;
+
+function Stepper({ label, value, onChange, min, max, step = 1, asRest = false }: { label: string; value: number; onChange: (value: number) => void; min: number; max: number; step?: number; asRest?: boolean }) {
+  return <View className="flex-1">
+    <Text className="mb-1 text-xs">{label}</Text>
+    <View className="flex-row items-center gap-2">
+      <Pressable accessibilityRole="button" accessibilityLabel={`Decrease ${label}`} disabled={value <= min} weight="firm"
+        onPress={() => { onChange(Math.max(min, value - step)); haptic('selection'); }}
+        className="h-10 w-10 items-center justify-center rounded-full bg-raised"><Text className="font-bold">−</Text></Pressable>
+      <Text className="flex-1 text-center font-bold">{asRest ? restLabel(value) : value}</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel={`Increase ${label}`} disabled={value >= max} weight="firm"
+        onPress={() => { onChange(Math.min(max, value + step)); haptic('selection'); }}
+        className="h-10 w-10 items-center justify-center rounded-full bg-raised"><Text className="font-bold">+</Text></Pressable>
+    </View>
+  </View>;
+}
+
+export function RoutineBuilder({ onClose, onSave, existing }: { onClose: () => void; onSave: (routine: WorkoutRoutine) => Promise<void>; existing?: WorkoutRoutine }) {
+  const owner = useAuthStore(s => s.session?.user.id) ?? 'anonymous';
+  const [step, setStep] = useState<'pick' | 'tune'>(existing ? 'tune' : 'pick');
+  const [name, setName] = useState(existing?.name ?? '');
+  const [search, setSearch] = useState('');
+  const [entries, setEntries] = useState<RoutineExercise[]>(existing?.exercises ?? existing?.exerciseIds.map(defaultRoutineExercise) ?? []);
+  const [timesPerWeek, setTimesPerWeek] = useState(existing?.timesPerWeek ?? 2);
+  const [experience, setExperience] = useState<ExperienceLevel>(() => readExperience(owner));
+  const [error, setError] = useState<string | null>(null); const [busy, setBusy] = useState(false);
+  const ids = entries.map(entry => entry.exerciseId);
+  const [low, high] = WEEKLY_SET_TARGETS[experience];
+  const volume = useMemo(() => weeklyVolume([{ exercises: entries, timesPerWeek }], experience), [entries, timesPerWeek, experience]);
+  const advice = useMemo(() => volumeAdvice(volume, experience), [volume, experience]);
+  const trained = volume.filter(entry => entry.sets > 0);
+
+  const toggle = (id: string) => {
+    setEntries(current => current.some(entry => entry.exerciseId === id)
+      ? current.filter(entry => entry.exerciseId !== id)
+      : current.length < 30 ? [...current, defaultRoutineExercise(id)] : current);
+    haptic('selection');
+  };
+  const update = (id: string, patch: Partial<RoutineExercise>) =>
+    setEntries(current => current.map(entry => entry.exerciseId === id ? { ...entry, ...patch } : entry));
+
+  const save = async () => {
+    if (busy) return; setBusy(true); setError(null);
+    const routine: WorkoutRoutine = { id: existing?.id ?? newId(), name: name.trim(), exerciseIds: ids, exercises: entries, timesPerWeek };
+    try {
+      validateRoutine(routine);
+      writeExperience(owner, experience);
+      await onSave(routine); haptic('success'); onClose();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'This routine could not be saved.'); haptic('error'); }
+    finally { setBusy(false); }
+  };
+
+  if (step === 'pick') {
+    const matches = EXERCISE_CATALOG.filter(exercise => `${exercise.name} ${exercise.primaryMuscle} ${exercise.equipment}`.toLowerCase().includes(search.toLowerCase()));
+    return <Modal visible presentationStyle="pageSheet" animationType="slide" onRequestClose={onClose}>
+      <SafeAreaView className="flex-1 bg-background">
+        <View className="px-5 pt-4">
+          <Text className="text-2xl font-bold">Choose your exercises</Text>
+          <Text className="mb-3 mt-1 text-sm">{ids.length} selected{ids.length ? ` · ${trained.length} muscles` : ''}. Sets and rest come next.</Text>
+          <Field label="Search the catalogue" value={search} onChangeText={setSearch} autoCorrect={false} />
+        </View>
+        <FlashList data={matches} keyExtractor={exercise => exercise.id} keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
+          renderItem={({ item }) => {
+            const chosen = ids.includes(item.id);
+            return <View className="mb-2 flex-row items-center gap-2">
+              <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: chosen }} accessibilityLabel={item.name}
+                onPress={() => toggle(item.id)} weight="subtle"
+                className={`flex-1 rounded-2xl border p-4 ${chosen ? 'border-accent bg-raised' : 'border-border bg-surface'}`}>
+                <Text className="font-bold">{chosen ? '✓ ' : ''}{item.name}</Text>
+                <Text className="text-sm">{MUSCLE_LABELS[item.primaryMuscle] ?? item.primaryMuscle} · {item.equipment}</Text>
+              </Pressable>
+              <ExerciseHelp exercise={item} />
+            </View>;
+          }} />
+        <View className="gap-2 px-5 pb-4">
+          <Action label={ids.length ? `Set up ${ids.length} exercise${ids.length > 1 ? 's' : ''}` : 'Pick at least one exercise'}
+            disabled={!ids.length} onPress={() => setStep('tune')} tone={ids.length ? 'success' : 'none'} />
+          <Action secondary label="Cancel" onPress={onClose} />
+        </View>
+      </SafeAreaView>
+    </Modal>;
+  }
+
+  return <Modal visible presentationStyle="pageSheet" animationType="slide" onRequestClose={onClose}>
+    <SafeAreaView className="flex-1 bg-background"><KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24, paddingBottom: 60 }}>
+        <Text className="mb-4 text-3xl font-bold">{existing ? 'Edit routine' : 'Set up your routine'}</Text>
+        <Field label="Routine name" value={name} onChangeText={setName} maxLength={80} placeholder="Push A" />
+
+        <Text className="mb-2 mt-2 font-bold">How experienced are you?</Text>
+        <View className="flex-row flex-wrap">{EXPERIENCE_LEVELS.map(level => <Choice key={level} label={level[0].toUpperCase() + level.slice(1)}
+          selected={experience === level} onPress={() => setExperience(level)} />)}</View>
+        <Text className="mb-4 text-sm">{EXPERIENCE_NOTES[experience]}</Text>
+
+        <Text className="mb-2 font-bold">How often will you run this routine?</Text>
+        <View className="mb-5 flex-row flex-wrap">{[1, 2, 3, 4].map(value => <Choice key={value} label={`${value}× a week`}
+          selected={timesPerWeek === value} onPress={() => setTimesPerWeek(value)} />)}</View>
+
+        {entries.map(entry => {
+          const exercise = exerciseById(entry.exerciseId);
+          return <View key={entry.exerciseId} className="mb-3 rounded-2xl border border-border bg-surface p-4">
+            <View className="mb-3 flex-row items-center gap-3">
+              <View className="flex-1"><Text className="font-bold">{exercise?.name ?? 'Exercise'}</Text>
+                <Text className="text-sm">{MUSCLE_LABELS[exercise?.primaryMuscle ?? ''] ?? exercise?.primaryMuscle}</Text></View>
+              {exercise && <ExerciseHelp exercise={exercise} />}
+              <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${exercise?.name ?? 'exercise'}`} tone="warning" weight="subtle"
+                onPress={() => setEntries(current => current.filter(item => item.exerciseId !== entry.exerciseId))}
+                className="h-10 w-10 items-center justify-center rounded-full bg-raised"><Text>×</Text></Pressable>
+            </View>
+            <View className="flex-row gap-3">
+              <Stepper label="Sets" value={entry.sets} min={1} max={20} onChange={sets => update(entry.exerciseId, { sets })} />
+              <Stepper label="Rest" value={entry.restSeconds} min={0} max={600} step={15} asRest onChange={restSeconds => update(entry.exerciseId, { restSeconds })} />
+            </View>
+            <View className="mt-3 flex-row gap-3">
+              <Stepper label="Min reps" value={entry.repLow} min={1} max={entry.repHigh} onChange={repLow => update(entry.exerciseId, { repLow })} />
+              <Stepper label="Max reps" value={entry.repHigh} min={entry.repLow} max={100} onChange={repHigh => update(entry.exerciseId, { repHigh })} />
+            </View>
+            <View className="mt-3 flex-row flex-wrap">{REST_CHOICES.map(value => <Choice key={value} label={restLabel(value)}
+              selected={entry.restSeconds === value} onPress={() => update(entry.exerciseId, { restSeconds: value })} />)}</View>
+          </View>;
+        })}
+        <Action secondary label="Add more exercises" onPress={() => setStep('pick')} />
+
+        <View className="my-4 rounded-3xl border border-border bg-surface p-5">
+          <Text className="mb-1 text-sm font-bold tracking-widest">WEEKLY VOLUME</Text>
+          <Text className="mb-3 text-sm">Target {low}–{high} hard sets per muscle, each trained at least twice a week.</Text>
+          {trained.map(entry => <View key={entry.muscle} className="mb-3">
+            <View className="mb-1 flex-row justify-between">
+              <Text className="text-sm">{entry.label}{entry.frequencyOk ? '' : ' · once a week'}</Text>
+              <Text className="text-sm font-bold">{entry.sets} sets</Text>
+            </View>
+            <ProgressBar value={Math.min(entry.sets, high)} target={high} height={6}
+              tone={entry.status === 'in-range' ? 'protein' : entry.status === 'over' ? 'fat' : 'carbs'} />
+          </View>)}
+          {advice.map((item, index) => <Text key={index} className={item.tone === 'good' ? 'mt-2 text-sm font-bold' : 'mt-2 text-sm'}>{item.text}</Text>)}
+        </View>
+
+        {error && <Text accessibilityRole="alert" className="mb-4">{error}</Text>}
+        <Action label={busy ? 'Saving…' : 'Save routine'} disabled={busy} onPress={() => void save()} tone="success" />
+        <Action secondary label="Cancel" onPress={onClose} />
+      </ScrollView>
+    </KeyboardAvoidingView></SafeAreaView>
+  </Modal>;
 }

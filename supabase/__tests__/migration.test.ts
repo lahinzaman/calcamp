@@ -6,6 +6,7 @@ import { PGlite } from '@electric-sql/pglite';
 const alice = '20000000-0000-4000-8000-000000000001';
 const bob = '20000000-0000-4000-8000-000000000002';
 const MIGRATION = '20260911120000_phase10_food_entries_measurements.sql';
+const ROUTINE_MIGRATION = '20260911210000_phase12_routine_plan.sql';
 
 /** Applies against a database holding everything except these two tables — the live shape. */
 test('Phase 10 migration applies to the deployed schema and enforces per-user isolation', async (t) => {
@@ -93,4 +94,39 @@ test('the migration leaves schema.sql and the migration in agreement', async () 
   const created = [...migration.matchAll(/create (?:table|index|policy) (?:public\.)?([a-z_]+)/g)].map(match => match[1]);
   assert.ok(created.length >= 10);
   for (const name of created) assert.ok(schema.includes(name), `schema.sql is missing ${name}`);
+});
+
+
+/**
+ * ADD COLUMN appends, so a bootstrap schema that declares a new column mid-table produces
+ * a different column order than a migrated database — which breaks positional inserts.
+ */
+test('a migrated workout_routines matches a freshly bootstrapped one, column for column', async () => {
+  const shim = `
+    create role anon; create role authenticated; create role service_role bypassrls;
+    create schema auth; create table auth.users (id uuid primary key);
+    create function auth.uid() returns uuid language sql stable as
+      $$select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid$$;
+    grant usage on schema auth to anon, authenticated, service_role;
+    grant execute on function auth.uid() to anon, authenticated, service_role;
+  `;
+  const columns = `select column_name, data_type from information_schema.columns
+    where table_schema = 'public' and table_name = 'workout_routines' order by ordinal_position`;
+  const schema = await readFile(new URL('../schema.sql', import.meta.url), 'utf8');
+  const migration = await readFile(new URL(`../migrations/${ROUTINE_MIGRATION}`, import.meta.url), 'utf8');
+
+  const fresh = new PGlite();
+  const migrated = new PGlite();
+  try {
+    await fresh.exec(shim); await fresh.exec(schema);
+    await migrated.exec(shim); await migrated.exec(schema);
+    // Reproduce the pre-migration table, then migrate it forward.
+    await migrated.exec('alter table public.workout_routines drop column exercise_plan, drop column times_per_week;');
+    await migrated.exec('drop policy routines_update on public.workout_routines;');
+    await migrated.exec(migration);
+    const before = (await fresh.query<{ column_name: string; data_type: string }>(columns)).rows;
+    const after = (await migrated.query<{ column_name: string; data_type: string }>(columns)).rows;
+    assert.deepEqual(after, before, 'migrated and bootstrapped schemas must agree on column order and types');
+    assert.ok(before.some(row => row.column_name === 'exercise_plan'));
+  } finally { await fresh.close(); await migrated.close(); }
 });

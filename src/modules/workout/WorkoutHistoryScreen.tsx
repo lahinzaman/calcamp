@@ -10,6 +10,7 @@ import { exerciseById } from './catalog';
 import { MUSCLE_LABELS } from './volume';
 import { VolumeTrend } from './VolumeTrend';
 import type { LiftHistory, SessionVolumePoint } from './history';
+import { bigThree } from './bigThree';
 const WEEK = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const pad = (value: number) => String(value).padStart(2, '0');
 const keyFor = (year: number, month: number, day: number) => `${year}-${pad(month + 1)}-${pad(day)}`;
@@ -37,6 +38,7 @@ export default function WorkoutHistoryScreen() {
     for (const point of volumeLog) map.set(point.date, (map.get(point.date) ?? 0) + point.value);
     return map;
   }, [volumeLog]);
+  const powerlifts = useMemo(() => bigThree(lifts), [lifts]);
   const records = useMemo(() => Object.values(lifts)
     .map(record => ({ ...record, name: exerciseById(record.exerciseId)?.name ?? 'Exercise', muscle: MUSCLE_LABELS[exerciseById(record.exerciseId)?.primaryMuscle ?? ''] ?? '' }))
     .sort((a, b) => b.lastPerformedMs - a.lastPerformedMs), [lifts]);
@@ -87,7 +89,26 @@ export default function WorkoutHistoryScreen() {
         <Reveal index={2}><VolumeTrend log={volumeLog} /></Reveal>
       </>}
 
-      {tab === 'records' && <Reveal index={1}>
+      {tab === 'records' && <>
+        <Reveal index={1}><View className="mb-3 rounded-3xl border border-border bg-surface p-5">
+          <Text className="mb-3 text-sm font-bold tracking-widest">SQUAT · BENCH · DEADLIFT</Text>
+          {!powerlifts.lifts.length && <Text>Log a barbell squat, bench press or deadlift and your bests appear here.</Text>}
+          {powerlifts.lifts.map(lift => <View key={lift.key} className="mb-3">
+            <View className="flex-row flex-wrap items-baseline justify-between gap-2">
+              <Text className="font-bold" style={{ flexGrow: 1, flexBasis: 140 }}>{lift.label}</Text>
+              <Text className="text-2xl font-bold" style={{ fontVariant: ['tabular-nums'] }}>{Math.round(lift.bestWeightLbs)} lbs</Text>
+            </View>
+            <Text className="mt-0.5 text-sm">{lift.exerciseName} · best estimated max {Math.round(lift.bestOneRepMaxLbs)} lbs</Text>
+          </View>)}
+          {powerlifts.totalLbs !== null && <View className="mt-2 rounded-2xl bg-raised p-4">
+            <Text className="text-3xl font-bold">{Math.round(powerlifts.totalLbs)} lbs</Text>
+            <Text className="mt-1 text-sm">Heaviest-set total · {Math.round(powerlifts.estimatedTotalLbs!)} lbs by estimated max.</Text>
+          </View>}
+          {!!powerlifts.missing.length && !!powerlifts.lifts.length && <Text className="mt-2 text-sm">
+            No {powerlifts.missing.join(' or ').toLowerCase()} logged yet, so there is no total to show.</Text>}
+          <Text className="mt-3 text-xs">Full-range barbell variants only. Partial pulls and different lifts with similar names are left out, so the total means what it usually means.</Text>
+        </View></Reveal>
+        <Reveal index={2}>
         {!records.length && <View className="rounded-3xl border border-border bg-surface p-6">
           <Text className="text-xl font-bold">No lifts logged yet</Text>
           <Text className="mt-2">Finish a session and your bests, previous reps and estimated one-rep maxes appear here.</Text>
@@ -105,7 +126,8 @@ export default function WorkoutHistoryScreen() {
           </View>
           {!!record.lastSets.length && <Text className="mt-3 text-sm">Last time: {record.lastSets.map(set => `${set.weightLbs}×${set.reps}`).join(' · ')}</Text>}
         </View>)}
-      </Reveal>}
+        </Reveal>
+      </>}
     </ScrollView>
   </SafeAreaView>;
 }

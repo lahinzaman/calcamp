@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { Text } from '../../theme/primitives';
@@ -18,8 +18,6 @@ import { loadMeasurements } from '../../api/measurements';
 import { calculateTdee } from '../nutrition/tdee';
 import { MicronutrientPanel } from '../nutrition/MicronutrientPanel';
 import { dayLabel, dayOfMonth, dayStatus, shortWeekday, weekDates, PERFECT_WINDOW_KCAL } from '../diary/logCalendar';
-import { syncEngine } from '../sync/runtime';
-import { bigThree, type BigThreeSummary } from '../workout/bigThree';
 import {
   BodyCompositionCard, Card, ConsistencyCard, EnergyBalanceCard,
   GoalProgressCard, MacroSplitCard, StepsCard, WeeklyAveragesCard,
@@ -27,28 +25,11 @@ import {
 
 const RANGES = [[28, '4 weeks'], [56, '8 weeks'], [90, '13 weeks']] as const;
 const MACROS = [['Protein', 'proteinG', 'protein'], ['Carbs', 'carbsG', 'carbs'], ['Fat', 'fatG', 'fat']] as const;
+const latestWeightOrNull = (rows: readonly HistoryDay[]) => {
+  const weighed = rows.filter(row => row.body_weight_lbs !== null);
+  return weighed.length ? weighed[weighed.length - 1].body_weight_lbs : null;
+};
 const MARK_TONE: Record<string, string> = { perfect: 'bg-accent', over: 'bg-raised', under: 'bg-raised', logged: 'bg-surface', none: 'bg-raised' };
-
-function BigThreeCard({ summary, index }: { summary: BigThreeSummary; index: number }) {
-  return <Card title="The big three" index={index}>
-    {!summary.lifts.length && <Text>Log a barbell squat, bench press or deadlift and your bests appear here.</Text>}
-    {summary.lifts.map(lift => <View key={lift.key} className="mb-3 flex-row flex-wrap items-baseline justify-between gap-2">
-      <View style={{ flexGrow: 1, flexBasis: 150 }}>
-        <Text className="font-bold">{lift.label}</Text>
-        <Text className="text-sm">{lift.exerciseName} · {lift.sessions} {lift.sessions === 1 ? 'session' : 'sessions'}</Text>
-      </View>
-      <Text className="text-2xl font-bold" style={{ fontVariant: ['tabular-nums'] }}>{Math.round(lift.bestWeightLbs)} lbs</Text>
-      <Text className="w-full text-sm">Best estimated max {Math.round(lift.bestOneRepMaxLbs)} lbs</Text>
-    </View>)}
-    {summary.totalLbs !== null && <View className="mt-2 rounded-2xl bg-raised p-4">
-      <Text className="text-3xl font-bold">{Math.round(summary.totalLbs)} lbs</Text>
-      <Text className="mt-1 text-sm">Heaviest-set total · {Math.round(summary.estimatedTotalLbs!)} lbs by estimated max.</Text>
-    </View>}
-    {!!summary.missing.length && !!summary.lifts.length && <Text className="mt-2 text-sm">
-      No {summary.missing.join(' or ').toLowerCase()} logged yet, so there is no total to show.</Text>}
-    <Text className="mt-3 text-xs">Counts full-range barbell variants only. Partial pulls and different lifts with similar names are left out, so the total means what it usually means.</Text>
-  </Card>;
-}
 
 /**
  * Health is the "how am I actually doing" tab: pick a day to see what you ate and what you
@@ -64,8 +45,6 @@ export default function HealthScreen() {
   const [days, setDays] = useState<number>(28);
   const [weekOffset, setWeekOffset] = useState(0);
   const [selected, setSelected] = useState(today);
-  const [lifts, setLifts] = useState<BigThreeSummary>(() => bigThree({}));
-  useEffect(() => { setLifts(bigThree(syncEngine.data.lifts ?? {})); }, []);
 
   const from = shiftDate(today, -(days - 1));
   const history = useQuery({ enabled: !!owner, queryKey: ['history', owner, days, today], queryFn: () => loadHistory(owner!, from, today) });
@@ -85,10 +64,13 @@ export default function HealthScreen() {
   const micros = isToday ? liveMicros : day?.micros ?? {};
   const status = dayStatus(isToday ? liveMacros.caloriesKcal : day?.calories_kcal, targets?.caloriesKcal ?? null);
   const stepsToday = activity.data?.find(entry => entry.activity_date === selected)?.steps ?? null;
+  const energyFromMacros = macros ? macros.proteinG * 4 + macros.carbsG * 4 + macros.fatG * 9 : 0;
   const weightToday = isToday ? null : day?.body_weight_lbs ?? null;
   const weights = rows.filter(row => row.body_weight_lbs !== null);
   const latestWeight = weights.length ? weights[weights.length - 1].body_weight_lbs : null;
   const goalWeight = (profile?.lifestyle_survey as { goalWeightLbs?: number | null } | null | undefined)?.goalWeightLbs ?? null;
+  const dayWeight = (isToday ? latestWeightOrNull(rows) : day?.body_weight_lbs) ?? null;
+  const proteinPerLb = macros && dayWeight ? macros.proteinG / dayWeight : null;
   const protein = rows.filter(row => row.proteinG !== null);
   const averageProtein = protein.length ? protein.reduce((sum, row) => sum + row.proteinG!, 0) / protein.length : null;
 
@@ -140,15 +122,6 @@ export default function HealthScreen() {
         {macros && <>
           <CalorieRing consumed={macros.caloriesKcal} target={targets?.caloriesKcal ?? null} />
           <Text className="mt-3 text-center text-sm">{status.label}</Text>
-          <View className="mt-5 flex-row flex-wrap gap-4">
-            {MACROS.map(([label, key, tone]) => <View key={key} style={{ flexGrow: 1, flexBasis: 96 }}>
-              <View className="mb-1 flex-row items-baseline justify-between gap-2">
-                <Text className="text-sm font-bold">{label}</Text>
-                <Text className="text-sm" style={{ fontVariant: ['tabular-nums'] }}>{Math.round(macros[key])}{targets ? `/${Math.round(targets[key])}` : ''} g</Text>
-              </View>
-              <ProgressBar value={macros[key]} target={targets?.[key] ?? 0} tone={tone} height={10} />
-            </View>)}
-          </View>
           <View className="mt-4 flex-row flex-wrap gap-5">
             {stepsToday !== null && <View><Text className="text-2xl font-bold">{stepsToday.toLocaleString()}</Text><Text className="text-sm">Steps</Text></View>}
             {weightToday !== null && <View><Text className="text-2xl font-bold">{weightToday.toFixed(1)}</Text><Text className="text-sm">Weighed lbs</Text></View>}
@@ -156,15 +129,39 @@ export default function HealthScreen() {
         </>}
       </Card>
 
-      <MicronutrientPanel index={3} micros={micros} />
+      {macros && <Card title="The big three" index={3}>
+        <Text className="mb-4 text-sm">Protein, carbohydrate and fat for {isToday ? 'today' : dayLabel(selected).toLowerCase()}, and the share of the day's energy each one supplied.</Text>
+        {MACROS.map(([label, key, tone]) => {
+          const grams = macros[key];
+          const target = targets?.[key] ?? null;
+          const left = target === null ? null : Math.round(target - grams);
+          // Energy share comes from the macros themselves, not from the logged calorie figure.
+          const share = energyFromMacros > 0 ? (grams * (key === 'fatG' ? 9 : 4)) / energyFromMacros * 100 : null;
+          return <View key={key} className="mb-4">
+            <View className="mb-1 flex-row flex-wrap items-baseline justify-between gap-2">
+              <Text className="font-bold" style={{ flexGrow: 1, flexBasis: 90 }}>{label}</Text>
+              <Text className="text-2xl font-bold" style={{ fontVariant: ['tabular-nums'] }}>{Math.round(grams)} g</Text>
+              {target !== null && <Text className="text-sm" style={{ fontVariant: ['tabular-nums'] }}>of {Math.round(target)} g</Text>}
+            </View>
+            <ProgressBar value={grams} target={target ?? 0} tone={tone} height={12} />
+            <Text className="mt-1 text-sm">
+              {left === null ? 'No target set' : left >= 0 ? `${left} g left` : `${Math.abs(left)} g over`}
+              {share !== null ? ` · ${Math.round(share)}% of the day's calories` : ''}
+            </Text>
+          </View>;
+        })}
+        {proteinPerLb !== null && <Text className="text-sm">That is {proteinPerLb.toFixed(2)} g of protein per lb of body weight.</Text>}
+      </Card>}
+
+      <MicronutrientPanel index={4} micros={micros} />
 
       {!history.isPending && !history.isError && <>
-        <Reveal index={4}>
+        <Reveal index={5}>
           <View className="mb-4 flex-row flex-wrap">{RANGES.map(([value, label]) => <Choice key={value} label={label}
             selected={days === value} onPress={() => { setDays(value); haptic('selection'); }} />)}</View>
         </Reveal>
-        <GoalProgressCard estimate={estimate} goalWeightLbs={goalWeight} index={5} />
-        <Card title="Adaptive expenditure" index={6}>
+        <GoalProgressCard estimate={estimate} goalWeightLbs={goalWeight} index={6} />
+        <Card title="Adaptive expenditure" index={7}>
           {estimate?.status === 'ready' ? <>
             <Text className="text-4xl font-bold">{Math.round(estimate.tdeeKcal!)} kcal</Text>
             <Text className="mt-1">Measured from your logged intake and weight trend over {estimate.adherentDays} complete days — an observation, not a target.</Text>
@@ -173,10 +170,9 @@ export default function HealthScreen() {
             <Text className="mt-2">This needs 14 days with both a weigh-in and a complete food log. You have {estimate?.adherentDays ?? 0}.</Text>
           </>}
         </Card>
-        <EnergyBalanceCard rows={rows} estimate={estimate} index={7} />
-        <MacroSplitCard rows={rows} bodyWeightLbs={latestWeight} index={8} />
-        <StepsCard activity={activity.data ?? []} index={9} />
-        <BigThreeCard summary={lifts} index={10} />
+        <EnergyBalanceCard rows={rows} estimate={estimate} index={8} />
+        <MacroSplitCard rows={rows} bodyWeightLbs={latestWeight} index={9} />
+        <StepsCard activity={activity.data ?? []} index={10} />
         <BodyCompositionCard measurements={measurements.data ?? []} weightLbs={latestWeight} index={11} />
         <WeeklyAveragesCard rows={rows} index={12} />
         <ConsistencyCard rows={rows} windowDays={days} estimate={estimate} averageProtein={averageProtein} index={13} />

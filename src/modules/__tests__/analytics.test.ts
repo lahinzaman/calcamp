@@ -107,3 +107,29 @@ test('consistency is measured against the window, not against the rows that came
   assert.ok(Math.abs(stats.loggedPercent - 100 / 28) < 1e-9);
   assert.equal(consistency([], 0).loggedPercent, 0, 'an empty window never divides by zero');
 });
+
+test('every nutrient the panel tracks explains itself and has a sane reference amount', async () => {
+  const { DAILY_VALUES, nutrientStatuses } = await import('../nutrition/dailyValues');
+  const { NUTRIENT_UNITS } = await import('../../types/nutrition');
+  const entries = Object.entries(DAILY_VALUES);
+  assert.ok(entries.length >= 35);
+  for (const [key, value] of entries) {
+    assert.ok(value!.why.length > 20, `${key} has no description`);
+    assert.ok(value!.amount > 0, `${key} needs a positive reference amount`);
+    assert.ok(key in NUTRIENT_UNITS, `${key} is not a storable nutrient`);
+  }
+  // The vitamins and minerals a general-purpose tracker is expected to cover.
+  for (const key of ['vitamin_a_mcg_rae', 'vitamin_c_mg', 'vitamin_d_mcg', 'vitamin_e_mg', 'vitamin_k_mcg',
+    'thiamin_b1_mg', 'riboflavin_b2_mg', 'niacin_b3_mg', 'pantothenic_acid_b5_mg', 'vitamin_b6_mg',
+    'biotin_b7_mcg', 'folate_b9_mcg_dfe', 'vitamin_b12_mcg', 'choline_mg',
+    'calcium_mg', 'phosphorus_mg', 'magnesium_mg', 'potassium_mg', 'sodium_mg', 'chloride_mg', 'iron_mg',
+    'zinc_mg', 'copper_mg', 'iodine_mcg', 'selenium_mcg', 'manganese_mg', 'fluoride_mg', 'chromium_mcg', 'molybdenum_mcg']) {
+    assert.ok(key in DAILY_VALUES, `${key} is missing a daily value`);
+  }
+  // A nutrient nothing reported stays out of the scored list rather than sitting at 0%.
+  const { tracked, unreported } = nutrientStatuses({ vitamin_c_mg: 45 });
+  assert.deepEqual(tracked.map(status => status.key), ['vitamin_c_mg']);
+  assert.equal(tracked[0].ratio, 0.5);
+  assert.equal(tracked.length + unreported.length, entries.length);
+  assert.ok(unreported.every(status => status.amount === 0 && status.why.length > 20));
+});

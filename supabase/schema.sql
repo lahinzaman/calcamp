@@ -276,25 +276,6 @@ $$;
 create trigger set_workout_volume after insert or update or delete on public.sets
   for each row execute function public.update_workout_volume();
 
-create table public.gym_locations (
-  slug text primary key,
-  name text not null unique
-);
-insert into public.gym_locations (slug, name) values
-  ('werblin', 'Werblin'), ('college-ave', 'College Ave'), ('cook-douglass', 'Cook/Douglass');
-
-create table public.gym_busyness_votes (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references public.users (id) on delete cascade,
-  location_slug text not null references public.gym_locations (slug),
-  status text not null check (status in ('Quiet', 'Normal', 'Packed')),
-  created_at timestamptz not null default now()
-);
-create index gym_votes_location_time_idx on public.gym_busyness_votes (location_slug, created_at desc);
-create index gym_votes_user_time_idx on public.gym_busyness_votes (user_id, created_at desc);
-comment on table public.gym_busyness_votes is
-  'Raw votes are private to the voter; a later server-side aggregation can expose busyness without publishing user location history. Timestamps are server-assigned.';
-
 create function public.set_updated_at() returns trigger
 language plpgsql set search_path = '' as $$
 begin new.updated_at := now(); return new; end;
@@ -312,22 +293,18 @@ alter table public.daily_nutrition_logs enable row level security;
 alter table public.workouts enable row level security;
 alter table public.exercises enable row level security;
 alter table public.sets enable row level security;
-alter table public.gym_locations enable row level security;
-alter table public.gym_busyness_votes enable row level security;
 
 revoke all on public.users, public.nutrient_definitions, public.daily_nutrition_logs,
-  public.workouts, public.exercises, public.sets, public.gym_locations, public.gym_busyness_votes from public, anon, authenticated;
+  public.workouts, public.exercises, public.sets from public, anon, authenticated;
 grant usage on schema public to authenticated, service_role;
 grant select, insert, update, delete on public.users, public.daily_nutrition_logs,
   public.exercises, public.sets to authenticated;
-grant select on public.nutrient_definitions, public.gym_locations to authenticated;
+grant select on public.nutrient_definitions to authenticated;
 grant select, delete on public.workouts to authenticated;
 grant insert (id, user_id, workout_date, name, started_at, finished_at, duration_seconds, notes),
   update (workout_date, name, started_at, finished_at, duration_seconds, notes) on public.workouts to authenticated;
-grant select, delete on public.gym_busyness_votes to authenticated;
-grant insert (id, user_id, location_slug, status), update (status) on public.gym_busyness_votes to authenticated;
 grant all on public.users, public.nutrient_definitions, public.daily_nutrition_logs,
-  public.workouts, public.exercises, public.sets, public.gym_locations, public.gym_busyness_votes to service_role;
+  public.workouts, public.exercises, public.sets to service_role;
 
 create policy users_own_select on public.users for select to authenticated using (id = (select auth.uid()));
 create policy users_own_insert on public.users for insert to authenticated with check (id = (select auth.uid()));
@@ -335,7 +312,6 @@ create policy users_own_update on public.users for update to authenticated using
 create policy users_own_delete on public.users for delete to authenticated using (id = (select auth.uid()));
 
 create policy nutrient_definitions_read on public.nutrient_definitions for select to authenticated using (true);
-create policy gym_locations_read on public.gym_locations for select to authenticated using (true);
 
 create policy nutrition_own_select on public.daily_nutrition_logs for select to authenticated using (user_id = (select auth.uid()));
 create policy nutrition_own_insert on public.daily_nutrition_logs for insert to authenticated with check (user_id = (select auth.uid()));
@@ -364,10 +340,6 @@ create policy sets_own_update on public.sets for update to authenticated using (
 create policy sets_own_delete on public.sets for delete to authenticated using (
   exists (select 1 from public.workouts where id = workout_id and user_id = (select auth.uid())));
 
-create policy gym_votes_own_select on public.gym_busyness_votes for select to authenticated using (user_id = (select auth.uid()));
-create policy gym_votes_own_insert on public.gym_busyness_votes for insert to authenticated with check (user_id = (select auth.uid()));
-create policy gym_votes_own_update on public.gym_busyness_votes for update to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
-create policy gym_votes_own_delete on public.gym_busyness_votes for delete to authenticated using (user_id = (select auth.uid()));
 
 -- Trigger functions cannot be invoked as public RPCs. PostgreSQL invokes them via triggers.
 revoke all on function public.validate_micronutrients(), public.validate_set_ownership(),
@@ -424,29 +396,6 @@ comment on column public.users.preworkout_carbs_g is 'Allocation within the trai
 
 -- Keep only the latest report from each voter in the 30-minute window.
 -- SECURITY DEFINER is deliberately confined to the unexposed private schema.
-create or replace function private.gym_vote_summary()
-returns table(location_slug text, vote_count bigint, crowd_score numeric, latest_vote_at timestamptz)
-language plpgsql stable security definer set search_path = '' as $$
-begin
-  if (select auth.uid()) is null then raise exception 'Authentication required' using errcode = '42501'; end if;
-  return query
-    with latest as (
-      select distinct on (v.user_id, v.location_slug) v.location_slug, v.status, v.created_at
-      from public.gym_busyness_votes v
-      where v.created_at > now() - interval '30 minutes' and v.created_at <= now()
-      order by v.user_id, v.location_slug, v.created_at desc, v.id desc
-    )
-    select g.slug, count(l.status), avg(case l.status when 'Quiet' then 0 when 'Normal' then 50 when 'Packed' then 100 end), max(l.created_at)
-    from public.gym_locations g left join latest l on l.location_slug = g.slug group by g.slug;
-end;
-$$;
-revoke all on function private.gym_vote_summary() from public, anon, authenticated;
-grant execute on function private.gym_vote_summary() to authenticated;
-create or replace function public.get_gym_busyness()
-returns table(location_slug text, vote_count bigint, crowd_score numeric, latest_vote_at timestamptz)
-language sql stable security invoker set search_path = '' as $$ select * from private.gym_vote_summary(); $$;
-revoke all on function public.get_gym_busyness() from public, anon;
-grant execute on function public.get_gym_busyness() to authenticated;
 commit;
 begin;
 -- Lightweight anonymous DB probe; it returns no application records.
@@ -552,11 +501,10 @@ begin
   if p_installation is null then raise exception 'Installation required' using errcode = '22023'; end if;
   if p_registration is not null and (
     jsonb_typeof(p_registration) <> 'object' or
-    not (p_registration ?& array['native_token','expo_token','platform','gym_alerts','threshold','time_zone']) or
+    not (p_registration ?& array['native_token','expo_token','platform','time_zone']) or
     jsonb_typeof(p_registration->'native_token') <> 'string' or length(p_registration->>'native_token') not between 1 and 4096 or
     jsonb_typeof(p_registration->'expo_token') <> 'string' or length(p_registration->>'expo_token') not between 1 and 512 or
-    jsonb_typeof(p_registration->'platform') <> 'string' or p_registration->>'platform' not in ('ios','android') or jsonb_typeof(p_registration->'gym_alerts') <> 'boolean' or
-    jsonb_typeof(p_registration->'threshold') <> 'number' or (p_registration->>'threshold')::numeric not between 5 and 95 or
+    jsonb_typeof(p_registration->'platform') <> 'string' or p_registration->>'platform' not in ('ios','android') or
     jsonb_typeof(p_registration->'time_zone') <> 'string' or not exists(select 1 from pg_catalog.pg_timezone_names where name = p_registration->>'time_zone')
   ) then raise exception 'Invalid push registration' using errcode = '22023'; end if;
   insert into public.profiles(id) values(owner_id) on conflict(id) do nothing;
@@ -566,8 +514,7 @@ begin
     if not(current_tokens ? p_installation::text) and (select count(*) from jsonb_object_keys(current_tokens)) >= 12 then raise exception 'Too many installations' using errcode = '22023'; end if;
     current_tokens := jsonb_set(current_tokens, array[p_installation::text], jsonb_build_object(
       'native_token',p_registration->'native_token','expo_token',p_registration->'expo_token','platform',p_registration->'platform',
-      'gym_alerts',p_registration->'gym_alerts','threshold',p_registration->'threshold','time_zone',p_registration->'time_zone',
-      'last_seen',now(),'expires_at',now() + interval '30 days'));
+      'time_zone',p_registration->'time_zone','last_seen',now(),'expires_at',now() + interval '30 days'));
   end if;
   update public.profiles set push_tokens = current_tokens where id = owner_id;
 end $$;
@@ -601,42 +548,12 @@ end $$;
 revoke all on function public.save_activity_snapshot(uuid,date,text,integer,numeric,timestamptz) from public, anon;
 grant execute on function public.save_activity_snapshot(uuid,date,text,integer,numeric,timestamptz) to authenticated;
 
--- Service-only threshold latch and delivery receipt state. Clients cannot trigger sends.
-create table public.campus_alert_state (
-  user_id uuid not null references public.users(id) on delete cascade,
-  installation_id uuid not null,
-  gym_slug text not null references public.gym_locations(slug),
-  below_threshold boolean not null default false,
-  checked_at timestamptz not null default now(),
-  ticket_id text,
-  expo_token text,
-  ticket_created_at timestamptz,
-  last_alert_at timestamptz,
-  receipt_checked boolean not null default true,
-  primary key(user_id, installation_id, gym_slug)
-);
-alter table public.campus_alert_state enable row level security;
-revoke all on public.campus_alert_state from public, anon, authenticated;
-grant all on public.campus_alert_state to service_role;
-create or replace function public.claim_campus_alert(p_user uuid,p_installation uuid,p_gym text,p_below boolean)
-returns boolean language plpgsql security invoker set search_path = '' as $$
-declare previous public.campus_alert_state; send boolean;
-begin
-  insert into public.campus_alert_state(user_id,installation_id,gym_slug) values(p_user,p_installation,p_gym) on conflict do nothing;
-  select * into previous from public.campus_alert_state where user_id=p_user and installation_id=p_installation and gym_slug=p_gym for update;
-  send := p_below and not previous.below_threshold and (previous.last_alert_at is null or previous.last_alert_at < now() - interval '4 hours');
-  update public.campus_alert_state set below_threshold=p_below,checked_at=now(),last_alert_at=case when send then now() else last_alert_at end where user_id=p_user and installation_id=p_installation and gym_slug=p_gym;
-  return send;
-end $$;
-revoke all on function public.claim_campus_alert(uuid,uuid,text,boolean) from public, anon, authenticated;
-grant execute on function public.claim_campus_alert(uuid,uuid,text,boolean) to service_role;
 create or replace function public.remove_invalid_push_token(p_user uuid,p_installation uuid,p_token text)
 returns void language sql security invoker set search_path = '' as $$
   update public.profiles set push_tokens=push_tokens-p_installation::text where id=p_user and push_tokens->p_installation::text->>'expo_token'=p_token;
 $$;
 revoke all on function public.remove_invalid_push_token(uuid,uuid,text) from public, anon, authenticated;
 grant execute on function public.remove_invalid_push_token(uuid,uuid,text) to service_role;
-create index pending_campus_receipts on public.campus_alert_state(ticket_created_at) where not receipt_checked;
 commit;
 begin;
 create table public.user_feedback (
@@ -720,7 +637,6 @@ begin;
 alter table public.users add column lifestyle_survey jsonb;
 alter table public.users add constraint users_lifestyle_survey_object check (lifestyle_survey is null or (jsonb_typeof(lifestyle_survey) = 'object' and octet_length(lifestyle_survey::text) <= 4096));
 
-insert into public.gym_locations(slug,name) values ('livingston','Livingston Recreation Center') on conflict (slug) do nothing;
 
 create table public.workout_routines (
   id uuid primary key,
@@ -932,45 +848,6 @@ create or replace function public.delete_own_account()
 returns boolean language sql volatile security invoker set search_path = '' as $$ select private.delete_own_account(); $$;
 revoke all on function public.delete_own_account() from public, anon;
 grant execute on function public.delete_own_account() to authenticated;
-
--- Busyness forecast built from the reports students have already submitted, so the
--- feature stands on its own when no paid forecast provider is configured. Votes are
--- bucketed by Eastern weekday and hour; only the aggregate leaves the function.
-create or replace function private.gym_hour_forecast()
-returns table(location_slug text, forecast_score numeric, sample_count bigint)
-language plpgsql stable security definer set search_path = '' as $$
-declare
-  local_now timestamp := (now() at time zone 'America/New_York');
-  target_dow int := extract(dow from local_now)::int;
-  target_hour int := extract(hour from local_now)::int;
-begin
-  if (select auth.uid()) is null then raise exception 'Authentication required' using errcode = '42501'; end if;
-  return query
-    with scored as (
-      select v.location_slug as slug,
-        case v.status when 'Quiet' then 0 when 'Normal' then 50 else 100 end as score,
-        extract(dow from (v.created_at at time zone 'America/New_York'))::int as dow,
-        extract(hour from (v.created_at at time zone 'America/New_York'))::int as hour
-      from public.gym_busyness_votes v
-      where v.created_at > now() - interval '120 days' and v.created_at <= now()
-    ),
-    -- The hour either side of now is included so a quiet slot still has a sample.
-    matched as (
-      select s.slug, s.score from scored s
-      where s.dow = target_dow and least((s.hour - target_hour + 24) % 24, (target_hour - s.hour + 24) % 24) <= 1
-    )
-    select g.slug, round(avg(m.score), 0), count(m.score)
-    from public.gym_locations g left join matched m on m.slug = g.slug group by g.slug;
-end;
-$$;
-revoke all on function private.gym_hour_forecast() from public, anon, authenticated;
-grant execute on function private.gym_hour_forecast() to authenticated;
-
-create or replace function public.get_gym_forecast()
-returns table(location_slug text, forecast_score numeric, sample_count bigint)
-language sql stable security invoker set search_path = '' as $$ select * from private.gym_hour_forecast(); $$;
-revoke all on function public.get_gym_forecast() from public, anon;
-grant execute on function public.get_gym_forecast() to authenticated;
 
 -- Catalogue expansion. Kept identical to the phase 13 catalogue migration so a bootstrapped
 -- database and a migrated one hold the same exercise rows.

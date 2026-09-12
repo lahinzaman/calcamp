@@ -26,18 +26,15 @@ mock.module('../../api/supabase.ts', { namedExports: { getSupabase: () => ({ aut
   signOut: async () => ({ error: null }),
 } }) } });
 mock.module('../../api/profile.ts', { namedExports: { completeOnboarding: async (profile: unknown) => { savedProfile = profile; return { ...(profile as object), id: 'alice', onboarding_completed_at: 'now' }; }, loadProfile: async () => null } });
-let voteInput: unknown; let rescueInput: unknown;
+let rescueInput: unknown;
 mock.module('../../api/campus.ts', { namedExports: {
-  fetchGymBaselines: async () => [{ slug: 'werblin', baseline: 80 }],
-  fetchGymSummary: async () => [{ location_slug: 'werblin', vote_count: 2, crowd_score: 25, latest_vote_at: new Date().toISOString() }],
-  submitGymVote: async (slug: string, status: string) => { voteInput = { slug, status }; },
   fetchMacroRescue: async (location: unknown, remaining: unknown, preference: unknown) => { rescueInput = { location, remaining, preference }; return { matches: [], eligibleRestaurants: 0, uncoveredRestaurants: 0, checkedAt: new Date().toISOString() }; },
 } });
 mock.module('../auth/social', { namedExports: { authRedirect: () => 'calcamp://auth-callback', signInSocial: async () => {} } });
 const { default: AuthScreen } = require('../auth/AuthScreen') as typeof import('../auth/AuthScreen');
 const { default: QuizScreen } = require('../onboarding/QuizScreen') as typeof import('../onboarding/QuizScreen');
 const { default: ReviewScreen } = require('../onboarding/ReviewScreen') as typeof import('../onboarding/ReviewScreen');
-const { default: GymStatus } = require('../busyness/GymStatus') as typeof import('../busyness/GymStatus');
+const { NotificationSettings } = require('../notifications/NotificationSettings') as typeof import('../notifications/NotificationSettings');
 const { default: MacroRescue } = require('../dining/MacroRescue') as typeof import('../dining/MacroRescue');
 const { authStore } = require('../../store/authStore') as typeof import('../../store/authStore');
 const { nutritionStore } = require('../../store/nutritionStore') as typeof import('../../store/nutritionStore');
@@ -113,10 +110,6 @@ test('the review screen saves the computed plan, not the draft targets', async (
   assert.equal((savedProfile as UserProfile).is_advanced_track, true); assert.equal((savedProfile as UserProfile).preworkout_carbs_g, 30);
   assert.equal(authStore.getState().profile?.onboarding_completed_at, 'now');
 });
-test('gym UI prioritizes recent crowd data and submits interactive votes', async () => {
-  login(); await render(<GymStatus />); await settle(); assert.ok(text().includes('25 / 100'));
-  await press('Packed'); await settle(); assert.deepEqual(voteInput, { slug: 'werblin', status: 'Packed' });
-});
 test('macro rescue makes no location or provider call before 10 PM', async () => {
   mock.timers.enable({ apis: ['Date'], now: new Date('2026-09-08T01:59:00Z') }); login();
   nutritionStore.getState().setDailyTargets({ macros: { caloriesKcal: 500, proteinG: 50, carbsG: 80, fatG: 20 }, micronutrients: {} });
@@ -132,10 +125,10 @@ test('macro rescue switches between Easton preset and live Millburn GPS after 10
 });
 
 test('notification settings mount and report invalid input without permission requests', async () => {
-  login(); await render(<GymStatus />); await settle();
+  login(); await render(<NotificationSettings />); await settle();
   await press('Reminders & background activity');
   assert.equal(root!.root.findByType('Modal' as React.ElementType).props.visible, true);
   assert.equal(root!.root.findByProps({ accessibilityLabel: 'Allow notifications' }).props.value, false);
-  await type('Gym alert threshold', '0'); await press('Save settings');
-  assert.ok(text().includes('Gym threshold must be between 5 and 95.'));
+  await type('Workout time (24-hour HH:MM)', '25:00'); await press('Save settings');
+  assert.ok(text().includes('Use a time such as 17:00.'));
 });

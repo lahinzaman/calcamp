@@ -1,25 +1,24 @@
 import { DEFAULT_UPPER_LOWER, type UserProfile } from '../../types/profile';
 export interface NotificationPreferences {
-  enabled: boolean; gymAlerts: boolean; gymThreshold: number; workoutReminders: boolean;
+  enabled: boolean; workoutReminders: boolean;
   workoutTime: string; nutritionReminders: boolean; nutritionTime: string; geofencing: boolean; uploadActivity: boolean;
   /** Weekly weigh-in prompt; the trend needs a regular reading to adjust a budget. */
   weighInReminders: boolean; weighInDay: number; weighInTime: string;
 }
-export const defaultPreferences: NotificationPreferences = { enabled: false, gymAlerts: false, gymThreshold: 30,
+export const defaultPreferences: NotificationPreferences = { enabled: false,
   workoutReminders: false, workoutTime: '17:00', nutritionReminders: false, nutritionTime: '20:00', geofencing: false, uploadActivity: false,
   weighInReminders: false, weighInDay: 0, weighInTime: '08:00' };
 export function parsePreferences(value: unknown): NotificationPreferences {
   const p = { ...defaultPreferences, ...(value && typeof value === 'object' ? value : {}) };
-  for (const k of ['enabled','gymAlerts','workoutReminders','nutritionReminders','geofencing','uploadActivity','weighInReminders'] as const) if (typeof p[k] !== 'boolean') throw new Error('Choose valid reminder settings.');
+  for (const k of ['enabled','workoutReminders','nutritionReminders','geofencing','uploadActivity','weighInReminders'] as const) if (typeof p[k] !== 'boolean') throw new Error('Choose valid reminder settings.');
   if (!Number.isInteger(p.weighInDay) || p.weighInDay < 0 || p.weighInDay > 6) throw new Error('Choose a weekday for your weigh-in reminder.');
-  if (!Number.isInteger(p.gymThreshold) || p.gymThreshold < 5 || p.gymThreshold > 95) throw new Error('Gym threshold must be between 5 and 95.');
   if (![p.workoutTime, p.nutritionTime, p.weighInTime].every(t => /^([01]\d|2[0-3]):[0-5]\d$/.test(t))) throw new Error('Use a time such as 17:00.');
   return Object.fromEntries(Object.keys(defaultPreferences).map(k => [k, p[k as keyof NotificationPreferences]])) as unknown as NotificationPreferences;
 }
-export type NotificationRoute = '/(tabs)' | '/(tabs)/explore' | '/(tabs)/campus';
+export type NotificationRoute = '/(tabs)' | '/(tabs)/explore';
 export function notificationRoute(data: unknown): NotificationRoute | null {
   const value = data as { kind?: unknown } | null;
-  return value?.kind === 'workout' ? '/(tabs)/explore' : value?.kind === 'nutrition' || value?.kind === 'rescue' || value?.kind === 'weigh-in' ? '/(tabs)' : value?.kind === 'gym' ? '/(tabs)/campus' : null;
+  return value?.kind === 'workout' ? '/(tabs)/explore' : value?.kind === 'nutrition' || value?.kind === 'rescue' || value?.kind === 'weigh-in' ? '/(tabs)' : null;
 }
 export interface Reminder { id: string; title: string; body: string; kind: 'workout' | 'nutrition' | 'weigh-in'; hour: number; minute: number; weekday?: number }
 export function reminderPlan(p: NotificationPreferences, profile: UserProfile | null): Reminder[] {

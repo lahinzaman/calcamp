@@ -56,7 +56,7 @@ export function configureNotifications(owner: string, preferences: NotificationP
     await verifyOwner(owner);
     const { error } = await getSupabase().rpc('set_push_installation', { p_owner: owner, p_installation: installation(), p_registration: {
       native_token: String(native.data), expo_token: expo.data, platform: Platform.OS,
-      gym_alerts: preferences.gymAlerts, threshold: preferences.gymThreshold, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     } });
     if (error) throw new Error('Reminders are scheduled. Push registration will retry when connected.');
     durableStorage.set(`push-registered:${owner}`, String(Date.now()));

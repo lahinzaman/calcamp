@@ -7,9 +7,9 @@ import { readRescuePrefetch } from '../background/rescuePrefetch';
 import { setTelemetrySink, breadcrumb } from '../telemetry/events';
 import type { UserProfile } from '../../types/profile';
 const profile = { is_advanced_track: true, training_days: [5, 1, 4, 2] } as UserProfile;
-test('notification settings default to opt-out and reject invalid clocks or thresholds', () => {
+test('notification settings default to opt-out and reject invalid clocks', () => {
   assert.deepEqual(parsePreferences(null), defaultPreferences);
-  for (const input of [{ gymThreshold: 0 }, { gymThreshold: 95.5 }, { enabled: 'yes' }, { workoutTime: '24:01' }, { nutritionTime: '2:00' }]) assert.throws(() => parsePreferences(input));
+  for (const input of [{ enabled: 'yes' }, { workoutTime: '24:01' }, { nutritionTime: '2:00' }, { weighInDay: 7 }, { weighInTime: '9:00' }]) assert.throws(() => parsePreferences(input));
   assert.deepEqual(reminderPlan(defaultPreferences, profile), []);
   assert.equal('secret' in parsePreferences({ secret: 'ignored' }), false);
 });
@@ -22,7 +22,8 @@ test('local reminders have stable IDs, calendar weekdays, and ordered Upper/Lowe
   assert.equal(new Set(reminders.map(r => r.id)).size, 5);
   assert.equal(reminderPlan(p, { ...profile, is_advanced_track: false }).length, 1);
   assert.equal(reminderPlan(p, { ...profile, training_days: [0,1,2,4] }).at(-1)?.weekday, 1);
-  assert.equal(notificationRoute({ kind: 'gym', url: 'https://malicious.example' }), '/(tabs)/campus');
+  // A push naming a route the app no longer has resolves to nothing, not to a URL it carries.
+  assert.equal(notificationRoute({ kind: 'gym', url: 'https://malicious.example' }), null);
   assert.equal(notificationRoute({ url: '/private' }), null); assert.equal(notificationRoute(null), null);
 });
 test('offline activity snapshots coalesce without adding calories or losing another day', async () => {

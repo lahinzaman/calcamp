@@ -96,7 +96,6 @@
     "verify:native": "node scripts/verify-native-config.cjs",
     "eas": "node scripts/eas.cjs",
     "postinstall": "patch-package --error-on-fail",
-    "backend:notifications": "node backend/dist/backend/notification-worker.js",
     "submit:prepare": "node scripts/prepare-ios-submit.cjs",
     "release:check": "node scripts/release-readiness.cjs",
     "launch:check": "node scripts/launch-readiness.cjs"

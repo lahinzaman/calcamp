@@ -136,8 +136,9 @@ test('a migrated workout_routines matches a freshly bootstrapped one, column for
 const DELETE_MIGRATION = '20260912093000_phase13_self_delete_and_gym_forecast.sql';
 const CATALOGUE_MIGRATION = '20260912094000_phase13_exercise_catalogue.sql';
 
-/** Self-service deletion and the community forecast both run in the database, with no backend. */
-test('Phase 13 migration adds self-deletion, an hourly forecast, and the expanded catalogue', async (t) => {
+/** Self-service deletion runs in the database, with no backend. Phase 13 also added a
+ *  busyness forecast; phase 14 withdrew it, so only deletion and the catalogue are replayed. */
+test('Phase 13 migration adds self-deletion and the expanded catalogue', async (t) => {
   const db = new PGlite();
   try {
     await db.exec(`
@@ -152,14 +153,16 @@ test('Phase 13 migration adds self-deletion, an hourly forecast, and the expande
     // Reproduce the deployed database: everything except what this migration introduces.
     await db.exec(`
       drop function public.delete_own_account(); drop function private.delete_own_account();
-      drop function public.get_gym_forecast(); drop function private.gym_hour_forecast();
       delete from public.exercises where id > '10000000-0000-4000-8000-000000000101';
     `);
     await db.exec(`
       insert into auth.users (id) values ('${alice}'), ('${bob}');
       insert into public.users (id) values ('${alice}'), ('${bob}');
     `);
-    await db.exec(await readFile(new URL(`../migrations/${DELETE_MIGRATION}`, import.meta.url), 'utf8'));
+    // Only the deletion half of that migration survives phase 14; the forecast half
+    // referenced tables this schema no longer creates.
+    const phase13 = await readFile(new URL(`../migrations/${DELETE_MIGRATION}`, import.meta.url), 'utf8');
+    await db.exec(phase13.slice(0, phase13.indexOf('-- Busyness forecast built')) + '\ncommit;');
     await db.exec(await readFile(new URL(`../migrations/${CATALOGUE_MIGRATION}`, import.meta.url), 'utf8'));
     const signIn = async (user: string) => {
       await db.exec('reset role');
@@ -172,36 +175,13 @@ test('Phase 13 migration adds self-deletion, an hourly forecast, and the expande
       assert.deepEqual(seeded.slice().sort(), EXERCISE_CATALOG.map(exercise => exercise.id).sort());
     });
 
-    await t.test('the forecast needs a session and averages only this weekday and hour', async () => {
-      await db.exec('set role anon');
-      await assert.rejects(db.query('select * from public.get_gym_forecast()'));
-      await signIn(alice);
-      // Votes carry server-assigned timestamps, so history is seeded as the table owner.
-      // Same hour last week counts; eight days ago is a different weekday and must not.
-      await db.exec('reset role');
-      await db.exec(`insert into public.gym_busyness_votes(user_id,location_slug,status,created_at) values
-        ('${alice}','werblin','Packed', now()),
-        ('${bob}','werblin','Normal', now() - interval '7 days'),
-        ('${alice}','werblin','Quiet', now() - interval '8 days'),
-        ('${bob}','college-ave','Quiet', now())`);
-      await signIn(alice);
-      const rows = (await db.query<{ location_slug: string; forecast_score: string | null; sample_count: string }>(
-        'select * from public.get_gym_forecast()')).rows;
-      const werblin = rows.find(row => row.location_slug === 'werblin')!;
-      assert.equal(Number(werblin.sample_count), 2);
-      assert.equal(Number(werblin.forecast_score), 75);
-      assert.equal(Number(rows.find(row => row.location_slug === 'college-ave')!.forecast_score), 0);
-      // A gym nobody has reported on reports no samples rather than disappearing.
-      assert.equal(Number(rows.find(row => row.location_slug === 'livingston')!.sample_count), 0);
-    });
-
     await t.test('deleting your own account erases your rows and leaves everyone else alone', async () => {
       await signIn(alice);
       assert.equal((await db.query<{ delete_own_account: boolean }>('select public.delete_own_account()')).rows[0].delete_own_account, true);
       await db.exec('reset role');
       assert.equal((await db.query(`select id from public.users where id = '${alice}'`)).rows.length, 0);
       assert.equal((await db.query(`select id from auth.users where id = '${alice}'`)).rows.length, 0);
-      assert.equal((await db.query(`select id from public.gym_busyness_votes where user_id = '${alice}'`)).rows.length, 0);
+      assert.equal((await db.query(`select id from public.food_entries where user_id = '${alice}'`)).rows.length, 0);
       assert.equal((await db.query(`select id from public.users where id = '${bob}'`)).rows.length, 1);
     });
 
@@ -210,6 +190,100 @@ test('Phase 13 migration adds self-deletion, an hourly forecast, and the expande
       await db.query("select set_config('request.jwt.claim.sub', '', false)");
       await db.exec('set role authenticated');
       await assert.rejects(db.query('select public.delete_own_account()'));
+    });
+  } finally { await db.close(); }
+});
+
+const DROP_MIGRATION = '20260912140000_phase14_drop_gym_busyness.sql';
+
+/** The teardown has to run against a database that still has the feature, not a fresh one. */
+test('Phase 14 migration removes gym busyness and frees push registrations of its threshold', async (t) => {
+  const db = new PGlite();
+  try {
+    await db.exec(`
+      create role anon; create role authenticated; create role service_role bypassrls;
+      create schema auth; create table auth.users (id uuid primary key);
+      create function auth.uid() returns uuid language sql stable as
+        $$select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid$$;
+      grant usage on schema auth to anon, authenticated, service_role;
+      grant execute on function auth.uid() to anon, authenticated, service_role;
+    `);
+    await db.exec(await readFile(new URL('../schema.sql', import.meta.url), 'utf8'));
+    // Rebuild the live shape: the tables, RPCs and threshold this migration takes away.
+    await db.exec(`
+      create table public.gym_locations (slug text primary key, name text not null unique);
+      insert into public.gym_locations (slug, name) values ('werblin','Werblin'), ('college-ave','College Ave');
+      create table public.gym_busyness_votes (
+        id uuid primary key default gen_random_uuid(),
+        user_id uuid not null references public.users (id) on delete cascade,
+        location_slug text not null references public.gym_locations (slug),
+        status text not null check (status in ('Quiet','Normal','Packed')),
+        created_at timestamptz not null default now());
+      alter table public.gym_locations enable row level security;
+      alter table public.gym_busyness_votes enable row level security;
+      create table public.campus_alert_state (
+        user_id uuid not null references public.users(id) on delete cascade,
+        installation_id uuid not null,
+        gym_slug text not null references public.gym_locations(slug),
+        below_threshold boolean not null default false,
+        primary key(user_id, installation_id, gym_slug));
+      alter table public.campus_alert_state enable row level security;
+      create function public.claim_campus_alert(p_user uuid,p_installation uuid,p_gym text,p_below boolean)
+        returns boolean language sql security invoker set search_path = '' as $$ select p_below $$;
+      create function private.gym_vote_summary() returns boolean language sql stable security definer set search_path = '' as $$ select true $$;
+      create function public.get_gym_busyness() returns boolean language sql stable security invoker set search_path = '' as $$ select private.gym_vote_summary() $$;
+      create function private.gym_hour_forecast() returns boolean language sql stable security definer set search_path = '' as $$ select true $$;
+      create function public.get_gym_forecast() returns boolean language sql stable security invoker set search_path = '' as $$ select private.gym_hour_forecast() $$;
+    `);
+    await db.exec(`insert into auth.users (id) values ('${alice}'); insert into public.users (id) values ('${alice}');`);
+    await db.exec(await readFile(new URL(`../migrations/${DROP_MIGRATION}`, import.meta.url), 'utf8'));
+
+    await t.test('every table and function the feature owned is gone', async () => {
+      for (const table of ['gym_locations', 'gym_busyness_votes', 'campus_alert_state']) {
+        assert.equal((await db.query(
+          `select 1 from pg_tables where schemaname = 'public' and tablename = $1`, [table])).rows.length, 0, table);
+      }
+      for (const fn of ['get_gym_busyness', 'get_gym_forecast', 'claim_campus_alert', 'gym_vote_summary', 'gym_hour_forecast']) {
+        assert.equal((await db.query(
+          `select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname in ('public','private') and p.proname = $1`, [fn])).rows.length, 0, fn);
+      }
+    });
+
+    await t.test('a push registration no longer has to carry an alert threshold', async () => {
+      await db.exec('reset role');
+      await db.query("select set_config('request.jwt.claim.sub', $1, false)", [alice]);
+      await db.exec('set role authenticated');
+      const install = '60000000-0000-4000-8000-000000000001';
+      const registration = { native_token: 'native', expo_token: 'ExpoPushToken[test]', platform: 'ios', time_zone: 'America/New_York' };
+      await db.query('select public.set_push_installation($1,$2,$3)', [alice, install, JSON.stringify(registration)]);
+      const tokens = (await db.query<{ push_tokens: Record<string, Record<string, unknown>> }>('select push_tokens from public.profiles')).rows[0].push_tokens;
+      assert.equal(Object.keys(tokens).length, 1);
+      // The stored shape drops the keys too, rather than writing a field nothing reads.
+      assert.equal('threshold' in tokens[install], false);
+      assert.equal('gym_alerts' in tokens[install], false);
+      assert.equal(tokens[install].time_zone, 'America/New_York');
+      // A registration sent by an older build, still carrying the old keys, is accepted.
+      await db.query('select public.set_push_installation($1,$2,$3)', [alice, install, JSON.stringify({ ...registration, gym_alerts: true, threshold: 30 })]);
+      await assert.rejects(db.query('select public.set_push_installation($1,$2,$3)', [alice, install, JSON.stringify({ ...registration, platform: null })]), { code: '22023' });
+    });
+
+    await t.test('a bootstrapped database and a migrated one end up with the same tables', async () => {
+      const fresh = new PGlite();
+      try {
+        await fresh.exec(`
+          create role anon; create role authenticated; create role service_role bypassrls;
+          create schema auth; create table auth.users (id uuid primary key);
+          create function auth.uid() returns uuid language sql stable as
+            $$select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid$$;
+          grant usage on schema auth to anon, authenticated, service_role;
+          grant execute on function auth.uid() to anon, authenticated, service_role;
+        `);
+        await fresh.exec(await readFile(new URL('../schema.sql', import.meta.url), 'utf8'));
+        const names = async (instance: PGlite) => (await instance.query<{ tablename: string }>(
+          `select tablename from pg_tables where schemaname = 'public' order by tablename`)).rows.map(row => row.tablename);
+        assert.deepEqual(await names(db), await names(fresh));
+      } finally { await fresh.close(); }
     });
   } finally { await db.close(); }
 });

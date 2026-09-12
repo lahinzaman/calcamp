@@ -1,10 +1,7 @@
-import { GYMS, type GymBaseline } from '../src/types/facilities';
 import { Router, json, type ErrorRequestHandler } from 'express';
 import cors from 'cors';
 import { structuredLimit as rateLimit } from './http';
 import { createClient } from '@supabase/supabase-js';
-import { createCachedLoader, type ResponseCache } from './cache';
-import { createBestTimeService } from './besttime';
 import { findRescueMeals } from './places';
 import { rescueEligible, type Coordinates, type MacroPreference } from '../src/types/rescue';
 import type { MacroTotals } from '../src/types/nutrition';
@@ -17,10 +14,10 @@ export function validateRescueRequest(body: unknown): { location: Coordinates; r
   return { location: { latitude: data.location.latitude, longitude: data.location.longitude }, remaining: data.remaining, preference: data.preference! };
 }
 export function createCampusProxyRouter(options: {
-  authenticate?: (token: string) => Promise<string | null>; baselines?: ReturnType<typeof createBestTimeService>;
-  rescue?: typeof findRescueMeals; now?: () => Date; cache?: ResponseCache;
+  authenticate?: (token: string) => Promise<string | null>;
+  rescue?: typeof findRescueMeals; now?: () => Date;
 } = {}) {
-  const router = Router(); const cached = createCachedLoader(options.cache); const baselines = options.baselines ?? createBestTimeService();
+  const router = Router();
   const authenticate = options.authenticate ?? (async token => {
     const url = process.env.SUPABASE_URL; const key = process.env.SUPABASE_PUBLISHABLE_KEY;
     if (!url || !key) return null;
@@ -30,7 +27,7 @@ export function createCampusProxyRouter(options: {
     const { data, error } = await client.auth.getUser(token); return error ? null : data.user?.id ?? null;
   });
   router.use(cors({ origin: (process.env.CAMPUS_ALLOWED_ORIGIN ?? process.env.VISION_ALLOWED_ORIGIN)?.split(',') ?? false,
-    methods: ['GET', 'POST'], allowedHeaders: ['Content-Type', 'Authorization'] }));
+    methods: ['POST'], allowedHeaders: ['Content-Type', 'Authorization'] }));
   router.use(rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false }));
   router.use(async (req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -40,22 +37,6 @@ export function createCampusProxyRouter(options: {
     catch { res.status(503).json({ error: { code: 'AUTH_UNAVAILABLE', message: 'Authentication unavailable.' } }); }
   });
   router.use(rateLimit({ windowMs: 60_000, limit: 12, keyGenerator: (_req, res) => res.locals.userId as string, standardHeaders: 'draft-8', legacyHeaders: false }));
-  router.get('/gyms', async (_req, res) => {
-    let refresh: Promise<GymBaseline[]> | undefined;
-    const gyms = await Promise.all(GYMS.map(async gym => {
-      try {
-        const result = await cached(`gym:${gym.slug}`, async () => {
-          refresh ??= baselines();
-          const value = (await refresh).find(g => g.slug === gym.slug);
-          if (!value || value.status === 'unavailable' || value.baseline === null) throw new Error('Forecast unavailable');
-          return value;
-        });
-        return { ...result.value, stale: result.stale, cachedAt: new Date(result.savedAt).toISOString() };
-      } catch { return { slug: gym.slug, baseline: null, checkedAt: new Date().toISOString(), status: 'unavailable' as const }; }
-    }));
-    if (gyms.every(g => g.status === 'unavailable')) { res.status(503).json({ error: { code: 'FORECAST_UNAVAILABLE', message: 'Gym forecasts are unavailable. Student reports can still be used.' } }); return; }
-    res.set('X-Data-Freshness', gyms.some(g => 'stale' in g && g.stale) ? 'stale' : 'fresh').json(gyms);
-  });
   router.post('/rescue', json({ limit: '4kb' }), async (req, res) => {
     let input: ReturnType<typeof validateRescueRequest>;
     try { input = validateRescueRequest(req.body); } catch { res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'Provide valid coordinates, macros, and a protein or carbs preference.' } }); return; }

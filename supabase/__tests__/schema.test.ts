@@ -62,7 +62,6 @@ test('fresh Supabase schema: permissions, nutrition constraints, and workout int
       await signIn(alice); await fails(`update public.workout_routines set user_id='${bob}'`,'42501');
       const rows=await db.query<{id:string;name:string}>('select id,name from public.exercises where owner_user_id is null');
       assert.deepEqual(rows.rows.sort((a,b)=>a.id.localeCompare(b.id)),EXERCISE_CATALOG.map(e=>({id:e.id,name:e.name})).sort((a,b)=>a.id.localeCompare(b.id)));
-      assert.ok((await db.query("select slug from public.gym_locations where slug='livingston'")).rows.length);
       await db.exec('reset role');
     });
 
@@ -76,7 +75,7 @@ test('fresh Supabase schema: permissions, nutrition constraints, and workout int
     await t.test('anonymous users have no table access or trigger RPC access', async () => {
       await db.exec('set role anon');
       await fails('select * from public.users', '42501');
-      await fails('select * from public.gym_busyness_votes', '42501');
+      await fails('select * from public.daily_nutrition_logs', '42501');
       await fails('select public.update_workout_volume()', '42501');
     });
 
@@ -162,21 +161,6 @@ test('fresh Supabase schema: permissions, nutrition constraints, and workout int
       assert.equal(await volume(), 0);
     });
 
-    await t.test('gym votes validate location/status, keep location history private, and assign timestamps', async () => {
-      await signIn(alice);
-      await db.exec(`insert into public.gym_busyness_votes (user_id, location_slug, status) values ('${alice}', 'werblin', 'Quiet')`);
-      await fails("update public.gym_busyness_votes set status = 'empty'");
-      await fails(`insert into public.gym_busyness_votes (user_id, location_slug, status) values ('${alice}', 'unknown', 'Quiet')`, '23503');
-      await fails(`insert into public.gym_busyness_votes (user_id, location_slug, status) values ('${bob}', 'werblin', 'Packed')`, '42501');
-      await fails("update public.gym_busyness_votes set created_at = now() + interval '1 day'", '42501');
-      await db.exec("update public.gym_busyness_votes set status = 'Normal'");
-      await signIn(bob);
-      assert.deepEqual((await db.query('select * from public.gym_busyness_votes')).rows, []);
-      await signIn(alice);
-      await db.exec('delete from public.gym_busyness_votes');
-      assert.deepEqual((await db.query('select * from public.gym_busyness_votes')).rows, []);
-    });
-
     await t.test('Phase 3 retry writes obey grants and preserve generated Brzycki and volume', async () => {
       await signIn(alice);
       const id = '30000000-0000-4000-8000-000000000099';
@@ -206,24 +190,6 @@ test('fresh Supabase schema: permissions, nutrition constraints, and workout int
       await fails('update public.users set preworkout_carbs_g = 301');
       await fails('update public.users set is_advanced_track = false');
     });
-    await t.test('crowd RPC aggregates latest reports without exposing voter histories', async () => {
-      await db.exec('reset role');
-      await db.exec(`insert into public.gym_busyness_votes (user_id, location_slug, status, created_at) values
-        ('${alice}', 'werblin', 'Packed', now() - interval '10 minutes'),
-        ('${alice}', 'werblin', 'Quiet', now() - interval '1 minute'),
-        ('${bob}', 'werblin', 'Normal', now() - interval '2 minutes'),
-        ('${bob}', 'college-ave', 'Packed', now() - interval '31 minutes')`);
-      await signIn(alice);
-      const result = await db.query<{ location_slug: string; vote_count: number; crowd_score: string | null }>('select * from public.get_gym_busyness()');
-      const werblin = result.rows.find(row => row.location_slug === 'werblin')!;
-      assert.equal(Number(werblin.vote_count), 2); assert.equal(Number(werblin.crowd_score), 25);
-      assert.equal(result.rows.find(row => row.location_slug === 'college-ave')!.crowd_score, null);
-      assert.equal((await db.query('select * from public.gym_busyness_votes')).rows.length, 2);
-      await db.exec('reset role; set role anon');
-      await fails('select * from public.get_gym_busyness()', '42501');
-      await fails('select * from private.gym_vote_summary()', '42501');
-    });
-
     await t.test('Phase 5 atomic nutrition deltas deduplicate retries and isolate receipts', async () => {
       const id = '50000000-0000-4000-8000-000000000001';
       const id2 = '50000000-0000-4000-8000-000000000002';
@@ -249,7 +215,7 @@ test('fresh Supabase schema: permissions, nutrition constraints, and workout int
 
     await t.test('Phase 6 push registrations and activity snapshots enforce owner, RLS, and retry order', async () => {
       const install = '60000000-0000-4000-8000-000000000001';
-      const registration = { native_token: 'native', expo_token: 'ExpoPushToken[test]', platform: 'ios', gym_alerts: true, threshold: 30, time_zone: 'America/New_York' };
+      const registration = { native_token: 'native', expo_token: 'ExpoPushToken[test]', platform: 'ios', time_zone: 'America/New_York' };
       await signIn(alice);
       await db.query('select public.set_push_installation($1,$2,$3)', [alice, install, JSON.stringify(registration)]);
       await db.query('select public.set_push_installation($1,$2,$3)', [alice, install, JSON.stringify(registration)]);
@@ -262,13 +228,9 @@ test('fresh Supabase schema: permissions, nutrition constraints, and workout int
       await db.query("select public.save_activity_snapshot($1,'2026-09-07','healthkit',5000,200,'2026-09-07T18:00:00Z')", [alice]);
       assert.equal((await db.query<{ steps: number }>('select steps from public.daily_activity_snapshots')).rows[0].steps, 5000);
       await assert.rejects(db.query("select public.save_activity_snapshot($1,'2026-09-07','healthkit',6000,300,now())", [bob]), { code: '42501' });
-      await fails("select public.claim_campus_alert('" + alice + "','" + install + "','werblin',true)", '42501');
       await signIn(bob); assert.equal((await db.query('select * from public.profiles')).rows.length, 0);
       assert.equal((await db.query('select * from public.daily_activity_snapshots')).rows.length, 0);
       await db.exec('reset role; set role service_role');
-      const claim = async (below: boolean) => (await db.query<{ claim_campus_alert: boolean }>('select public.claim_campus_alert($1,$2,\'werblin\',$3)', [alice, install, below])).rows[0].claim_campus_alert;
-      assert.equal(await claim(true), true); assert.equal(await claim(true), false);
-      assert.equal(await claim(false), false); assert.equal(await claim(true), false); // Four-hour cooldown.
       await db.query('select public.remove_invalid_push_token($1,$2,$3)', [alice, install, 'old-token']);
       assert.equal(Object.keys((await db.query<{ push_tokens: object }>('select push_tokens from public.profiles')).rows[0].push_tokens).length, 1);
       await db.query('select public.remove_invalid_push_token($1,$2,$3)', [alice, install, registration.expo_token]);
@@ -306,7 +268,7 @@ test('fresh Supabase schema: permissions, nutrition constraints, and workout int
       assert.deepEqual((await db.query(`select * from public.sets where workout_id = '${aliceWorkout}'`)).rows, []);
       assert.deepEqual((await db.query(`select * from public.daily_nutrition_logs where user_id = '${alice}'`)).rows, []);
       assert.equal((await db.query('select id from public.users')).rows.length, 1);
-      for (const table of ['user_feedback', 'profiles', 'daily_activity_snapshots', 'campus_alert_state']) assert.equal((await db.query(`select * from public.${table} where ${table === 'profiles' ? 'id' : 'user_id'} = '${alice}'`)).rows.length, 0);
+      for (const table of ['user_feedback', 'profiles', 'daily_activity_snapshots']) assert.equal((await db.query(`select * from public.${table} where ${table === 'profiles' ? 'id' : 'user_id'} = '${alice}'`)).rows.length, 0);
     });
   } finally {
     await db.close();

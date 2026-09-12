@@ -48,20 +48,3 @@ test('rate limits return structured 429 and Retry-After; malformed JSON is sanit
   assert.equal(invalid.status, 400); assert.ok(!(await invalid.text()).includes('private'));
 });
 
-test('a partial gym outage keeps that venue stale while another venue refreshes', async t => {
-  const { createCampusProxyRouter } = await import('../campus-proxy');
-  const { GYMS } = await import('../../src/types/facilities');
-  const entries = new Map<string, CacheEntry<unknown>>(); let stale = false; let calls = 0;
-  const cache = { get: async (key: string) => { const value = entries.get(key); return value ? { ...value, freshUntil: stale ? 0 : value.freshUntil } : null; },
-    set: async (key: string, value: CacheEntry<unknown>) => { entries.set(key, value); } } as ResponseCache;
-  const app = express().use('/campus', createCampusProxyRouter({ cache, authenticate: async () => 'alice', baselines: async () => {
-    calls++; return GYMS.map(g => ({ slug: g.slug, baseline: stale && g.slug === 'werblin' ? null : stale ? 70 : 40,
-      status: stale && g.slug === 'werblin' ? 'unavailable' : 'available', checkedAt: new Date().toISOString() }));
-  } }));
-  const server = app.listen(0, '127.0.0.1'); await once(server, 'listening'); t.after(() => { server.closeAllConnections(); server.close(); });
-  const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/campus/gyms`;
-  const options = { headers: { Authorization: 'Bearer fixture' } };
-  assert.equal((await fetch(url, options)).status, 200); stale = true;
-  const result = await (await fetch(url, options)).json(); assert.equal(calls, 2);
-  assert.equal(result[0].baseline, 40); assert.equal(result[0].stale, true); assert.equal(result[1].baseline, 70); assert.equal(result[1].stale, false);
-});

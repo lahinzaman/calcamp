@@ -1,6 +1,8 @@
 import { RoutineBuilder } from './RoutineBuilder';
 import { router } from 'expo-router';
 import { SessionTimer } from './SessionTimer';
+import { TrainingTips } from './TrainingTips';
+import { readExperience } from './experience';
 import { routineExercises } from './routines';
 import { haptic } from '../../theme/haptics';
 import { overloadSuggestion, type LiftHistory, type PersonalRecord, type SessionVolumePoint } from './history';
@@ -85,6 +87,7 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
   const [program, setProgram] = useState(0);
   const owner = useAuthStore(s => s.session?.user.id);
   const [builder,setBuilder] = useState(false); const [routines,setRoutines] = useState<WorkoutRoutine[]>([]);
+  const experience = useMemo(() => readExperience(owner ?? 'anonymous'), [owner]);
   const [lifts,setLifts] = useState<LiftHistory>({}); const [volumeLog,setVolumeLog] = useState<SessionVolumePoint[]>([]); const [records,setRecords] = useState<PersonalRecord[]>([]);
   const [routineError,setRoutineError] = useState<string|null>(null);
   useEffect(() => {
@@ -171,6 +174,7 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
         <Pressable accessibilityRole="button" onPress={() => safelyEdit(start)} className="mt-6 items-center rounded-2xl bg-accent p-4"><Text className="font-bold text-ink">Start session</Text></Pressable>
         <Action secondary label="Create another routine" onPress={() => setBuilder(true)} />
         </>}
+        <TrainingTips routines={routines} experience={experience} lifts={lifts} volumeLog={volumeLog} />
         <Action secondary label="📅 Training history & records" onPress={() => router.push('/workouts')} />
         <VolumeTrend log={volumeLog} />
         {routineError && <Text>{routineError}</Text>}

@@ -208,7 +208,9 @@ test('CalCamp dashboard mounts real targets and all four training days', async (
 });
 
 test('with no routines the training tab sends you to build one instead of offering a preset', async () => {
-  await act(async () => { rendered = create(<ActiveWorkoutScreen />); });
+  // Coaching tips read diary history, so the screen needs a query client.
+  const trainingClient = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
+  await act(async () => { rendered = create(<QueryClientProvider client={trainingClient}><ActiveWorkoutScreen /></QueryClientProvider>); });
   const text = JSON.stringify(rendered!.toJSON());
   assert.ok(text.includes('Build your first routine'));
   assert.ok(text.includes('Create a routine'));

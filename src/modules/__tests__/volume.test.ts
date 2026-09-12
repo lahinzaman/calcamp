@@ -70,3 +70,53 @@ test('routine details must line up with their exercise ids and stay inside sane 
   // A routine saved before per-exercise detail existed still opens, with defaults.
   assert.deepEqual(routineExercises(base), [defaultRoutineExercise(chest), defaultRoutineExercise(quads)]);
 });
+
+test('coaching fires on the user own data and puts frequency before volume', () => {
+  const { coachingTips } = require('../workout/coaching') as typeof import('../workout/coaching');
+  const base = { experience: 'beginner' as const, sessionsThisWeek: 3, stalledSessions: 0, averageRpe: 8,
+    proteinPerLb: 0.9, intendedWeeklyChangeLbs: 0, daysSinceWeighIn: 1, shortestRestSeconds: 120 };
+  const once = weeklyVolume([{ exercises: [plan(chest, 11)], timesPerWeek: 1 }], 'beginner');
+  const tips = coachingTips({ ...base, volume: once });
+  // Frequency outranks everything else when the set total is already fine.
+  assert.equal(tips[0].id, 'frequency');
+
+  const stalled = coachingTips({ ...base, volume: weeklyVolume([{ exercises: [plan(chest, 5)], timesPerWeek: 2 }], 'beginner'), stalledSessions: 4 });
+  assert.ok(stalled.some(tip => tip.id === 'stall'));
+
+  const lowProtein = coachingTips({ ...base, volume: once, proteinPerLb: 0.4, intendedWeeklyChangeLbs: -1 });
+  const protein = lowProtein.find(tip => tip.id === 'protein')!;
+  assert.ok(protein, 'low protein should be raised');
+  assert.match(protein.body, /deficit/);
+
+  // Signals the app cannot measure yet must not invent a tip.
+  const unknown = coachingTips({ ...base, volume: once, averageRpe: null, proteinPerLb: null, daysSinceWeighIn: null, shortestRestSeconds: null });
+  for (const id of ['rpe-high', 'rpe-low', 'protein', 'weigh-in', 'rest']) assert.equal(unknown.some(tip => tip.id === id), false, id);
+
+  assert.ok(coachingTips({ ...base, volume: once, daysSinceWeighIn: 9 }).some(tip => tip.id === 'weigh-in'));
+  assert.ok(coachingTips({ ...base, volume: once, averageRpe: 9.8 }).some(tip => tip.id === 'rpe-high'));
+  assert.ok(coachingTips({ ...base, volume: once, shortestRestSeconds: 30 }).some(tip => tip.id === 'rest'));
+});
+
+test('every demonstration renders a full figure with ground, limbs and a head', () => {
+  const { demonstration, DEMO_KINDS } = require('../workout/demonstrations') as typeof import('../workout/demonstrations');
+  for (const kind of DEMO_KINDS) {
+    const animation = demonstration(kind);
+    const shapes = animation.layers[0].shapes;
+    // Ground, far leg, far arm, near leg, near arm, head — equipment is optional.
+    assert.ok(shapes.length >= 6, `${kind} should draw a full figure`);
+    assert.equal(animation.fr, 30);
+    assert.equal(animation.op, 91);
+    const head = shapes.find(group => group.it.some((item: { ty: string }) => item.ty === 'el'));
+    assert.ok(head, `${kind} needs a head`);
+    // Every animated path must return to its starting pose so the loop does not jump.
+    for (const group of shapes) {
+      const path = group.it.find((item: { ty: string }) => item.ty === 'sh') as { ks: { a: number; k: { t: number; s: unknown[] }[] } } | undefined;
+      if (!path || path.ks.a !== 1) continue;
+      assert.deepEqual(path.ks.k.at(-1)!.s, path.ks.k[0].s, `${kind} loop must close`);
+    }
+  }
+  // Barbell movements carry a bar; bodyweight ones do not.
+  const squat = demonstration('squat').layers[0].shapes.length;
+  const pullup = demonstration('pullup').layers[0].shapes.length;
+  assert.ok(squat > pullup, 'loaded lifts should draw their equipment');
+});

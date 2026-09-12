@@ -28,10 +28,55 @@ export function demonstration(kind: string) {
     case 'crunch': a = { head:[40,197], shoulder:[65,212], hip:[132,226], knee:[166,175], foot:[208,232], elbow:[84,179], hand:[56,183] }; b = { ...a, head:[63,154], shoulder:[83,180], elbow:[104,153], hand:[80,141] }; break;
   }
   const shape = (points: Point[]) => ({ i:points.map(() => [0,0]), o:points.map(() => [0,0]), v:points, c:false });
-  const lines: (keyof Pose)[][] = [['shoulder','hip','knee','foot'],['shoulder','elbow','hand'],['head','shoulder']];
-  const frames = (start: unknown, end: unknown) => ({ a:1, k:[{ t:0, s:[start], e:[end], i:{x:.65,y:1}, o:{x:.35,y:0} },{ t:45,s:[end],e:[start],i:{x:.65,y:1},o:{x:.35,y:0} },{t:90,s:[start]}] });
+  const ease = { i:{x:.4,y:1}, o:{x:.6,y:0} };
+  /** Two-pose loop: out on the concentric, back on the eccentric, with a hold at each end. */
+  const pathFrames = (start: unknown, end: unknown) => ({ a:1, k:[
+    { t:0, s:[start], e:[end], ...ease }, { t:38, s:[end], e:[end], ...ease },
+    { t:52, s:[end], e:[start], ...ease }, { t:90, s:[start] }] });
+  const pointFrames = (start: Point, end: Point) => ({ a:1, k:[
+    { t:0, s:start, e:end, ...ease }, { t:38, s:end, e:end, ...ease },
+    { t:52, s:end, e:start, ...ease }, { t:90, s:start } ] });
+
+  const INK: [number,number,number,number] = [.55,.6,1,1];
+  const LIMB: [number,number,number,number] = [1,.7,.25,1];
+  const FAINT: [number,number,number,number] = [.55,.6,1,.38];
+  const GEAR: [number,number,number,number] = [.42,.86,.62,1];
+  const stroke = (color: [number,number,number,number], width: number) => ({ ty:'st', c:{a:0,k:color}, o:{a:0,k:100}, w:{a:0,k:width}, lc:2, lj:2 });
+  const transform = { ty:'tr', p:{a:0,k:[0,0]}, a:{a:0,k:[0,0]}, s:{a:0,k:[100,100]}, r:{a:0,k:0}, o:{a:0,k:100} };
+  const chain = (keys: (keyof Pose)[], color: [number,number,number,number], width: number) =>
+    ({ ty:'gr', it:[{ ty:'sh', ks: pathFrames(shape(keys.map(k => a[k])), shape(keys.map(k => b[k]))) }, stroke(color, width), transform] });
+  /** The far-side limb, nudged back and drawn faintly, reads as depth without a second figure. */
+  const offset = (pose: Pose, keys: (keyof Pose)[], dx: number): Point[] => keys.map(k => [pose[k][0] - dx, pose[k][1]] as Point);
+  const farChain = (keys: (keyof Pose)[], dx: number) =>
+    ({ ty:'gr', it:[{ ty:'sh', ks: pathFrames(shape(offset(a, keys, dx)), shape(offset(b, keys, dx))) }, stroke(FAINT, 7), transform] });
+
+  const head = { ty:'gr', it:[
+    { ty:'el', p: pointFrames(a.head, b.head), s:{a:0,k:[30,30]} },
+    stroke(INK, 7), transform] };
+  const ground = { ty:'gr', it:[
+    { ty:'sh', ks:{ a:0, k: shape([[16,244],[244,244]]) } }, stroke(FAINT, 4), transform] };
+
+  const gear: Record<string, 'bar'|'dumbbell'|'none'> = { press:'bar', pushup:'none', fly:'dumbbell', row:'bar', pulldown:'bar',
+    pullup:'none', overhead:'bar', raise:'dumbbell', rear:'dumbbell', squat:'bar', legpress:'none', lunge:'dumbbell',
+    hinge:'bar', bridge:'bar', legcurl:'none', legextension:'none', calf:'none', curl:'dumbbell', extension:'dumbbell', crunch:'none' };
+  const held = gear[kind] ?? 'none';
+  const barAt = (pose: Pose, half: number): Point[] => [[pose.hand[0], pose.hand[1] - half], [pose.hand[0], pose.hand[1] + half]];
+  const equipment = held === 'none' ? [] : [{ ty:'gr', it:[
+    { ty:'sh', ks: pathFrames(shape(barAt(a, held === 'bar' ? 46 : 16)), shape(barAt(b, held === 'bar' ? 46 : 16))) },
+    stroke(GEAR, held === 'bar' ? 8 : 12), transform] }];
+
+  const shapes = [
+    ground,
+    farChain(['shoulder','hip','knee','foot'], 12),
+    farChain(['shoulder','elbow','hand'], 12),
+    chain(['shoulder','hip','knee','foot'], INK, 10),
+    chain(['shoulder','elbow','hand'], LIMB, 10),
+    head,
+    ...equipment,
+  ];
   return { v:'5.7.4', fr:30, ip:0, op:91, w:260, h:260, nm:`CalCamp ${kind} schematic`, ddd:0, assets:[], layers:[{
-    ddd:0, ind:1, ty:4, nm:'movement', sr:1, ks:{o:{a:0,k:100},r:{a:0,k:0},p:{a:0,k:[0,0,0]},a:{a:0,k:[0,0,0]},s:{a:0,k:[100,100,100]}}, ao:0,
-    shapes:lines.map((keys,i) => ({ty:'gr',it:[{ty:'sh',ks:frames(shape(keys.map(k=>a[k])),shape(keys.map(k=>b[k])))},{ty:'st',c:{a:0,k:i===1?[1,.7,.25,1]:[.55,.6,1,1]},o:{a:0,k:100},w:{a:0,k:9},lc:2,lj:2},{ty:'tr',p:{a:0,k:[0,0]},a:{a:0,k:[0,0]},s:{a:0,k:[100,100]},r:{a:0,k:0},o:{a:0,k:100}}]})), ip:0,op:91,st:0,bm:0
+    ddd:0, ind:1, ty:4, nm:'movement', sr:1,
+    ks:{ o:{a:0,k:100}, r:{a:0,k:0}, p:{a:0,k:[0,0,0]}, a:{a:0,k:[0,0,0]}, s:{a:0,k:[100,100,100]} }, ao:0,
+    shapes, ip:0, op:91, st:0, bm:0,
   }] };
 }

@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, ScrollView, View } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
 import { SafeAreaView } from '../../theme/SafeArea';
 import { Text } from '../../theme/primitives';
 import { Pressable } from '../../theme/Pressable';
@@ -8,8 +7,9 @@ import { Action, Choice, Field } from '../../components/FormControls';
 import { ProgressBar } from '../../theme/motion';
 import { haptic } from '../../theme/haptics';
 import { useAuthStore } from '../../store/authStore';
-import { EXERCISE_CATALOG, exerciseById } from './catalog';
+import { exerciseById } from './catalog';
 import { ExerciseHelp } from './ExerciseHelp';
+import { ExercisePicker } from './ExercisePicker';
 import { defaultRoutineExercise, validateRoutine, REST_CHOICES, type WorkoutRoutine } from './routines';
 import { EXPERIENCE_LEVELS, EXPERIENCE_NOTES, MUSCLE_LABELS, WEEKLY_SET_TARGETS, volumeAdvice, weeklyVolume, type ExperienceLevel, type RoutineExercise } from './volume';
 import { readExperience, writeExperience } from './experience';
@@ -35,7 +35,6 @@ export function RoutineBuilder({ onClose, onSave, existing }: { onClose: () => v
   const owner = useAuthStore(s => s.session?.user.id) ?? 'anonymous';
   const [step, setStep] = useState<'pick' | 'tune'>(existing ? 'tune' : 'pick');
   const [name, setName] = useState(existing?.name ?? '');
-  const [search, setSearch] = useState('');
   const [entries, setEntries] = useState<RoutineExercise[]>(existing?.exercises ?? existing?.exerciseIds.map(defaultRoutineExercise) ?? []);
   const [timesPerWeek, setTimesPerWeek] = useState(existing?.timesPerWeek ?? 2);
   const [experience, setExperience] = useState<ExperienceLevel>(() => readExperience(owner));
@@ -67,33 +66,17 @@ export function RoutineBuilder({ onClose, onSave, existing }: { onClose: () => v
   };
 
   if (step === 'pick') {
-    const matches = EXERCISE_CATALOG.filter(exercise => `${exercise.name} ${exercise.primaryMuscle} ${exercise.equipment}`.toLowerCase().includes(search.toLowerCase()));
     return <Modal visible presentationStyle="pageSheet" animationType="slide" onRequestClose={onClose}>
       <SafeAreaView className="flex-1 bg-background">
         <View className="px-5 pt-4">
           <Text className="text-2xl font-bold">Choose your exercises</Text>
-          <Text className="mb-3 mt-1 text-sm">{ids.length} selected{ids.length ? ` · ${trained.length} muscles` : ''}. Sets and rest come next.</Text>
-          <Field label="Search the catalogue" value={search} onChangeText={setSearch} autoCorrect={false} />
+          <Text className="mt-1 text-sm">Search or filter down to what your gym actually has. Sets and rest come next.</Text>
         </View>
-        <FlashList data={matches} keyExtractor={exercise => exercise.id} keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
-          renderItem={({ item }) => {
-            const chosen = ids.includes(item.id);
-            return <View className="mb-2 flex-row items-center gap-2">
-              <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: chosen }} accessibilityLabel={item.name}
-                onPress={() => toggle(item.id)} weight="subtle"
-                className={`flex-1 rounded-2xl border p-4 ${chosen ? 'border-accent bg-raised' : 'border-border bg-surface'}`}>
-                <Text className="font-bold">{chosen ? '✓ ' : ''}{item.name}</Text>
-                <Text className="text-sm">{MUSCLE_LABELS[item.primaryMuscle] ?? item.primaryMuscle} · {item.equipment}</Text>
-              </Pressable>
-              <ExerciseHelp exercise={item} />
-            </View>;
-          }} />
-        <View className="gap-2 px-5 pb-4">
+        <ExercisePicker selectedIds={ids} onToggle={toggle} footer={<>
           <Action label={ids.length ? `Set up ${ids.length} exercise${ids.length > 1 ? 's' : ''}` : 'Pick at least one exercise'}
             disabled={!ids.length} onPress={() => setStep('tune')} tone={ids.length ? 'success' : 'none'} />
           <Action secondary label="Cancel" onPress={onClose} />
-        </View>
+        </>} />
       </SafeAreaView>
     </Modal>;
   }

@@ -116,7 +116,10 @@ test('fresh Supabase schema: permissions, nutrition constraints, and workout int
 
     await t.test('catalogue is shared and only owner custom variations can be edited', async () => {
       await signIn(alice);
-      assert.equal((await db.query('select id from public.exercises')).rows.length, 101);
+      // Routines validate every exercise ID against this table, so the shipped catalogue
+      // and the seeded rows must stay identical — not merely the same size.
+      const seeded = (await db.query<{ id: string }>('select id from public.exercises')).rows.map(r => r.id);
+      assert.deepEqual(seeded.slice().sort(), EXERCISE_CATALOG.map(e => e.id).sort());
       for (const lift of Object.values(LIFTS)) assert.equal((await db.query<{ name: string }>('select name from public.exercises where id = $1', [lift.id])).rows[0]?.name, lift.name);
       assert.deepEqual((await db.query("update public.exercises set name = 'Oops' where owner_user_id is null returning id")).rows, []);
       await fails(`insert into public.exercises (name, movement_pattern, equipment, primary_muscle)

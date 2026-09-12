@@ -46,7 +46,8 @@ test('onboarding budgets preserve weekly energy and do not infer deficits for un
   assert.throws(()=>startingBudget({...base,lifestyle_survey:{...base.lifestyle_survey,age:17}}));assert.throws(()=>startingBudget({...base,lifestyle_survey:{...base.lifestyle_survey,specializedNutrition:true}}));
 });
 test('all 101 presets have distinct IDs and motion help; routine creation survives offline restart',async()=>{
-  assert.equal(EXERCISE_CATALOG.length,101);assert.equal(new Set(EXERCISE_CATALOG.map(e=>e.id)).size,101);
+  assert.equal(EXERCISE_CATALOG.length,232);assert.equal(new Set(EXERCISE_CATALOG.map(e=>e.id)).size,232);
+  assert.equal(new Set(EXERCISE_CATALOG.map(e=>e.name.toLowerCase())).size,232);
   for(const e of EXERCISE_CATALOG){assert.ok(e.description.length>60);assert.ok((DEMO_KINDS as readonly string[]).includes(e.demo));assert.ok(demonstration(e.demo).layers[0].shapes.length>=3);}
   const routine={id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',name:'My Tuesday',exerciseIds:EXERCISE_CATALOG.slice(0,4).map(e=>e.id)};
   validateRoutine(routine);assert.throws(()=>validateRoutine({...routine,exerciseIds:[routine.exerciseIds[0],routine.exerciseIds[0]]}));

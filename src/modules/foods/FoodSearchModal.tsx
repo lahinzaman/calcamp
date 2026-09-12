@@ -15,9 +15,10 @@ import { orderFoods, readSavedFoods, rememberFood, toggleFavorite, forgetFood, t
 import { foodEmoji } from '../dining/foodEmoji';
 import { RecipeBuilder } from './RecipeBuilder';
 import { deleteRecipe, perServing, readRecipes, type Recipe } from './recipes';
+import { DiningPicker } from './DiningPicker';
 import { DRINK_CATEGORIES, drinkMacros, drinkMicros, drinkNote, drinksInCategory, searchDrinks, servingLabelFor, type Drink, type DrinkCategory } from '../../data/alcohol';
-type Tab = 'recent' | 'frequent' | 'favorite' | 'recipe' | 'drinks' | 'search';
-const TABS: [Tab, string][] = [['search', 'Search'], ['recent', 'Recent'], ['frequent', 'Frequent'], ['favorite', 'Favorites'], ['recipe', 'Recipes'], ['drinks', 'Drinks']];
+type Tab = 'recent' | 'frequent' | 'favorite' | 'recipe' | 'drinks' | 'dining' | 'search';
+const TABS: [Tab, string][] = [['search', 'Search'], ['dining', 'Dining halls'], ['recent', 'Recent'], ['frequent', 'Frequent'], ['favorite', 'Favorites'], ['recipe', 'Recipes'], ['drinks', 'Drinks']];
 const drinkCandidate = (drink: Drink): Candidate => ({ name: drink.name, servingLabel: servingLabelFor(drink),
   macros: drinkMacros(drink), micros: drinkMicros(drink), source: 'custom', note: drinkNote(drink) });
 type Candidate = { name: string; servingLabel: string | null; macros: SearchResult['macros']; micros: SearchResult['micros']; source: SavedFood['source']; note?: string };
@@ -66,6 +67,7 @@ export function FoodSearchModal({ onClose, meal }: { onClose: () => void; meal?:
             onPress={() => setChosen({ name: recipe.name, servingLabel: 'serving', macros: single.macros, micros: single.micros, source: 'recipe' })} />; })}
           <Action secondary label="Create a recipe" onPress={() => setBuilding('new')} />
         </>}
+        {tab === 'dining' && <DiningPicker meal={meal} onLogged={onClose} />}
         {tab === 'drinks' && <>
           <Text className="mb-3">Beer, wine, spirits and the rest, with the alcohol counted. Energy is calculated from ABV — a label always wins over this estimate.</Text>
           <View className="mb-3 flex-row flex-wrap">{DRINK_CATEGORIES.map(([value, label]) => <Choice key={value} label={label}

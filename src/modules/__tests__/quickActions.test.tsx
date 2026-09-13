@@ -33,10 +33,16 @@ test('manual food log refuses partial nutrition and logs once after confirmation
  await type('Food name','Test rice');await type('Portion · oz','4');await type('Calories · kcal','200');await type('Protein · g','4');await type('Fats · g','0');await type('Carbs · g','45');
  await press('Confirm food log');await press('Confirm food log');assert.equal(closed,1);assert.equal(nutritionStore.getState().consumedMacros.caloriesKcal,200);
 });
-test('body weight form writes pounds and rejects incomplete text',async()=>{
+test('a weigh-in goes through the photo step, and an invalid one never gets there',async()=>{
  let closed=0;await act(async()=>{view=create(<QuickLogModal action="weight" onClose={()=>closed++}/>);});
- await type('Body weight · lbs','NaN');await press('Save body weight');assert.equal(closed,0);
- await type('Body weight · lbs','180.5');await press('Save body weight');assert.equal(nutritionStore.getState().bodyWeightLbs,180.5);assert.equal(closed,1);
+ await type('Body weight · lbs','NaN');await press('Save body weight');
+ assert.equal(closed,0);assert.equal(nutritionStore.getState().bodyWeightLbs,null);
+ await type('Body weight · lbs','180.5');await press('Save body weight');
+ // The weight is not committed until the photo step resolves, one way or the other.
+ assert.equal(nutritionStore.getState().bodyWeightLbs,null);
+ assert.ok(JSON.stringify(view!.toJSON()).includes('Progress photo'));
+ await press('Save the weight without a photo');
+ assert.equal(nutritionStore.getState().bodyWeightLbs,180.5);assert.equal(closed,1);
 });
 test('exercise help explains the movement in words',async()=>{
  const exercise=EXERCISE_CATALOG[0];await act(async()=>{view=create(<ExerciseHelp exercise={exercise}/>);});

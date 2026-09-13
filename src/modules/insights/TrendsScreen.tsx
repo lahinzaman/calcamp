@@ -19,6 +19,7 @@ import {
 import { calculateTdee } from '../nutrition/tdee';
 import { MilestonesCard } from '../habits/MilestonesCard';
 import { MeasurementsCard } from './MeasurementsCard';
+import { ProgressPhotoCard } from '../progress/ProgressPhotoCard';
 import { milestones, summarizeStreak } from '../habits/streaks';
 import { localDateKey } from '../../store/nutritionStore';
 const RANGES = [[28, '4 weeks'], [56, '8 weeks'], [90, '13 weeks']] as const;
@@ -95,6 +96,7 @@ export default function TrendsScreen() {
         <NutrientAveragesCard rows={rows} sex={survey?.metabolicSex ?? 'unspecified'} age={survey?.age ?? null} index={8} />
         <StepsCard activity={activity.data ?? []} index={8} />
         <BodyCompositionCard measurements={measurements.data ?? []} weightLbs={latestWeight} index={9} />
+        <ProgressPhotoCard index={10} />
         <WeeklyAveragesCard rows={rows} index={10} />
         <MeasurementsCard index={11} />
         <MilestonesCard items={milestones(summarizeStreak(rows, today), 0)} index={12} />

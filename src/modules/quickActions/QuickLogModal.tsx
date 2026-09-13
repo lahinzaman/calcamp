@@ -8,6 +8,10 @@ import { nutritionStore } from '../../store/nutritionStore';
 import { gramsToOz, ozToGrams } from '../../lib/units';
 import { useFoodVision } from '../vision/useFoodVision';
 import { lookupBarcode } from './barcode';
+import { WeightPhotoSheet } from '../progress/WeightPhotoSheet';
+import { addPhotos } from '../progress/photos';
+import { useAuthStore } from '../../store/authStore';
+import { localDateKey } from '../../store/nutritionStore';
 import type { MacroTotals } from '../../types/nutrition';
 export type QuickAction = 'photo'|'barcode'|'manual'|'weight'|'quick';
 const names:Record<QuickAction,string>={photo:'AI Photo Log',barcode:'Barcode Scanner',manual:'Manual Food Log',weight:'Update Body Weight',quick:'Quick Add Calories'};
@@ -25,6 +29,8 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
   const [values,setValues]=useState<Record<keyof MacroTotals,string>>({caloriesKcal:'',proteinG:'',fatG:'',carbsG:''});
   const [notice,setNotice]=useState(''); const [error,setError]=useState<string|null>(null); const [busy,setBusy]=useState(false);
   const [code,setCode]=useState('');
+  const [photoWeight,setPhotoWeight]=useState<number|null>(null);
+  const owner=useAuthStore(s=>s.session?.user.id)??'anonymous';
   const locked=useRef(false); const alive=useRef(true); const request=useRef<AbortController|null>(null); const vision=useFoodVision();
   const [reference,setReference]=useState<{grams:number;macros:MacroTotals}|null>(null);
   useEffect(()=>()=>{alive.current=false;request.current?.abort();},[]);
@@ -56,7 +62,8 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
     if(locked.current)return;setError(null);
     try{if(action==='weight'){
       if(!weight.trim()||!Number.isFinite(Number(weight))||Number(weight)<70||Number(weight)>700)throw new Error('Enter a body weight of 70–700 lbs.');
-      nutritionStore.getState().setBodyWeightLbs(Number(weight));
+      // The photo step saves the weight; the scale number alone shows far less than it plus a photo.
+      setPhotoWeight(Number(weight));return;
     }else{
       if(action==='quick'){
         if(!values.caloriesKcal.trim()||!Number.isFinite(Number(values.caloriesKcal))||Number(values.caloriesKcal)<=0||Number(values.caloriesKcal)>20000)throw new Error('Enter the calories for this quick add.');
@@ -81,6 +88,12 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
       onBarcode={code=>{void scan(code);}} onCapture={base64=>{void capture(base64);}}
       onManual={()=>{setError(null);setEditing(true);}} onClose={onClose} />
   </Modal>;
+  if(photoWeight!==null)return <WeightPhotoSheet weightLbs={photoWeight} onClose={()=>setPhotoWeight(null)}
+    onDone={photos=>{
+      nutritionStore.getState().setBodyWeightLbs(photoWeight);
+      if(photos.length)addPhotos(owner,localDateKey(new Date()),photos);
+      locked.current=true;onClose();
+    }} />;
   return <Modal visible presentationStyle={scanner?'fullScreen':'pageSheet'} animationType="slide" onRequestClose={onClose}><SafeAreaView className="flex-1 bg-background"><KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:24,paddingBottom:60}}>
     <Text className="mb-5 text-3xl font-bold">{names[action]}</Text>
     {action==='barcode'&&!reference&&<>
@@ -89,6 +102,7 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
       <Action label={busy?'Looking up…':'Look up this barcode'} disabled={busy||!code.trim()} onPress={()=>{void scan(code.trim());}} />
       <Action secondary label="Back to the scanner" disabled={busy} onPress={()=>{setError(null);setEditing(false);}} />
     </>}
+    {action==='weight'&&<Text className="mb-4">A photo alongside the number is what actually shows change — the scale moves with water and food. Photos stay on this device and are never uploaded.</Text>}
     {editing&&(action==='quick'?<>
       <Text className="mb-4">For when you know roughly what it cost you but not the breakdown. Leave a macro blank and it is recorded as zero for this entry.</Text>
       <Field label="Food name" value={name} onChangeText={setName} maxLength={150} placeholder="Quick add" />

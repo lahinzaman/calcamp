@@ -17,14 +17,13 @@ export function SessionTimer({ startedAtMs, volumeLbs, sets }: { startedAtMs: nu
     const subscription = AppState.addEventListener('change', state => { if (state === 'active') setNow(Date.now()); });
     return () => { clearInterval(id); subscription.remove(); };
   }, []);
-  return <View className="mb-4 flex-row items-center gap-5 rounded-3xl border border-border bg-surface p-5">
-    <View>
-      <Text className="text-sm font-bold tracking-widest">ELAPSED</Text>
-      <Text accessibilityLabel={`Session time ${elapsedLabel(now - startedAtMs)}`} className="text-4xl font-bold" style={{ fontVariant: ['tabular-nums'] }}>{elapsedLabel(now - startedAtMs)}</Text>
-    </View>
-    <View className="flex-1 flex-row justify-end gap-5">
-      <View className="items-end"><Text className="text-2xl font-bold">{sets}</Text><Text className="text-sm">sets</Text></View>
-      <View className="items-end"><Text className="text-2xl font-bold">{Math.round(volumeLbs).toLocaleString()}</Text><Text className="text-sm">lbs moved</Text></View>
+  return <View className="mb-4 items-center rounded-3xl border border-border bg-surface p-5">
+    <Text className="text-sm font-bold tracking-widest">ELAPSED</Text>
+    <Text accessibilityLabel={`Session time ${elapsedLabel(now - startedAtMs)}`} className="my-1 text-5xl font-bold"
+      style={{ fontVariant: ['tabular-nums'] }}>{elapsedLabel(now - startedAtMs)}</Text>
+    <View className="mt-3 flex-row flex-wrap justify-center gap-6">
+      <View className="items-center"><Text className="text-2xl font-bold" style={{ fontVariant: ['tabular-nums'] }}>{sets}</Text><Text className="text-sm">sets</Text></View>
+      <View className="items-center"><Text className="text-2xl font-bold" style={{ fontVariant: ['tabular-nums'] }}>{Math.round(volumeLbs).toLocaleString()}</Text><Text className="text-sm">lbs moved</Text></View>
     </View>
   </View>;
 }

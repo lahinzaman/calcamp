@@ -21,10 +21,10 @@ const label=(name:string)=>view!.root.findByProps({accessibilityLabel:name});
 const press=async(name:string)=>{await act(async()=>{view!.root.findAllByType('Pressable' as React.ElementType).find(n=>n.findAllByType('Text' as React.ElementType).some(t=>t.props.children===name))!.props.onPress();});};
 const type=async(name:string,text:string)=>{await act(async()=>label(name).props.onChangeText(text));};
 afterEach(async()=>{await act(async()=>view?.unmount());view=undefined;nutritionStore.getState().reset();permission=false;prompts=0;});
-test('global FAB exposes all four actions and camera stays opt-in',async()=>{
+test('the FAB lists every way to log, and the camera stays opt-in',async()=>{
  await act(async()=>{view=create(<QuickActions/>);});await act(async()=>label('Open quick actions').props.onPress());
- for(const text of ['AI Photo Log','Barcode Scanner','Manual Food Log','Update Body Weight'])assert.ok(JSON.stringify(view!.toJSON()).includes(text));
- await press('📷 AI Photo Log');assert.equal(prompts,0);assert.equal(view!.root.findAllByType('Camera' as React.ElementType).length,0);
+ for(const text of ['Search the food database','Scan a barcode','Scan a nutrition label','Photograph a meal','Quick add calories','Add a food by hand','Log your weight'])assert.ok(JSON.stringify(view!.toJSON()).includes(text),text);
+ await press('Photograph a meal');assert.equal(prompts,0);assert.equal(view!.root.findAllByType('Camera' as React.ElementType).length,0);
  await press('Enter food manually');assert.ok(label('Food name'));
 });
 test('manual food log refuses partial nutrition and logs once after confirmation',async()=>{

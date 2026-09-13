@@ -242,10 +242,15 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
 
 function RestTimerPanel() {
   const timer = useWorkoutStore(s => s.restTimer); const remaining = useRestCountdown();
-  return <View className="mt-5 rounded-3xl bg-background p-5">
-          <View className="flex-row items-center justify-between"><View><Text className="text-xs font-bold uppercase tracking-widest text-ink">{timer ? 'Rest remaining' : 'Between sets'}</Text><Text testID="rest-countdown" accessibilityLiveRegion="none" className="mt-2 text-4xl font-bold tabular-nums text-ink">{timer ? timerText(remaining) : 'Ready'}</Text></View>{timer && <Pressable accessibilityRole="button" onPress={() => safelyEdit(() => workoutStore.getState().clearRestTimer())} className="rounded-xl bg-raised px-4 py-3"><Text className="font-semibold text-ink">Skip rest</Text></Pressable>}</View>
-          <Text className="mt-3 text-sm text-ink">{timer ? 'Take a breath. Your next set is coming.' : 'Complete a set to start your rest timer.'}</Text>
-        </View>;
+  return <View className="mt-5 items-center rounded-3xl border border-border bg-surface p-5">
+    <Text className="text-xs font-bold uppercase tracking-widest">{timer ? 'Rest remaining' : 'Between sets'}</Text>
+    <Text testID="rest-countdown" accessibilityLiveRegion="none" className="my-2 text-5xl font-bold"
+      style={{ fontVariant: ['tabular-nums'] }}>{timer ? timerText(remaining) : 'Ready'}</Text>
+    <Text className="text-center text-sm">{timer ? 'Take a breath. Your next set is coming.' : 'Complete a set to start your rest timer.'}</Text>
+    {timer && <Pressable accessibilityRole="button" accessibilityLabel="Skip rest"
+      onPress={() => safelyEdit(() => workoutStore.getState().clearRestTimer())} weight="subtle"
+      className="mt-4 min-h-12 justify-center rounded-xl bg-raised px-5"><Text className="font-semibold">Skip rest</Text></Pressable>}
+  </View>;
 }
 
 function ImportedWorkouts() {

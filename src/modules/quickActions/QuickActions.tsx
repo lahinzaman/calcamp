@@ -11,7 +11,7 @@ import { haptic } from '../../theme/haptics';
 import { QuickLogModal, type QuickAction } from './QuickLogModal';
 import { FoodSearchModal } from '../foods/FoodSearchModal';
 type MenuKey = QuickAction | 'search';
-const actions:[MenuKey,string][]=[['search','🔎 Search the food database'],['photo','📷 AI Photo Log'],['barcode','▥ Barcode Scanner'],['label','▤ Scan a Nutrition Label'],['quick','⚡ Quick Add Calories'],['manual','✎ Manual Food Log'],['weight','⚖ Update Body Weight']];
+const actions:[MenuKey,string][]=[['search','Search the food database'],['barcode','Scan a barcode'],['label','Scan a nutrition label'],['photo','Photograph a meal'],['quick','Quick add calories'],['manual','Add a food by hand'],['weight','Log your weight']];
 export function QuickActions() {
   const [open,setOpen]=useState(false); const [pending,setPending]=useState<MenuKey|null>(null);
   const [action,setAction]=useState<MenuKey|null>(null); const insets=useSafeAreaInsets();
@@ -41,7 +41,7 @@ export function QuickActions() {
           {actions.map(([key,label],i)=><Animated.View key={key}
             entering={FadeInDown.delay((actions.length-1-i)*ENTER_STAGGER).duration(TIMING.base).reduceMotion(ReduceMotion.System)}
             exiting={FadeOutDown.delay(i*30).duration(TIMING.fast).reduceMotion(ReduceMotion.System)} style={{maxWidth:'100%'}}>
-            <Pressable accessibilityRole="button" accessibilityLabel={label.slice(2).trim()} onPress={()=>choose(key)} weight="firm" tone="none" className="mb-3 min-h-14 justify-center rounded-2xl bg-surface px-5 py-3"><Text className="text-lg font-bold">{label}</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={()=>choose(key)} weight="firm" tone="none" className="mb-3 min-h-14 justify-center rounded-2xl bg-surface px-5 py-3"><Text className="text-lg font-bold">{label}</Text></Pressable>
           </Animated.View>)}
           <Animated.View style={spin}>
             <Pressable accessibilityRole="button" accessibilityLabel="Close quick actions" onPress={()=>reveal(false)} tone="none" weight="firm" className="h-16 w-16 items-center justify-center rounded-full bg-accent"><Text className="text-4xl">+</Text></Pressable>

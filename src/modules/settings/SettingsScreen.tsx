@@ -17,6 +17,7 @@ import { FeedbackModal } from '../feedback/FeedbackModal';
 import { AccountAccess } from '../account/AccountAccess';
 import { TargetEditor } from './TargetEditor';
 import { GoalEditor } from './GoalEditor';
+import { UnitsCard } from './UnitsCard';
 import { ExportControls } from './ExportControls';
 export async function checkService(signal: AbortSignal): Promise<boolean> {
   const base = process.env.EXPO_PUBLIC_BACKEND_URL;
@@ -41,7 +42,7 @@ export default function SettingsScreen() {
   const mode = useThemeStore(state => state.mode);
   const profile = useAuthStore(state => state.profile);
   const [targets, setTargets] = useState(false); const [feedback, setFeedback] = useState(false);
-  const [goal, setGoal] = useState(false);
+  const [goal, setGoal] = useState(false); const [, setUnitsTick] = useState(0);
   const survey = (profile?.lifestyle_survey ?? {}) as { goalDirection?: string; rateLbsPerWeek?: number; goalWeightLbs?: number | null };
   const goalLine = [
     profile?.weight_lbs ? `${Number(profile.weight_lbs.toFixed(1))} lbs now` : 'No weight on file',
@@ -66,6 +67,7 @@ export default function SettingsScreen() {
         <Text className="mb-3">{rest ? `${Math.round(rest.caloriesKcal)} kcal · P ${Math.round(rest.proteinG)} g · C ${Math.round(rest.carbsG)} g · F ${Math.round(rest.fatG)} g` : 'No targets set yet.'}</Text>
         <Action label="Adjust targets" onPress={() => setTargets(true)} />
       </Section>
+      <Section title="Units" index={3}><UnitsCard onChange={() => setUnitsTick(value => value + 1)} /></Section>
       <Section title="Appearance" index={3}>
         <Text className="mb-3">Choose the surface that is easiest on your eyes.</Text>
         <View className="flex-row flex-wrap">{THEMES.map(theme => <Choice key={theme} label={theme[0].toUpperCase() + theme.slice(1)} selected={theme === mode} onPress={() => useThemeStore.getState().setMode(theme)} />)}</View>

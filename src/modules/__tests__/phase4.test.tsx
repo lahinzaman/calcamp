@@ -85,11 +85,13 @@ test('the quiz asks one question at a time and blocks advancing past an invalid 
   assert.ok(text().includes('metabolic reference'));
   await press('Male reference'); await press('Continue');
 
-  // An under-18 age is rejected in place rather than carried forward.
-  await type('Amount · years', '15'); await press('Continue');
+  // A date of birth under 18 is rejected in place rather than carried forward.
+  await type('When were you born?', '2015-01-01'); await press('Continue');
   assert.ok(text().includes('adults 18–100'));
-  assert.ok(text().includes('How old are you?'), 'must stay on the same question');
-  await type('Amount · years', '21'); await press('Continue');
+  assert.ok(text().includes('When were you born?'), 'must stay on the same question');
+  await type('When were you born?', 'yesterday'); await press('Continue');
+  assert.ok(text().includes('YYYY-MM-DD'), 'an unparseable date is refused too');
+  await type('When were you born?', '2004-06-15'); await press('Continue');
   assert.ok(text().includes('How tall are you?'));
   await type('Feet', '5'); await type('Inches', '11'); await press('Continue');
   await type('Amount · lbs', '180.'); await type('Amount · lbs', '180.5'); await press('Continue');

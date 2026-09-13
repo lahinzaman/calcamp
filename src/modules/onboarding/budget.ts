@@ -1,4 +1,5 @@
 import type { MacroTotals } from '../../types/nutrition';
+import { effectiveAge } from './birthDate';
 import type { OnboardingProfile } from '../../types/profile';
 
 export const GOAL_DIRECTIONS = ['auto', 'lose', 'maintain', 'gain', 'recomp'] as const;
@@ -10,6 +11,8 @@ export const RATE_CHOICES = [0.5, 1, 1.5, 2] as const;
 
 export interface LifestyleSurvey {
   age: number | null;
+  /** Preferred over `age`, which is only kept so older profiles keep working. */
+  birthDate?: string | null;
   metabolicSex: 'female' | 'male' | 'unspecified';
   composition: 'unsure' | 'lean' | 'balanced' | 'higher';
   priority: 'energy' | 'strength' | 'mobility';
@@ -25,7 +28,7 @@ export interface LifestyleSurvey {
   trainingDaysPerWeek?: number;
 }
 export const defaultSurvey: LifestyleSurvey = {
-  age: null, metabolicSex: 'unspecified', composition: 'unsure', priority: 'energy', recovery: 'steady',
+  age: null, birthDate: null, metabolicSex: 'unspecified', composition: 'unsure', priority: 'energy', recovery: 'steady',
   specializedNutrition: false, goalDirection: 'auto', rateLbsPerWeek: 1, goalWeightLbs: null,
   dietStyle: 'balanced', trainingDaysPerWeek: 3,
 };
@@ -69,7 +72,8 @@ function validate(p: OnboardingProfile, s: LifestyleSurvey) {
   if (!GOAL_DIRECTIONS.includes(s.goalDirection ?? 'auto')) throw new Error('Choose what you want your weight to do.');
   if (!DIET_STYLES.includes(s.dietStyle ?? 'balanced')) throw new Error('Choose how you prefer to eat.');
   if (s.skipAutomaticBudget) throw new Error('Automatic targets are turned off. You can track intake without a calorie recommendation.');
-  if (!Number.isInteger(s.age) || s.age! < 18 || s.age! > 100) throw new Error('Automatic budgets are available for adults 18–100. Enter your age.');
+  const years = effectiveAge(s);
+  if (years === null || !Number.isInteger(years) || years < 18 || years > 100) throw new Error('Automatic budgets are available for adults 18–100. Enter your date of birth.');
   if (s.specializedNutrition) throw new Error('Automatic targets are unavailable for pregnancy, breastfeeding, or clinician-managed nutrition. Use personal targets from your care team.');
   if (!Number.isFinite(p.weight_lbs) || p.weight_lbs! < 70 || p.weight_lbs! > 700 || !Number.isFinite(p.height_inches)
     || p.height_inches! < 48 || p.height_inches! > 90) throw new Error('Enter a height of 4–7 ft 6 in and a weight of 70–700 lbs.');
@@ -84,7 +88,7 @@ export function startingBudget(p: OnboardingProfile): StartingBudget {
   validate(p, s);
   const factor = { sedentary: 1.2, light: 1.375, moderate: 1.55, high: 1.725 }[p.activity_level ?? 'light'];
   const offset = s.metabolicSex === 'male' ? 5 : s.metabolicSex === 'female' ? -161 : -78;
-  const restingKcal = 4.5359237 * p.weight_lbs! + 15.875 * p.height_inches! - 5 * s.age! + offset;
+  const restingKcal = 4.5359237 * p.weight_lbs! + 15.875 * p.height_inches! - 5 * effectiveAge(s)! + offset;
   const tdeeKcal = Math.round(restingKcal * factor);
   const bmi = 703.06958 * p.weight_lbs! / p.height_inches! ** 2;
   const direction = s.goalDirection ?? 'auto';

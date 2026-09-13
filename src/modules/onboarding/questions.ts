@@ -1,3 +1,4 @@
+import { birthDateProblem } from './birthDate';
 import type { OnboardingProfile } from '../../types/profile';
 import { heightInches } from '../../lib/units';
 import { defaultSurvey, RATE_CHOICES, type LifestyleSurvey } from './budget';
@@ -8,7 +9,7 @@ export interface QuizQuestion {
   id: string;
   prompt: string;
   helper?: string;
-  kind: 'choice' | 'number' | 'height' | 'weekdays';
+  kind: 'choice' | 'number' | 'height' | 'weekdays' | 'text';
   options?: QuizOption[];
   /** Hidden questions are skipped entirely and never counted in the progress total. */
   applies?: (draft: Draft) => boolean;
@@ -19,6 +20,7 @@ export interface QuizQuestion {
   /** Optional questions may be advanced past without an answer. */
   optional?: boolean;
   unit?: string;
+  placeholder?: string;
 }
 
 const survey = (draft: Draft): LifestyleSurvey => ({ ...defaultSurvey, ...(draft.lifestyle_survey ?? {}) });
@@ -86,12 +88,13 @@ export const QUESTIONS: QuizQuestion[] = [
     write: (draft, value: LifestyleSurvey['metabolicSex']) => patchSurvey(draft, { metabolicSex: value }),
   },
   {
-    id: 'age', kind: 'number', unit: 'years',
-    prompt: 'How old are you?',
-    helper: 'Energy needs fall gradually with age; the equation accounts for it.',
-    read: draft => survey(draft).age,
-    write: (draft, value: number | null) => patchSurvey(draft, { age: value }),
-    problem: draft => { const age = survey(draft).age; return Number.isInteger(age) && age! >= 18 && age! <= 100 ? null : 'Automatic targets are available for adults 18–100.'; },
+    id: 'birthDate', kind: 'text',
+    prompt: 'When were you born?',
+    helper: 'Energy needs fall gradually with age. A date stays right as time passes, where a typed age is wrong within the year.',
+    placeholder: 'YYYY-MM-DD',
+    read: draft => survey(draft).birthDate ?? '',
+    write: (draft, value: string) => patchSurvey(draft, { birthDate: value.trim() || null }),
+    problem: draft => { const value = survey(draft).birthDate; return value ? birthDateProblem(value) : 'Enter a date of birth as YYYY-MM-DD.'; },
   },
   {
     id: 'height', kind: 'height',

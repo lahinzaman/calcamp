@@ -11,6 +11,7 @@ import {
   macroSplit, nutrientAverages, stepsSummary, weeklyAverages,
 } from './analytics';
 import { nutrientStatuses, personalDailyValues, type MetabolicSex } from '../nutrition/dailyValues';
+import { readUnits, showWeight, weightUnit } from '../settings/measurementUnits';
 
 export function Card({ title, children, index }: { title: string; children: React.ReactNode; index: number }) {
   return <Reveal index={index}><View className="mb-4 rounded-3xl border border-border bg-surface p-5">
@@ -25,6 +26,9 @@ function Stat({ value, label }: { value: string; label: string }) {
 }
 const signed = (value: number, unit: string, digits = 1) =>
   `${value > 0 ? '+' : value < 0 ? '−' : ''}${Math.abs(value).toFixed(digits)} ${unit}`;
+/** Weight is stored in pounds; these cards show it in whichever system is chosen. */
+const inUnits = (lbs: number) => showWeight(lbs, readUnits());
+const unit = () => weightUnit(readUnits());
 
 export function GoalProgressCard({ estimate, goalWeightLbs, index }: { estimate: TdeeEstimate | null; goalWeightLbs: number | null; index: number }) {
   const progress = goalProgress(estimate?.weightTrend ?? [], goalWeightLbs, estimate?.weightChangeLbsPerDay ?? null);
@@ -32,11 +36,11 @@ export function GoalProgressCard({ estimate, goalWeightLbs, index }: { estimate:
   return <Card title="Goal progress" index={index}>
     <View className="mb-3 flex-row items-end justify-between gap-3">
       <Text className="text-4xl font-bold">{Math.round(progress.percent * 100)}%</Text>
-      <Text className="flex-1 text-right text-sm">{progress.currentLbs.toFixed(1)} → {progress.goalLbs.toFixed(1)} lbs</Text>
+      <Text className="flex-1 text-right text-sm">{inUnits(progress.currentLbs)} → {inUnits(progress.goalLbs)} {unit()}</Text>
     </View>
     <ProgressBar value={progress.percent} target={1} height={12} tone={progress.wrongWay ? 'fat' : 'protein'} />
     <Text className="mt-3">
-      {signed(progress.movedLbs, 'lbs')} since {progress.startDate}, with {Math.abs(progress.remainingLbs).toFixed(1)} lbs to go.
+      {signed(inUnits(progress.movedLbs), unit())} since {progress.startDate}, with {Math.abs(inUnits(progress.remainingLbs))} {unit()} to go.
     </Text>
     {progress.wrongWay && <Text className="mt-2 text-sm">Your trend is moving away from this goal right now. That is information, not a verdict — check the calorie target before changing anything else.</Text>}
     {progress.weeksLeft !== null && <Text className="mt-2 text-sm">At the current trend that is about {Math.round(progress.weeksLeft)} more {Math.round(progress.weeksLeft) === 1 ? 'week' : 'weeks'}. It moves as your intake and activity move.</Text>}
@@ -55,8 +59,8 @@ export function EnergyBalanceCard({ rows, estimate, index }: { rows: readonly Hi
     <BarChart series={balance.days.map(day => ({ date: day.date, value: day.intakeKcal }))} target={estimate?.tdeeKcal ?? null} tone="protein" />
     <Text className="mt-2 text-sm">Bars are what you ate; the dashed line is what you burned.</Text>
     <View className="mt-4 flex-row flex-wrap gap-4">
-      <Stat value={signed(balance.predictedLbs, 'lbs')} label="Predicted from balance" />
-      {actualLbs !== null && <Stat value={signed(actualLbs, 'lbs')} label="Actual trend change" />}
+      <Stat value={signed(inUnits(balance.predictedLbs), unit())} label="Predicted from balance" />
+      {actualLbs !== null && <Stat value={signed(inUnits(actualLbs), unit())} label="Actual trend change" />}
     </View>
     {actualLbs !== null && <Text className="mt-3 text-sm">The two rarely match exactly. A gap usually means the logging is off somewhere, not that the arithmetic is — the scale is the measurement that settles it.</Text>}
   </Card>;
@@ -73,8 +77,8 @@ export function BodyCompositionCard({ measurements, weightLbs, index }: { measur
     <Text className="mb-3 mt-1">Body fat recorded {latest.date}{series.length > 1 ? ` · ${signed(latest.value - first.value, 'pts')} since ${first.date}` : ''}.</Text>
     {series.length > 1 && <LineChart trend={series} unit="%" tone="fat" caption="Whatever you measure with, keep measuring the same way — the direction is the useful part, not the absolute number." />}
     {composition && <View className="mt-4 flex-row flex-wrap gap-4">
-      <Stat value={`${composition.leanMassLbs.toFixed(1)}`} label="Lean mass lbs" />
-      <Stat value={`${composition.fatMassLbs.toFixed(1)}`} label="Fat mass lbs" />
+      <Stat value={`${inUnits(composition.leanMassLbs)}`} label={`Lean mass ${unit()}`} />
+      <Stat value={`${inUnits(composition.fatMassLbs)}`} label={`Fat mass ${unit()}`} />
     </View>}
     {!composition && <Text className="mt-2 text-sm">Log a body weight and this splits into fat and lean mass.</Text>}
   </Card>;
@@ -129,8 +133,8 @@ export function WeeklyAveragesCard({ rows, index }: { rows: readonly HistoryDay[
         <Text className="text-sm" style={{ fontVariant: ['tabular-nums'] }}>
           {week.averageKcal === null ? '— kcal' : `${Math.round(week.averageKcal)} kcal`}
           {kcalDelta !== null ? ` (${signed(kcalDelta, '', 0).trim()})` : ''}
-          {week.averageWeightLbs !== null ? ` · ${week.averageWeightLbs.toFixed(1)} lbs` : ''}
-          {weightDelta !== null ? ` (${signed(weightDelta, '').trim()})` : ''}
+          {week.averageWeightLbs !== null ? ` · ${inUnits(week.averageWeightLbs)} ${unit()}` : ''}
+          {weightDelta !== null ? ` (${signed(inUnits(weightDelta), '').trim()})` : ''}
         </Text>
       </View>;
     })}

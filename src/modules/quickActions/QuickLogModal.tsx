@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, ScrollView, View } from 'react-native';
 import { CameraScanner } from './CameraScanner';
 import { SafeAreaView } from '../../theme/SafeArea';
@@ -6,6 +6,7 @@ import { Text } from '../../theme/primitives';
 import { Action, Field } from '../../components/FormControls';
 import { nutritionStore } from '../../store/nutritionStore';
 import { gramsToOz, ozToGrams } from '../../lib/units';
+import { readUnits, readWeight, showWeight, weightUnit } from '../settings/measurementUnits';
 import { useFoodVision } from '../vision/useFoodVision';
 import { lookupBarcode } from './barcode';
 import { WeightPhotoSheet } from '../progress/WeightPhotoSheet';
@@ -30,6 +31,8 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
   const [notice,setNotice]=useState(''); const [error,setError]=useState<string|null>(null); const [busy,setBusy]=useState(false);
   const [code,setCode]=useState('');
   const [photoWeight,setPhotoWeight]=useState<number|null>(null);
+  const units=useMemo(()=>readUnits(),[]);
+  const bounds={min:showWeight(70,units,0),max:showWeight(700,units,0)};
   const owner=useAuthStore(s=>s.session?.user.id)??'anonymous';
   const locked=useRef(false); const alive=useRef(true); const request=useRef<AbortController|null>(null); const vision=useFoodVision();
   const [reference,setReference]=useState<{grams:number;macros:MacroTotals}|null>(null);
@@ -61,9 +64,10 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
   const save=()=>{
     if(locked.current)return;setError(null);
     try{if(action==='weight'){
-      if(!weight.trim()||!Number.isFinite(Number(weight))||Number(weight)<70||Number(weight)>700)throw new Error('Enter a body weight of 70–700 lbs.');
+      const pounds=weight.trim()&&Number.isFinite(Number(weight))?readWeight(Number(weight),units):Number.NaN;
+      if(!Number.isFinite(pounds)||pounds<70||pounds>700)throw new Error(`Enter a body weight of ${bounds.min}–${bounds.max} ${weightUnit(units)}.`);
       // The photo step saves the weight; the scale number alone shows far less than it plus a photo.
-      setPhotoWeight(Number(weight));return;
+      setPhotoWeight(pounds);return;
     }else{
       if(action==='quick'){
         if(!values.caloriesKcal.trim()||!Number.isFinite(Number(values.caloriesKcal))||Number(values.caloriesKcal)<=0||Number(values.caloriesKcal)>20000)throw new Error('Enter the calories for this quick add.');
@@ -107,7 +111,7 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
       <Text className="mb-4">For when you know roughly what it cost you but not the breakdown. Leave a macro blank and it is recorded as zero for this entry.</Text>
       <Field label="Food name" value={name} onChangeText={setName} maxLength={150} placeholder="Quick add" />
       {macroFields.map(([key,label])=><Field key={key} label={key==='caloriesKcal'?label:`${label} · optional`} value={values[key]} onChangeText={text=>setValues(s=>({...s,[key]:text}))} keyboardType="decimal-pad" />)}
-    </>:action==='weight'?<><Text className="mb-4">Saved to today's diary and queued for cloud sync.</Text><Field label="Body weight · lbs" value={weight} onChangeText={setWeight} keyboardType="decimal-pad" /></>:<>
+    </>:action==='weight'?<><Text className="mb-4">Saved to today's diary and queued for cloud sync.</Text><Field label={`Body weight · ${weightUnit(units)}`} value={weight} onChangeText={setWeight} keyboardType="decimal-pad" /></>:<>
       {!!notice&&<Text className="mb-4">{notice}</Text>}<Field label="Food name" value={name} onChangeText={setName} maxLength={150}/><Field label="Portion · oz" value={portion} onChangeText={changePortion} keyboardType="decimal-pad" />
       <Text className="mb-3">Macros for the entire portion above. Changing a manual macro keeps your edited value until you change the portion again.</Text>{macroFields.map(([key,label])=><Field key={key} label={label} value={values[key]} onChangeText={text=>setValues(s=>({...s,[key]:text}))} keyboardType="decimal-pad" />)}
     </>)}

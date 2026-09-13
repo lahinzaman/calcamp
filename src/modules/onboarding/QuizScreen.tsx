@@ -5,7 +5,7 @@ import Animated, { FadeInRight, FadeOutLeft, ReduceMotion } from 'react-native-r
 import { SafeAreaView } from '../../theme/SafeArea';
 import { Text } from '../../theme/primitives';
 import { Pressable } from '../../theme/Pressable';
-import { Action, NumericField } from '../../components/FormControls';
+import { Action, Field, NumericField } from '../../components/FormControls';
 import { ProgressBar, TIMING } from '../../theme/motion';
 import { haptic } from '../../theme/haptics';
 import { useOnboardingStore } from '../../store/onboardingStore';
@@ -39,6 +39,11 @@ function Body({ question, draft, patch }: { question: QuizQuestion; draft: Draft
   if (question.kind === 'number') {
     return <NumericField label={question.unit ? `Amount · ${question.unit}` : 'Amount'} keyboardType="decimal-pad"
       value={current as number | null} onValue={value => patch(question.write(draft, value as never))} />;
+  }
+  if (question.kind === 'text') {
+    return <Field label={question.prompt} value={(current as string) ?? ''} placeholder={question.placeholder}
+      autoCapitalize="none" autoCorrect={false} keyboardType="numbers-and-punctuation"
+      onChangeText={(value: string) => patch(question.write(draft, value as never))} />;
   }
   if (question.kind === 'height') {
     const apply = (nextFeet: number | null, nextInches: number | null) => {

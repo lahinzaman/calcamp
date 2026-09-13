@@ -17,6 +17,8 @@ mock.module('expo-crypto', { namedExports: { randomUUID: () => 'retry-id' } });
 mock.module('../notifications/NotificationSettings', { namedExports: { NotificationSettings: () => null } });
 // Health connect owns a device adapter; the settings screen only has to render it.
 mock.module('../health/HealthConnectCard', { namedExports: { HealthConnectCard: () => null } });
+// Permission priming owns the camera and notification adapters; settings only renders it.
+mock.module('../onboarding/PermissionsCard', { namedExports: { PermissionsCard: () => null } });
 let deleted = 0; let submits = 0; const ids: unknown[] = [];
 mock.module('../account/deleteAccount', { namedExports: { deleteAccount: async (owner: string) => { assert.equal(owner, 'alice'); deleted++; return { identityRemoved: true, providerHistoryPending: false }; } } });
 mock.module('../../api/supabase', { namedExports: { getSupabase: () => ({ rpc: async (_name: string, input: Record<string, unknown>) => {

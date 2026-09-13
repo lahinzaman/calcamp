@@ -11,6 +11,7 @@ import { authStore, useAuthStore } from '../../store/authStore';
 import { completeOnboarding } from '../../api/profile';
 import { heightLabel } from '../../lib/units';
 import { applyStartingBudget, defaultSurvey, startingBudget } from './budget';
+import { PermissionsCard } from './PermissionsCard';
 import type { MacroTotals } from '../../types/nutrition';
 function Plan({ label, macros, note }: { label: string; macros: MacroTotals; note?: string }) {
   return <View className="mb-3 rounded-3xl border border-border bg-surface p-5">
@@ -58,6 +59,7 @@ export default function ReviewScreen() {
           <Text className="mb-5 text-sm">{budget.explanation}</Text>
         </Reveal>
       </> : <Reveal index={1}><View className="mb-5 rounded-3xl bg-surface p-5"><Text className="font-bold">No calorie target</Text><Text className="mt-2">{budgetError}</Text><Text className="mt-2 text-sm">You can still log food, training and weight — everything works without a target.</Text></View></Reveal>}
+      <Reveal index={2}><PermissionsCard /></Reveal>
       {error && <Text accessibilityRole="alert" className="mb-4">{error}</Text>}
       {!session && <Text className="mb-4 rounded-xl bg-raised p-4">Sign in to save this plan. Your answers are kept on this device meanwhile.</Text>}
       <Action label={busy ? 'Saving…' : 'Start using CalCamp'} disabled={!session || busy} onPress={() => void save()} tone="success" />

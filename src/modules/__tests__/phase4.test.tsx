@@ -31,6 +31,8 @@ mock.module('../../api/campus.ts', { namedExports: {
   fetchMacroRescue: async (location: unknown, remaining: unknown, preference: unknown) => { rescueInput = { location, remaining, preference }; return { matches: [], eligibleRestaurants: 0, uncoveredRestaurants: 0, checkedAt: new Date().toISOString() }; },
 } });
 mock.module('../auth/social', { namedExports: { authRedirect: () => 'calcamp://auth-callback', signInSocial: async () => {} } });
+// Permission priming owns the camera and notification adapters; review only renders it.
+mock.module('../onboarding/PermissionsCard', { namedExports: { PermissionsCard: () => null } });
 const { default: AuthScreen } = require('../auth/AuthScreen') as typeof import('../auth/AuthScreen');
 const { default: QuizScreen } = require('../onboarding/QuizScreen') as typeof import('../onboarding/QuizScreen');
 const { default: ReviewScreen } = require('../onboarding/ReviewScreen') as typeof import('../onboarding/ReviewScreen');

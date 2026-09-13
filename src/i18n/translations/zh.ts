@@ -100,4 +100,7 @@ export const zh: Partial<Catalogue> = {
   'weight.saveWithout': '不拍照，直接保存体重', 'weight.takePhoto': '拍摄进度照片',
   'onboarding.continue': '继续', 'onboarding.back': '返回', 'onboarding.start': '开始使用 CalCamp',
   'onboarding.changeAnswers': '修改我的回答',
+  'trends.cloudUnavailable': '无法连接到云端记录。本机数据不受影响——恢复网络后请重试。',
+  'trends.expenditureNote': '根据你记录的摄入与体重趋势估算的每日消耗——这不是目标值。',
+  'trends.weighInNote': '每天早晨称重，并在记录完当天所有内容后把这一天标为达标。',
 };

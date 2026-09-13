@@ -100,4 +100,7 @@ export const ru: Partial<Catalogue> = {
   'weight.saveWithout': 'Сохранить вес без фото', 'weight.takePhoto': 'Сделать фото прогресса',
   'onboarding.continue': 'Далее', 'onboarding.back': 'Назад', 'onboarding.start': 'Начать пользоваться CalCamp',
   'onboarding.changeAnswers': 'Изменить мои ответы',
+  'trends.cloudUnavailable': 'Не удалось связаться с облачным дневником. Данные на устройстве не затронуты — повторите попытку при подключении.',
+  'trends.expenditureNote': 'Расчётный дневной расход по вашему учтённому потреблению и тренду веса — это не цель.',
+  'trends.weighInNote': 'Взвешивайтесь каждое утро и отмечайте день как соблюдённый, когда всё записано.',
 };

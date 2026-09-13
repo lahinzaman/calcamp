@@ -126,6 +126,9 @@ export const en = {
   'trends.consistency': 'Consistency',
   'trends.stillMeasuring': 'Still measuring',
   'trends.historyUnavailable': 'History unavailable',
+  'trends.cloudUnavailable': 'We could not reach your cloud diary. Your device data is unaffected — try again when connected.',
+  'trends.expenditureNote': 'Estimated daily expenditure from your logged intake and weight trend — not a target.',
+  'trends.weighInNote': 'Weigh in each morning and mark the day adherent once you have logged everything.',
   'trends.loading': 'Loading your history…',
 
   'train.title': 'Make progress.',

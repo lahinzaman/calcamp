@@ -100,4 +100,7 @@ export const bn: Partial<Catalogue> = {
   'weight.saveWithout': 'ছবি ছাড়াই ওজন সংরক্ষণ করুন', 'weight.takePhoto': 'অগ্রগতির ছবি তুলুন',
   'onboarding.continue': 'এগিয়ে যান', 'onboarding.back': 'পিছনে', 'onboarding.start': 'CalCamp ব্যবহার শুরু করুন',
   'onboarding.changeAnswers': 'আমার উত্তর বদলান',
+  'trends.cloudUnavailable': 'আপনার ক্লাউড দিনলিপিতে পৌঁছানো যায়নি। ডিভাইসের তথ্য অক্ষত আছে — সংযোগ পেলে আবার চেষ্টা করুন।',
+  'trends.expenditureNote': 'আপনার লেখা গ্রহণ ও ওজনের ধারা থেকে অনুমান করা দৈনিক ব্যয় — এটি লক্ষ্য নয়।',
+  'trends.weighInNote': 'প্রতিদিন সকালে ওজন নিন, আর সব কিছু লেখা হয়ে গেলে দিনটিকে সম্পন্ন হিসেবে চিহ্নিত করুন।',
 };

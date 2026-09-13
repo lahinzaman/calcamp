@@ -100,4 +100,7 @@ export const ar: Partial<Catalogue> = {
   'weight.saveWithout': 'حفظ الوزن بدون صورة', 'weight.takePhoto': 'التقاط صورة التقدّم',
   'onboarding.continue': 'متابعة', 'onboarding.back': 'رجوع', 'onboarding.start': 'ابدأ استخدام CalCamp',
   'onboarding.changeAnswers': 'تعديل إجاباتي',
+  'trends.cloudUnavailable': 'تعذّر الوصول إلى سجلك السحابي. بيانات جهازك لم تتأثر — أعد المحاولة عند الاتصال.',
+  'trends.expenditureNote': 'الإنفاق اليومي المقدَّر من مدخولك المسجّل ومسار وزنك — وليس هدفًا.',
+  'trends.weighInNote': 'زِن نفسك كل صباح، وضع علامة الالتزام على اليوم بعد أن تسجّل كل شيء.',
 };

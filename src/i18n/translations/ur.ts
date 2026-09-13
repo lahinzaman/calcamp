@@ -100,4 +100,7 @@ export const ur: Partial<Catalogue> = {
   'weight.saveWithout': 'تصویر کے بغیر وزن محفوظ کریں', 'weight.takePhoto': 'پیش رفت کی تصویر لیں',
   'onboarding.continue': 'جاری رکھیں', 'onboarding.back': 'واپس', 'onboarding.start': 'CalCamp استعمال کرنا شروع کریں',
   'onboarding.changeAnswers': 'اپنے جوابات بدلیں',
+  'trends.cloudUnavailable': 'آپ کے کلاؤڈ روزنامچے تک رسائی نہیں ہو سکی۔ آلے کا ڈیٹا محفوظ ہے — رابطہ بحال ہونے پر دوبارہ کوشش کریں۔',
+  'trends.expenditureNote': 'آپ کے درج کردہ استعمال اور وزن کے رجحان سے اندازہ شدہ روزانہ خرچ — یہ ہدف نہیں ہے۔',
+  'trends.weighInNote': 'ہر صبح وزن کریں، اور سب کچھ درج کر لینے پر اُس دن کو مکمل نشان زد کریں۔',
 };

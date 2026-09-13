@@ -100,4 +100,7 @@ export const ja: Partial<Catalogue> = {
   'weight.saveWithout': '写真なしで体重を保存', 'weight.takePhoto': '記録写真を撮る',
   'onboarding.continue': '次へ', 'onboarding.back': '戻る', 'onboarding.start': 'CalCamp を使いはじめる',
   'onboarding.changeAnswers': '回答を修正する',
+  'trends.cloudUnavailable': 'クラウドの記録に接続できませんでした。端末内のデータは影響を受けていません。接続できたら再試行してください。',
+  'trends.expenditureNote': '記録した摂取量と体重の推移から推定した1日の消費量です。目標値ではありません。',
+  'trends.weighInNote': '毎朝体重を量り、その日の記録をすべて終えたら「達成」として印を付けてください。',
 };

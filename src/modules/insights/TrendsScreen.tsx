@@ -63,7 +63,7 @@ export default function TrendsScreen() {
         <View className="mb-4 flex-row flex-wrap">{RANGES.map(([value, key]) => <Choice key={value} label={t(key)} selected={days === value} onPress={() => setDays(value)} />)}</View>
       </Reveal>
       {history.isLoading && <LoadingCards label={t('trends.loading')} />}
-      {history.isError && <Card title={t('trends.historyUnavailable')} index={1}><Text>We could not reach your cloud diary. Your device data is unaffected — try again when connected.</Text></Card>}
+      {history.isError && <Card title={t('trends.historyUnavailable')} index={1}><Text>{t('trends.cloudUnavailable')}</Text></Card>}
       {!history.isLoading && !history.isError && <>
         <Card title={t('trends.weightTrend')} index={1}>
           <LineChart unit=" lbs" tone="protein"
@@ -74,14 +74,14 @@ export default function TrendsScreen() {
         <Card title={t('trends.expenditure')} index={2}>
           {estimate?.status === 'ready' ? <>
             <Text className="text-4xl font-bold">{Math.round(estimate.tdeeKcal!)} kcal</Text>
-            <Text className="mb-3 mt-1">Estimated daily expenditure from your logged intake and weight trend — not a target.</Text>
+            <Text className="mb-3 mt-1">{t('trends.expenditureNote')}</Text>
             <Text className="text-sm">Based on {estimate.adherentDays} complete days ({Math.round(estimate.coverage * 100)}% of the window).
               {perDay !== null && Math.abs(perDay) > .001 ? ` Trending ${perDay > 0 ? 'up' : 'down'} about ${Math.abs(perDay * 7).toFixed(2)} lbs per week.` : ' Weight is holding steady.'}</Text>
             {profile?.dynamic_tdee_kcal ? <Text className="mt-3 text-sm">Your onboarding estimate was {Math.round(profile.dynamic_tdee_kcal)} kcal. This measured figure is the better one once you have a few weeks of data.</Text> : null}
           </> : <>
             <Text className="text-xl font-bold">{t('trends.stillMeasuring')}</Text>
             <Text className="mt-2">This needs 14 days that have both a weigh-in and a complete food log, marked adherent. You have {estimate?.adherentDays ?? 0}.</Text>
-            <Text className="mt-3 text-sm">Weigh in each morning and mark the day adherent once you have logged everything.</Text>
+            <Text className="mt-3 text-sm">{t('trends.weighInNote')}</Text>
           </>}
         </Card>
         <GoalProgressCard estimate={estimate} goalWeightLbs={goalWeight} index={3} />

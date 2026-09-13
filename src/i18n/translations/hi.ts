@@ -100,4 +100,7 @@ export const hi: Partial<Catalogue> = {
   'weight.saveWithout': 'बिना तस्वीर वज़न सहेजें', 'weight.takePhoto': 'प्रगति की तस्वीर लें',
   'onboarding.continue': 'आगे बढ़ें', 'onboarding.back': 'वापस', 'onboarding.start': 'CalCamp इस्तेमाल शुरू करें',
   'onboarding.changeAnswers': 'मेरे उत्तर बदलें',
+  'trends.cloudUnavailable': 'आपकी क्लाउड डायरी तक नहीं पहुँचा जा सका। डिवाइस का डेटा सुरक्षित है — कनेक्ट होने पर फिर कोशिश करें।',
+  'trends.expenditureNote': 'आपके दर्ज सेवन और वज़न के रुझान से अनुमानित दैनिक व्यय — यह लक्ष्य नहीं है।',
+  'trends.weighInNote': 'हर सुबह वज़न लें, और सब कुछ दर्ज कर लेने पर उस दिन को पूरा चिह्नित करें।',
 };

@@ -100,4 +100,7 @@ export const es: Partial<Catalogue> = {
   'weight.saveWithout': 'Guardar el peso sin foto', 'weight.takePhoto': 'Hacer foto de progreso',
   'onboarding.continue': 'Continuar', 'onboarding.back': 'Atrás', 'onboarding.start': 'Empezar a usar CalCamp',
   'onboarding.changeAnswers': 'Cambiar mis respuestas',
+  'trends.cloudUnavailable': 'No pudimos acceder a tu diario en la nube. Los datos de tu dispositivo no se ven afectados: inténtalo de nuevo con conexión.',
+  'trends.expenditureNote': 'Gasto diario estimado a partir de tu ingesta registrada y tu tendencia de peso; no es un objetivo.',
+  'trends.weighInNote': 'Pésate cada mañana y marca el día como cumplido cuando hayas registrado todo.',
 };

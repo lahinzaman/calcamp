@@ -44,6 +44,8 @@ export interface WorkoutActions {
   clearExpiredRestTimer: (nowMs?: number) => void;
   /** Returns the detached session for a later persistence layer, then clears state. */
   finishSession: (endedAtMs?: number) => CompletedWorkout;
+  /** Throws the session away. Nothing is queued, so nothing reaches history. */
+  cancelSession: () => void;
   savePendingWorkouts: () => Promise<void>;
   reset: () => void;
 }
@@ -253,6 +255,11 @@ export function createWorkoutStore(options: { now?: () => number; repository?: T
       const queued = JSON.parse(JSON.stringify(completed)) as CompletedWorkout;
       set({ ...initialState(), pendingWorkouts: [...state.pendingWorkouts, { workout: queued, ownerId: null }] });
       return completed;
+    },
+    cancelSession: () => {
+      requireSession(get());
+      // Workouts already queued for upload are somebody else's completed sessions.
+      set({ ...initialState(), pendingWorkouts: get().pendingWorkouts, importedWorkouts: get().importedWorkouts });
     },
     savePendingWorkouts: async () => {
       if (options.durable && syncBridge.drain) return syncBridge.drain();

@@ -67,3 +67,38 @@ test('plate loading is per side, greedy, and honest about what the rack cannot m
   assert.equal(loadPlates(30)!.achieved, 45);
   assert.equal(loadPlates(Number.NaN), null);
 });
+
+test('a cancelled session reaches neither history nor the upload queue', () => {
+  const { workoutStore } = require('../../store/workoutStore') as typeof import('../../store/workoutStore');
+  const store = workoutStore.getState();
+  store.reset();
+  store.startSession({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa01', name: 'Push A' });
+  store.addExercise({ id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb01', exercise: { id: 'cccccccc-cccc-4ccc-8ccc-cccccccccc01', name: 'Bench' }, defaultRestSeconds: 120 });
+  store.addSet({ id: 'dddddddd-dddd-4ddd-8ddd-dddddddddd01', sessionExerciseId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb01' });
+  store.updateSet('dddddddd-dddd-4ddd-8ddd-dddddddddd01', { weightLbs: 185, reps: 5 });
+  store.completeSet('dddddddd-dddd-4ddd-8ddd-dddddddddd01');
+  assert.equal(workoutStore.getState().sets.length, 1);
+
+  workoutStore.getState().cancelSession();
+  const after = workoutStore.getState();
+  assert.equal(after.activeSession, null);
+  assert.deepEqual(after.sets, []);
+  assert.deepEqual(after.exerciseSequence, []);
+  // Finishing queues a workout; cancelling must not, or the session lands in history anyway.
+  assert.deepEqual(after.pendingWorkouts, []);
+  assert.throws(() => workoutStore.getState().cancelSession(), /session/i, 'there is nothing to cancel twice');
+  workoutStore.getState().reset();
+});
+
+test('cancelling keeps workouts that were already finished and waiting to upload', () => {
+  const { workoutStore } = require('../../store/workoutStore') as typeof import('../../store/workoutStore');
+  const store = workoutStore.getState();
+  store.reset();
+  store.startSession({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa02', name: 'Finished' });
+  store.finishSession();
+  assert.equal(workoutStore.getState().pendingWorkouts.length, 1);
+  workoutStore.getState().startSession({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa03', name: 'Abandoned' });
+  workoutStore.getState().cancelSession();
+  assert.equal(workoutStore.getState().pendingWorkouts.length, 1, 'an earlier session is not collateral');
+  workoutStore.getState().reset();
+});

@@ -72,7 +72,7 @@ export function RoutineBuilder({ onClose, onSave, existing }: { onClose: () => v
           <Text className="text-2xl font-bold">Choose your exercises</Text>
           <Text className="mt-1 text-sm">Search or filter down to what your gym actually has. Sets and rest come next.</Text>
         </View>
-        <ExercisePicker selectedIds={ids} onToggle={toggle} footer={<>
+        <ExercisePicker selectedIds={ids} onToggle={toggle} onClose={onClose} footer={<>
           <Action label={ids.length ? `Set up ${ids.length} exercise${ids.length > 1 ? 's' : ''}` : 'Pick at least one exercise'}
             disabled={!ids.length} onPress={() => setStep('tune')} tone={ids.length ? 'success' : 'none'} />
           <Action secondary label="Cancel" onPress={onClose} />

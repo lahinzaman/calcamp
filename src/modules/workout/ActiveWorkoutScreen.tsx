@@ -9,6 +9,8 @@ import { overloadSuggestion, type LiftHistory, type PersonalRecord, type Session
 import { VolumeTrend } from './VolumeTrend';
 import { PlateCalculator } from './PlateCalculator';
 import { ExerciseHelp } from './ExerciseHelp';
+import { ExerciseOrder } from './ExerciseOrder';
+import { SessionControls } from './SessionControls';
 import { exerciseById } from './catalog';
 import type { WorkoutRoutine } from './routines';
 import { useAuthStore } from '../../store/authStore';
@@ -124,6 +126,7 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
   const pending = useWorkoutStore(state => state.pendingWorkouts.length);
   const [localHistory, setLocalHistory] = useState<PreviousSets>({});
   const [finished, setFinished] = useState<string | null>(null);
+  const [ordering, setOrdering] = useState(false);
   const active = sequence.find((exercise) => exercise.id === activeId);
   const currentSets = useMemo(() => sets.filter((entry) => entry.sessionExerciseId === activeId), [sets, activeId]);
   const history = active ? (localHistory[active.exercise.id] ?? previousSets[active.exercise.id] ?? lifts[active.exercise.id]?.lastSets ?? []) : [];
@@ -152,7 +155,7 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
       <View className="mb-6 flex-row justify-between"><Text className="text-sm font-black tracking-widest text-ink">CALCAMP</Text><Text className="text-xs font-semibold text-ink">TRAINING</Text></View>
       <SyncIndicator />
       {!!recordNames.length && <View className="my-3 rounded-2xl bg-surface p-4">
-        <Text className="font-bold">🏆 New personal record{recordNames.length > 1 ? 's' : ''}</Text>
+        <Text className="font-bold">New personal record{recordNames.length > 1 ? 's' : ''}</Text>
         {recordNames.map(record => <Text key={`${record.exerciseId}:${record.kind}`} className="mt-2 text-sm text-ink">{record.name} · {record.kind === 'weight' ? 'heaviest set' : 'estimated 1RM'} {Math.round(record.value)} lbs{record.previous ? ` (was ${Math.round(record.previous)})` : ''}</Text>)}
       </View>}
       <ImportedWorkouts />
@@ -175,16 +178,33 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
         <Action secondary label="Create another routine" onPress={() => setBuilder(true)} />
         </>}
         <TrainingTips routines={routines} experience={experience} lifts={lifts} volumeLog={volumeLog} />
-        <Action secondary label="📅 Training history & records" onPress={() => router.push('/workouts')} />
+        <Action secondary label="Training history & records" onPress={() => router.push('/workouts')} />
         <VolumeTrend log={volumeLog} />
         {routineError && <Text>{routineError}</Text>}
         <View className="gap-2">{(plan?.lifts ?? []).map(e => <View key={e.id} className="flex-row items-center gap-3"><Text className="flex-1">{e.name}</Text><ExerciseHelp exercise={e} /></View>)}</View>
         {finished && <Text accessibilityRole="alert" className="mt-4 text-sm text-ink">{finished}</Text>}
       </View> : <>
         <SessionTimer startedAtMs={session.startedAtMs} volumeLbs={volume} sets={sets.filter(entry => entry.completedAtMs !== null).length} />
-        <View className="my-6 flex-row gap-3"><View className="flex-1 rounded-2xl bg-surface p-4"><Text className="text-xs text-ink">Completed sets</Text><Text className="mt-2 text-2xl font-bold text-ink">{sets.filter((entry) => entry.completedAtMs !== null).length}</Text></View><View className="flex-1 rounded-2xl bg-surface p-4"><Text className="text-xs text-ink">Volume · lbs × reps</Text><Text className="mt-2 text-2xl font-bold text-ink">{Number(volume.toFixed(1))}</Text></View></View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-5" contentContainerStyle={{ gap: 8 }}>
-          {sequence.map((entry, index) => <View key={entry.id} className="flex-row items-center gap-2"><Pressable accessibilityRole="tab" accessibilityLabel={entry.exercise.name} accessibilityState={{ selected: entry.id === activeId }} onPress={() => safelyEdit(() => workoutStore.getState().setActiveExercise(entry.id))} className={entry.id === activeId ? 'rounded-xl bg-background px-4 py-3' : 'rounded-xl bg-surface px-4 py-3'}><Text className={entry.id === activeId ? 'text-sm font-semibold text-ink' : 'text-sm font-semibold text-ink'}>{index + 1}. {entry.exercise.name}</Text></Pressable><ExerciseHelp exercise={entry.exercise} /></View>)}
+        <View className="my-6 flex-row flex-wrap gap-3">
+          <View className="items-center rounded-2xl bg-surface p-4" style={{ flexGrow: 1, flexBasis: 140 }}>
+            <Text className="text-3xl font-bold" style={{ fontVariant: ['tabular-nums'] }}>{sets.filter(entry => entry.completedAtMs !== null).length}</Text>
+            <Text className="mt-1 text-xs">Completed sets</Text></View>
+          <View className="items-center rounded-2xl bg-surface p-4" style={{ flexGrow: 1, flexBasis: 140 }}>
+            <Text className="text-3xl font-bold" style={{ fontVariant: ['tabular-nums'] }}>{Math.round(volume).toLocaleString()}</Text>
+            <Text className="mt-1 text-xs">Volume · lbs</Text></View>
+        </View>
+        <View className="mb-2 flex-row items-center justify-between gap-3">
+          <Text className="flex-1 text-sm font-bold tracking-widest">EXERCISES</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Reorder exercises" onPress={() => setOrdering(true)} weight="subtle"
+            className="min-h-11 justify-center rounded-full bg-surface px-4"><Text className="text-sm font-semibold">Reorder</Text></Pressable>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-5" contentContainerStyle={{ gap: 8, paddingRight: 16 }}>
+          {sequence.map((entry, index) => <Pressable key={entry.id} accessibilityRole="tab" accessibilityLabel={entry.exercise.name}
+            accessibilityState={{ selected: entry.id === activeId }}
+            onPress={() => safelyEdit(() => workoutStore.getState().setActiveExercise(entry.id))} weight="subtle"
+            className={`min-h-12 justify-center rounded-xl px-4 ${entry.id === activeId ? 'bg-accent' : 'bg-surface'}`}>
+            <Text className="text-sm font-semibold">{index + 1}. {entry.exercise.name}</Text>
+          </Pressable>)}
         </ScrollView>
         {active ? <View className="rounded-3xl bg-surface pt-4">
           <View className="mx-4 flex-row items-center gap-3"><Text className="flex-1 text-xl font-bold">{active.exercise.name}</Text><ExerciseHelp exercise={active.exercise} /></View>
@@ -200,20 +220,23 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
         {active && <Pressable accessibilityRole="button" onPress={() => safelyEdit(() => workoutStore.getState().addSet({ id: localId(), sessionExerciseId: active.id }))} className="mt-3 items-center rounded-xl bg-raised p-4"><Text className="font-bold text-ink">+ Add set</Text></Pressable>
         }
         <RestTimerPanel />
-        <Pressable accessibilityRole="button" onPress={() => safelyEdit(() => {
-          const snapshot = workoutStore.getState().finishSession();
-          const next: PreviousSets = {};
-          for (const exercise of snapshot.exercises) {
-            const completed = snapshot.sets.filter((entry) => entry.sessionExerciseId === exercise.id && entry.completedAtMs !== null && !entry.isWarmup);
-            if (completed.length) next[exercise.exercise.id] = completed.map((entry) => ({ weightLbs: entry.weightLbs!, reps: entry.reps! }));
-          }
-          setLocalHistory((current) => ({ ...current, ...next }));
-          setFinished('Session finished and queued for cloud save.');
-          void workoutStore.getState().savePendingWorkouts();
-        })} className="mt-6 items-center rounded-2xl border border-border p-4"><Text className="font-bold text-ink">Finish session</Text></Pressable>
+        <SessionControls completedSets={sets.filter(entry => entry.completedAtMs !== null).length} volumeLbs={volume}
+          onFinish={() => safelyEdit(() => {
+            const snapshot = workoutStore.getState().finishSession();
+            const next: PreviousSets = {};
+            for (const exercise of snapshot.exercises) {
+              const completed = snapshot.sets.filter((entry) => entry.sessionExerciseId === exercise.id && entry.completedAtMs !== null && !entry.isWarmup);
+              if (completed.length) next[exercise.exercise.id] = completed.map((entry) => ({ weightLbs: entry.weightLbs!, reps: entry.reps! }));
+            }
+            setLocalHistory((current) => ({ ...current, ...next }));
+            setFinished('Session finished and queued for cloud save.');
+            void workoutStore.getState().savePendingWorkouts();
+          })}
+          onCancel={() => safelyEdit(() => { workoutStore.getState().cancelSession(); setFinished('Session discarded. Nothing was recorded.'); })} />
       </> : null}
     />
     {builder && <RoutineBuilder onClose={() => setBuilder(false)} onSave={saveRoutine} />}
+    {ordering && <ExerciseOrder sequence={sequence} onClose={() => setOrdering(false)} />}
   </SafeAreaView>;
 }
 

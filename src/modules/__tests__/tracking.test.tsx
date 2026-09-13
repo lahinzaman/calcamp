@@ -37,7 +37,6 @@ mock.module('@shopify/flash-list', { namedExports: {
   </>,
   useRecyclingState: (value: unknown) => React.useState(value),
 } });
-mock.module('lottie-react-native', { defaultExport: 'LottieView' });
 mock.module('expo-crypto', { namedExports: { randomUUID: () => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' } });
 mock.module('expo-location', { namedExports: { requestForegroundPermissionsAsync: async () => ({ granted: false }), getCurrentPositionAsync: async () => ({ coords: { latitude: 0, longitude: 0 } }), Accuracy: { Balanced: 3 } } });
 mock.module('react-native-safe-area-context', { namedExports: { SafeAreaView: 'SafeAreaView' } });

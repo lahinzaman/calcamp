@@ -97,26 +97,3 @@ test('coaching fires on the user own data and puts frequency before volume', () 
   assert.ok(coachingTips({ ...base, volume: once, shortestRestSeconds: 30 }).some(tip => tip.id === 'rest'));
 });
 
-test('every demonstration renders a full figure with ground, limbs and a head', () => {
-  const { demonstration, DEMO_KINDS } = require('../workout/demonstrations') as typeof import('../workout/demonstrations');
-  for (const kind of DEMO_KINDS) {
-    const animation = demonstration(kind);
-    const shapes = animation.layers[0].shapes;
-    // Ground, far leg, far arm, near leg, near arm, head — equipment is optional.
-    assert.ok(shapes.length >= 6, `${kind} should draw a full figure`);
-    assert.equal(animation.fr, 30);
-    assert.equal(animation.op, 91);
-    const head = shapes.find(group => group.it.some((item: { ty: string }) => item.ty === 'el'));
-    assert.ok(head, `${kind} needs a head`);
-    // Every animated path must return to its starting pose so the loop does not jump.
-    for (const group of shapes) {
-      const path = group.it.find((item: { ty: string }) => item.ty === 'sh') as { ks: { a: number; k: { t: number; s: unknown[] }[] } } | undefined;
-      if (!path || path.ks.a !== 1) continue;
-      assert.deepEqual(path.ks.k.at(-1)!.s, path.ks.k[0].s, `${kind} loop must close`);
-    }
-  }
-  // Barbell movements carry a bar; bodyweight ones do not.
-  const squat = demonstration('squat').layers[0].shapes.length;
-  const pullup = demonstration('pullup').layers[0].shapes.length;
-  assert.ok(squat > pullup, 'loaded lifts should draw their equipment');
-});

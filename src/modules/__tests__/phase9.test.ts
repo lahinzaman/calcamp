@@ -9,7 +9,6 @@ import { createTrackingRepository } from '../../api/trackingRepository';
 import { startingBudget,defaultSurvey } from '../onboarding/budget';
 import { useOnboardingStore } from '../../store/onboardingStore';
 import { EXERCISE_CATALOG } from '../workout/catalog';
-import { DEMO_KINDS,demonstration } from '../workout/demonstrations';
 import { validateRoutine } from '../workout/routines';
 import { parseBarcodeProduct } from '../quickActions/barcode';
 import { servingLabel } from '../dining/serving';
@@ -48,7 +47,7 @@ test('onboarding budgets preserve weekly energy and do not infer deficits for un
 test('all 101 presets have distinct IDs and motion help; routine creation survives offline restart',async()=>{
   assert.equal(EXERCISE_CATALOG.length,232);assert.equal(new Set(EXERCISE_CATALOG.map(e=>e.id)).size,232);
   assert.equal(new Set(EXERCISE_CATALOG.map(e=>e.name.toLowerCase())).size,232);
-  for(const e of EXERCISE_CATALOG){assert.ok(e.description.length>60);assert.ok((DEMO_KINDS as readonly string[]).includes(e.demo));assert.ok(demonstration(e.demo).layers[0].shapes.length>=3);}
+  for(const e of EXERCISE_CATALOG){assert.ok(e.description.length>60,e.name);assert.ok(e.primaryMuscle.length>2,e.name);}
   const routine={id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',name:'My Tuesday',exerciseIds:EXERCISE_CATALOG.slice(0,4).map(e=>e.id)};
   validateRoutine(routine);assert.throws(()=>validateRoutine({...routine,exerciseIds:[routine.exerciseIds[0],routine.exerciseIds[0]]}));
   const storage=memoryStorage();let sends=0;const first=new SyncEngine(storage,async()=>{sends++;});first.activate('alice');first.setOnline(false);first.queue({kind:'routine',data:routine},'routine:id',{routines:[routine]});

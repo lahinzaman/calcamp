@@ -11,7 +11,6 @@ mock.module('react-native-safe-area-context',{namedExports:{SafeAreaView:'SafeAr
 mock.module('expo-router',{namedExports:{usePathname:()=>'/dining'}});
 let permission=false;let prompts=0;
 mock.module('expo-camera',{namedExports:{CameraView:React.forwardRef((props:unknown,ref)=>{React.useImperativeHandle(ref,()=>({takePictureAsync:async()=>({base64:'/9j/4AECAwQ='})}));return React.createElement('Camera',props as object);}),useCameraPermissions:()=>[{granted:permission,canAskAgain:true},async()=>{prompts++;}]}});
-mock.module('lottie-react-native',{defaultExport:'LottieView'});
 const {QuickActions}=require('../quickActions/QuickActions') as typeof import('../quickActions/QuickActions');
 const {QuickLogModal}=require('../quickActions/QuickLogModal') as typeof import('../quickActions/QuickLogModal');
 const {ExerciseHelp}=require('../workout/ExerciseHelp') as typeof import('../workout/ExerciseHelp');
@@ -39,9 +38,9 @@ test('body weight form writes pounds and rejects incomplete text',async()=>{
  await type('Body weight · lbs','NaN');await press('Save body weight');assert.equal(closed,0);
  await type('Body weight · lbs','180.5');await press('Save body weight');assert.equal(nutritionStore.getState().bodyWeightLbs,180.5);assert.equal(closed,1);
 });
-test('every exercise help button opens mechanics and a bundled looping demonstration',async()=>{
+test('exercise help explains the movement in words',async()=>{
  const exercise=EXERCISE_CATALOG[0];await act(async()=>{view=create(<ExerciseHelp exercise={exercise}/>);});
  await act(async()=>label(`Help for ${exercise.name}`).props.onPress());
- assert.ok(JSON.stringify(view!.toJSON()).includes(exercise.description));const lottie=view!.root.findByType('LottieView' as React.ElementType);assert.equal(lottie.props.loop,true);assert.equal(lottie.props.source.fr,30);
- await press('Close exercise help');assert.equal(view!.root.findAllByType('LottieView' as React.ElementType).length,0);
+ assert.ok(JSON.stringify(view!.toJSON()).includes(exercise.description));
+ await press('Close exercise help');assert.ok(!JSON.stringify(view!.toJSON()).includes(exercise.description));
 });

@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { Text } from '../../theme/primitives';
 import { Pressable } from '../../theme/Pressable';
-import { Field } from '../../components/FormControls';
+import { TextInput } from '../../theme/primitives';
 import { haptic } from '../../theme/haptics';
 import { EXERCISE_CATALOG, type CatalogExercise } from './catalog';
 import { ExerciseHelp } from './ExerciseHelp';
@@ -11,6 +11,18 @@ import { activeFilterCount, equipmentFacets, filterExercises, muscleFacets, musc
 
 type Group = 'muscles' | 'equipment' | 'patterns';
 const GROUP_LABELS: Record<Group, string> = { muscles: 'Muscle', equipment: 'Equipment', patterns: 'Movement' };
+
+const ExerciseRow = memo(function ExerciseRow({ exercise, chosen, onToggle }: { exercise: CatalogExercise; chosen: boolean; onToggle: (id: string) => void }) {
+  return <View className="mb-2 flex-row items-center gap-2">
+    <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: chosen }} accessibilityLabel={exercise.name}
+      onPress={() => { onToggle(exercise.id); haptic('selection'); }} weight="subtle"
+      className={`flex-1 rounded-2xl border p-4 ${chosen ? 'border-accent bg-raised' : 'border-border bg-surface'}`}>
+      <Text className="font-bold">{chosen ? '✓ ' : ''}{exercise.name}</Text>
+      <Text className="mt-0.5 text-sm">{muscleLabel(exercise.primaryMuscle)} · {exercise.equipment} · {patternLabel(exercise.movementPattern ?? '')}</Text>
+    </Pressable>
+    <ExerciseHelp exercise={exercise} />
+  </View>;
+});
 
 function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
   return <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: selected }} accessibilityLabel={label}
@@ -32,11 +44,14 @@ function FacetRow({ facets, selected, onToggle }: { facets: Facet[]; selected: r
  * Browsing 230-odd exercises by scrolling does not work, so the list is narrowed by
  * typed words and by chips. One open facet row at a time keeps the list on screen.
  */
-export function ExercisePicker({ catalog = EXERCISE_CATALOG, selectedIds, onToggle, footer }: {
+export function ExercisePicker({ catalog = EXERCISE_CATALOG, selectedIds, onToggle, footer, onClose }: {
   catalog?: readonly CatalogExercise[]; selectedIds: readonly string[];
-  onToggle: (id: string) => void; footer: React.ReactNode;
+  onToggle: (id: string) => void; footer: React.ReactNode; onClose?: () => void;
 }) {
+  const [term, setTerm] = useState('');
+  // Re-filtering 200-odd rows on every keystroke made the list thrash under the keyboard.
   const [query, setQuery] = useState('');
+  useEffect(() => { const id = setTimeout(() => setQuery(term), 180); return () => clearTimeout(id); }, [term]);
   const [open, setOpen] = useState<Group | null>(null);
   const [filters, setFilters] = useState<Record<Group, string[]>>({ muscles: [], equipment: [], patterns: [] });
   const facets = useMemo(() => ({ muscles: muscleFacets(catalog), equipment: equipmentFacets(catalog), patterns: patternFacets(catalog) }), [catalog]);
@@ -47,7 +62,19 @@ export function ExercisePicker({ catalog = EXERCISE_CATALOG, selectedIds, onTogg
 
   return <>
     <View className="px-5 pt-2">
-      <Field label="Search exercises" value={query} onChangeText={setQuery} autoCorrect={false} placeholder="cable row, split squat…" />
+      <View className="mb-4">
+        <View className="mb-2 flex-row items-center justify-between gap-3">
+          <Text className="text-sm font-semibold">Search exercises</Text>
+          {onClose && <Pressable accessibilityRole="button" accessibilityLabel="Close exercise search" onPress={onClose} weight="subtle"
+            className="h-10 w-10 items-center justify-center rounded-full bg-raised"><Text className="text-lg font-bold">✕</Text></Pressable>}
+        </View>
+        <View className="flex-row items-center gap-2 rounded-xl border border-border bg-surface px-2">
+          <TextInput accessibilityLabel="Search exercises" value={term} onChangeText={setTerm} autoCorrect={false}
+            placeholder="cable row, split squat…" className="flex-1 px-2 py-3 text-base" />
+          {!!term && <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => { setTerm(''); setQuery(''); haptic('selection'); }}
+            weight="subtle" className="h-9 w-9 items-center justify-center rounded-full bg-raised"><Text className="font-bold">✕</Text></Pressable>}
+        </View>
+      </View>
       <View className="mb-1 flex-row">
         {(Object.keys(GROUP_LABELS) as Group[]).map(group => <Chip key={group}
           label={filters[group].length ? `${GROUP_LABELS[group]} · ${filters[group].length}` : GROUP_LABELS[group]}
@@ -59,20 +86,9 @@ export function ExercisePicker({ catalog = EXERCISE_CATALOG, selectedIds, onTogg
     </View>
     {matches.length === 0
       ? <View className="flex-1 items-center justify-center px-8"><Text className="text-center">Nothing matches that. Clear a filter or search for a shorter word.</Text></View>
-      : <FlashList data={matches} keyExtractor={exercise => exercise.id} keyboardShouldPersistTaps="handled"
+      : <FlashList data={matches} keyExtractor={exercise => exercise.id} keyboardShouldPersistTaps="always" keyboardDismissMode="none"
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
-          renderItem={({ item }) => {
-            const chosen = selectedIds.includes(item.id);
-            return <View className="mb-2 flex-row items-center gap-2">
-              <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: chosen }} accessibilityLabel={item.name}
-                onPress={() => { onToggle(item.id); haptic('selection'); }} weight="subtle"
-                className={`flex-1 rounded-2xl border p-4 ${chosen ? 'border-accent bg-raised' : 'border-border bg-surface'}`}>
-                <Text className="font-bold">{chosen ? '✓ ' : ''}{item.name}</Text>
-                <Text className="text-sm">{muscleLabel(item.primaryMuscle)} · {item.equipment} · {patternLabel(item.movementPattern ?? '')}</Text>
-              </Pressable>
-              <ExerciseHelp exercise={item} />
-            </View>;
-          }} />}
+          renderItem={({ item }) => <ExerciseRow exercise={item} chosen={selectedIds.includes(item.id)} onToggle={onToggle} />} />}
     <View className="gap-2 px-5 pb-4">{footer}</View>
   </>;
 }

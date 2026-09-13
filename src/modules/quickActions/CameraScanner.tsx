@@ -10,7 +10,7 @@ import { Action } from '../../components/FormControls';
 import { TIMING } from '../../theme/motion';
 import { haptic } from '../../theme/haptics';
 
-export type ScannerMode = 'photo' | 'barcode';
+export type ScannerMode = 'photo' | 'barcode' | 'label';
 /** A preview that has not started by now is not going to without being told why. */
 const READY_TIMEOUT_MS = 6000;
 /**
@@ -45,9 +45,11 @@ function Reticle({ scanning }: { scanning: boolean }) {
   </Animated.View>;
 }
 
-export function CameraScanner({ mode, busy, onBarcode, onCapture, onClose, onManual, notice }: {
+export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, onClose, onManual, notice }: {
   mode: ScannerMode; busy: boolean; notice?: string | null;
   onBarcode: (code: string) => void; onCapture: (base64: string) => void; onClose: () => void; onManual: () => void;
+  /** Label reading works from a file, not base64: text recognition takes a URI. */
+  onCaptureUri?: (uri: string) => void;
 }) {
   const [permission, requestPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
@@ -88,10 +90,11 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onClose, onMan
     if (busy || !ready || locked.current) return;
     locked.current = true;
     try {
-      const photo = await camera.current?.takePictureAsync({ base64: true, quality: .6 });
-      if (!photo?.base64) throw new Error();
+      const wantsUri = mode === 'label';
+      const photo = await camera.current?.takePictureAsync({ base64: !wantsUri, quality: wantsUri ? 1 : .6 });
+      if (!photo?.uri || (!wantsUri && !photo.base64)) throw new Error();
       haptic('medium');
-      onCapture(photo.base64);
+      if (wantsUri) onCaptureUri?.(photo.uri); else onCapture(photo.base64!);
     } catch { setError('The camera could not take a photo. Try again, or enter this meal by hand.'); }
     finally { locked.current = false; }
   };
@@ -132,7 +135,9 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onClose, onMan
           <Text style={styles.chromeText}>✕</Text>
         </Pressable>
         <View style={styles.titlePill}>
-          <Text style={styles.chromeText}>{mode === 'barcode' ? (busy ? 'Looking up label…' : 'Point at a barcode') : 'Fill the frame with your plate'}</Text>
+          <Text style={styles.chromeText}>{mode === 'barcode' ? (busy ? 'Looking up label…' : 'Point at a barcode')
+            : mode === 'label' ? (busy ? 'Reading the label…' : 'Fill the frame with the Nutrition Facts panel')
+            : 'Fill the frame with your plate'}</Text>
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel={torch ? 'Turn off torch' : 'Turn on torch'}
           accessibilityState={{ selected: torch }} onPress={() => { setTorch(value => !value); haptic('selection'); }} style={styles.roundButton} weight="firm">
@@ -142,7 +147,7 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onClose, onMan
 
       <View style={styles.bottomBar}>
         {(notice || error || stalled) && <View style={styles.noticePill}><Text style={styles.chromeText}>{error ?? notice ?? stalledMessage}</Text></View>}
-        {mode === 'photo' && <Pressable accessibilityRole="button" accessibilityLabel="Take food photo" disabled={!ready || busy}
+        {mode !== 'barcode' && <Pressable accessibilityRole="button" accessibilityLabel={mode === 'label' ? 'Photograph the label' : 'Take food photo'} disabled={!ready || busy}
           onPress={() => { void capture(); }} style={[styles.shutter, (!ready || busy) && { opacity: .5 }]} weight="firm">
           <View style={styles.shutterInner} />
         </Pressable>}

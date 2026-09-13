@@ -9,13 +9,15 @@ import { gramsToOz, ozToGrams } from '../../lib/units';
 import { readUnits, readWeight, showWeight, weightUnit } from '../settings/measurementUnits';
 import { useFoodVision } from '../vision/useFoodVision';
 import { lookupBarcode } from './barcode';
+import { LabelUnavailable, recognizeLabel } from './recognizeLabel';
+import { missingMacros } from './nutritionLabel';
 import { WeightPhotoSheet } from '../progress/WeightPhotoSheet';
 import { addPhotos } from '../progress/photos';
 import { useAuthStore } from '../../store/authStore';
 import { localDateKey } from '../../store/nutritionStore';
 import type { MacroTotals } from '../../types/nutrition';
-export type QuickAction = 'photo'|'barcode'|'manual'|'weight'|'quick';
-const names:Record<QuickAction,string>={photo:'AI Photo Log',barcode:'Barcode Scanner',manual:'Manual Food Log',weight:'Update Body Weight',quick:'Quick Add Calories'};
+export type QuickAction = 'photo'|'barcode'|'label'|'manual'|'weight'|'quick';
+const names:Record<QuickAction,string>={photo:'AI Photo Log',barcode:'Barcode Scanner',label:'Scan a Nutrition Label',manual:'Manual Food Log',weight:'Update Body Weight',quick:'Quick Add Calories'};
 const macroFields=[['caloriesKcal','Calories · kcal'],['proteinG','Protein · g'],['fatG','Fats · g'],['carbsG','Carbs · g']] as const;
 /** Distinguish "this build has no provider" from "the request failed" — they need different actions. */
 export function visionMessage(code: string | undefined) {
@@ -46,6 +48,23 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
     try{const food=await lookupBarcode(code,request.current.signal);if(alive.current)fill(food,food.name,food.source);}
     catch{if(alive.current){setError('No complete food label found. Enter the package values manually.');setEditing(true);}}
     finally{if(alive.current)setBusy(false);locked.current=false;}
+  };
+  const readLabel=async(uri:string)=>{
+    if(locked.current)return;locked.current=true;setBusy(true);setError(null);
+    try{
+      const reading=await recognizeLabel(uri);if(!alive.current)return;
+      if(!Object.keys(reading.macros).length){setEditing(true);setError('No nutrition panel was readable in that photo. Fill the frame with the label, or enter it by hand.');return;}
+      setReference({grams:ozToGrams(1),macros:reading.macros as MacroTotals});
+      setName('Packaged food');setPortion('1');
+      setValues({caloriesKcal:String(reading.macros.caloriesKcal??''),proteinG:String(reading.macros.proteinG??''),
+        fatG:String(reading.macros.fatG??''),carbsG:String(reading.macros.carbsG??'')});
+      setNotice(`Read from the label${reading.servingLabel?` · per ${reading.servingLabel}`:''}. Check every value before logging.`);
+      setEditing(true);
+      const missing=missingMacros(reading);
+      if(missing.length)setError(`The ${missing.join(' and ')} line could not be read. Fill it in from the package.`);
+    }catch(cause){if(alive.current){setEditing(true);
+      setError(cause instanceof LabelUnavailable?cause.message:'That label could not be read. Try again, or enter it by hand.');}}
+    finally{locked.current=false;if(alive.current)setBusy(false);}
   };
   const capture=async(base64:string)=>{
     if(locked.current)return;locked.current=true;setBusy(true);setError(null);
@@ -86,10 +105,10 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
   };
   // One Modal for the life of this screen. presentationStyle cannot be changed on a modal
   // that is already presented, and swapping between two of them races iOS's dismissal.
-  const scanner=action==='photo'||action==='barcode';
+  const scanner=action==='photo'||action==='barcode'||action==='label';
   if(scanner&&!editing)return <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose} statusBarTranslucent>
-    <CameraScanner mode={action==='photo'?'photo':'barcode'} busy={busy} notice={error}
-      onBarcode={code=>{void scan(code);}} onCapture={base64=>{void capture(base64);}}
+    <CameraScanner mode={action==='photo'?'photo':action==='label'?'label':'barcode'} busy={busy} notice={error}
+      onBarcode={code=>{void scan(code);}} onCapture={base64=>{void capture(base64);}} onCaptureUri={uri=>{void readLabel(uri);}}
       onManual={()=>{setError(null);setEditing(true);}} onClose={onClose} />
   </Modal>;
   if(photoWeight!==null)return <WeightPhotoSheet weightLbs={photoWeight} onClose={()=>setPhotoWeight(null)}

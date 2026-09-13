@@ -8,7 +8,7 @@ import { reanimatedMock } from './support/reanimated';
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, __DEV__: true });
 mock.module('nativewind', { namedExports: { cssInterop: () => {}, vars: (value: unknown) => value } });
 mock.module('react-native-reanimated', reanimatedMock);
-mock.module('react-native', { namedExports: { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1, scale: 3 }), View: 'View', Text: 'Text', Pressable: 'Pressable', TextInput: 'TextInput', ScrollView: 'ScrollView', Modal: 'Modal', KeyboardAvoidingView: 'KeyboardAvoidingView', Platform: { OS: 'ios', Version: '18.0' }, Linking: { openURL: async () => {} } } });
+mock.module('react-native', { namedExports: { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1, scale: 3 }), View: 'View', Text: 'Text', Pressable: 'Pressable', TextInput: 'TextInput', ScrollView: 'ScrollView', Modal: 'Modal', KeyboardAvoidingView: 'KeyboardAvoidingView', Platform: { OS: 'ios', Version: '18.0', select: (map: Record<string, unknown>) => map.ios ?? map.default }, Linking: { openURL: async () => {} } } });
 mock.module('react-native-safe-area-context', { namedExports: { SafeAreaView: 'SafeAreaView' } });
 mock.module('expo-application', { namedExports: { nativeApplicationVersion: '1.0.0', nativeBuildVersion: '5' } });
 mock.module('expo-constants', { defaultExport: { expoConfig: {} } });
@@ -16,11 +16,13 @@ mock.module('expo-updates', { namedExports: { isEnabled: false, updateId: '8f4a2
 mock.module('expo-crypto', { namedExports: { randomUUID: () => 'retry-id' } });
 mock.module('../notifications/NotificationSettings', { namedExports: { NotificationSettings: () => null } });
 // Health connect owns a device adapter; the settings screen only has to render it.
-mock.module('../health/HealthConnectCard', { namedExports: { HealthConnectCard: () => null } });
+mock.module('../health/HealthConnectCard.tsx', { namedExports: { HealthConnectCard: () => null } });
 // Permission priming owns the camera and notification adapters; settings only renders it.
-mock.module('../onboarding/PermissionsCard', { namedExports: { PermissionsCard: () => null } });
+mock.module('../onboarding/PermissionsCard.tsx', { namedExports: { PermissionsCard: () => null } });
 let deleted = 0; let submits = 0; const ids: unknown[] = [];
 mock.module('../account/deleteAccount', { namedExports: { deleteAccount: async (owner: string) => { assert.equal(owner, 'alice'); deleted++; return { identityRemoved: true, providerHistoryPending: false }; } } });
+// The goal editor talks to the profile API; settings only opens it.
+mock.module('../settings/GoalEditor.tsx', { namedExports: { GoalEditor: () => null } });
 mock.module('../../api/supabase', { namedExports: { getSupabase: () => ({ rpc: async (_name: string, input: Record<string, unknown>) => {
   submits++; ids.push(input.p_id); assert.equal(input.p_owner, 'alice');
   assert.equal((input.p_context as Record<string, string>).build, '5');

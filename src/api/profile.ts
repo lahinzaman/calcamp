@@ -29,6 +29,23 @@ export async function completeOnboarding(input: OnboardingProfile): Promise<User
   return fromDatabase(data);
 }
 
+/**
+ * Your goal, your current weight and the answers behind them stay editable after onboarding.
+ * Targets are left alone here: changing a goal and recalculating a budget are separate acts,
+ * and doing both silently would move someone's calories without telling them.
+ */
+export async function updateGoal(input: { weight_lbs: number; goal: UserProfile['goal']; lifestyle_survey: Record<string, unknown> }): Promise<UserProfile> {
+  if (!Number.isFinite(input.weight_lbs) || input.weight_lbs < 70 || input.weight_lbs > 700) throw new Error('Enter a body weight of 70–700 lbs.');
+  const client = getSupabase(); const { data: auth, error: authError } = await client.auth.getUser();
+  if (authError || !auth.user) throw new Error('Sign in before changing your goal.');
+  const { data, error } = await client.from('users')
+    .update({ weight_kg: lbsToKg(input.weight_lbs), goal: input.goal, lifestyle_survey: input.lifestyle_survey })
+    .eq('id', auth.user.id).select(columns).single();
+  if (error) throw new Error('Your goal could not be saved. Check your connection and try again.');
+  durableStorage.set(`profile:${auth.user.id}`, JSON.stringify(data));
+  return fromDatabase(data);
+}
+
 /** Targets stay editable after onboarding; nothing else about the profile is touched. */
 export async function updateTargets(input: { rest_targets: MacroTotals; training_targets: MacroTotals | null; dynamic_tdee_kcal?: number | null }): Promise<UserProfile> {
   for (const target of [input.rest_targets, input.training_targets]) {

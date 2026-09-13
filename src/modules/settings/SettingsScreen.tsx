@@ -16,6 +16,7 @@ import { UpdateControls } from '../updates/UpdateControls';
 import { FeedbackModal } from '../feedback/FeedbackModal';
 import { AccountAccess } from '../account/AccountAccess';
 import { TargetEditor } from './TargetEditor';
+import { GoalEditor } from './GoalEditor';
 import { ExportControls } from './ExportControls';
 export async function checkService(signal: AbortSignal): Promise<boolean> {
   const base = process.env.EXPO_PUBLIC_BACKEND_URL;
@@ -40,6 +41,13 @@ export default function SettingsScreen() {
   const mode = useThemeStore(state => state.mode);
   const profile = useAuthStore(state => state.profile);
   const [targets, setTargets] = useState(false); const [feedback, setFeedback] = useState(false);
+  const [goal, setGoal] = useState(false);
+  const survey = (profile?.lifestyle_survey ?? {}) as { goalDirection?: string; rateLbsPerWeek?: number; goalWeightLbs?: number | null };
+  const goalLine = [
+    profile?.weight_lbs ? `${Number(profile.weight_lbs.toFixed(1))} lbs now` : 'No weight on file',
+    ({ lose: 'losing', gain: 'gaining', maintain: 'maintaining', recomp: 'recomposing', auto: 'letting CalCamp decide' } as Record<string, string>)[survey.goalDirection ?? 'auto'],
+    survey.goalWeightLbs ? `towards ${survey.goalWeightLbs} lbs` : null,
+  ].filter(Boolean).join(' · ');
   const service = useQuery({ queryKey: ['service-health'], queryFn: ({ signal }) => checkService(signal), enabled: s.online,
     refetchInterval: 60000, retry: false, staleTime: 30000 });
   const label = !s.online ? 'Offline' : s.blocked ? 'Sync needs review' : s.syncing ? 'Syncing…' : s.queued ? `${s.queued} queued` : !s.ready || service.isPending ? 'Checking…' : service.isError || !service.data || s.error ? 'Connection unavailable' : s.lastSyncedAt ? 'Synced' : 'Waiting for first sync';
@@ -49,6 +57,10 @@ export default function SettingsScreen() {
       <Reveal index={0}><Text className="mb-5 text-4xl font-bold">Settings</Text></Reveal>
       <Section title="Service status" index={1}>
         <Text accessibilityLiveRegion="polite" className="text-3xl font-bold">{label}</Text>
+      </Section>
+      <Section title="Goal & weight" index={2}>
+        <Text className="mb-3">{goalLine}</Text>
+        <Action label="Update my goal" onPress={() => setGoal(true)} />
       </Section>
       <Section title="Daily targets" index={2}>
         <Text className="mb-3">{rest ? `${Math.round(rest.caloriesKcal)} kcal · P ${Math.round(rest.proteinG)} g · C ${Math.round(rest.carbsG)} g · F ${Math.round(rest.fatG)} g` : 'No targets set yet.'}</Text>
@@ -67,6 +79,7 @@ export default function SettingsScreen() {
         <AccountAccess />
       </Section>
       {targets && <TargetEditor onClose={() => setTargets(false)} />}
+      {goal && <GoalEditor onClose={() => setGoal(false)} />}
       {feedback && <FeedbackModal onClose={() => setFeedback(false)} />}
     </ScrollView>
   </SafeAreaView>;

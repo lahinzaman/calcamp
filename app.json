@@ -86,7 +86,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow CalCamp to photograph meals and scan food barcodes.",
+          "cameraPermission": "Allow CalCamp to scan food barcodes and nutrition labels, photograph meals, and take progress photos with a weigh-in. Photos you take stay on this device.",
           "recordAudioAndroid": false,
           "microphonePermission": false,
           "barcodeScannerEnabled": true

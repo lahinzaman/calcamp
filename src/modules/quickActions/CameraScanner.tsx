@@ -9,6 +9,7 @@ import { Pressable } from '../../theme/Pressable';
 import { Action } from '../../components/FormControls';
 import { TIMING } from '../../theme/motion';
 import { haptic } from '../../theme/haptics';
+import { t as translate } from '../../i18n';
 
 export type ScannerMode = 'photo' | 'barcode' | 'label';
 /** A preview that has not started by now is not going to without being told why. */
@@ -104,7 +105,7 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, 
 
   if (!permission?.granted) {
     return <SafeAreaView className="flex-1 justify-center bg-background p-6">
-      <Text className="mb-3 text-3xl font-bold">Camera access</Text>
+      <Text className="mb-3 text-3xl font-bold">{translate('camera.access')}</Text>
       <Text className="mb-6">{mode === 'barcode' ? 'Scanning a package barcode needs the camera.' : 'Estimating a meal from a photo needs the camera.'} Nothing is stored until you confirm the entry.</Text>
       {!!webCameraProblem() && <Text accessibilityRole="alert" className="mb-4">{webCameraProblem()}</Text>}
       <Action label="Allow camera access" onPress={() => { void requestPermission().catch(() => setError('Camera access is unavailable on this device.')); }} />
@@ -131,13 +132,13 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, 
 
     <View pointerEvents="box-none" style={[styles.chrome, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24, paddingLeft: insets.left, paddingRight: insets.right }]}>
       <View style={styles.topBar}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Close camera" onPress={onClose} style={styles.roundButton} weight="firm">
+        <Pressable accessibilityRole="button" accessibilityLabel={translate('camera.closeCamera')} onPress={onClose} style={styles.roundButton} weight="firm">
           <Text style={styles.chromeText}>✕</Text>
         </Pressable>
         <View style={styles.titlePill}>
-          <Text style={styles.chromeText}>{mode === 'barcode' ? (busy ? 'Looking up label…' : 'Point at a barcode')
-            : mode === 'label' ? (busy ? 'Reading the label…' : 'Fill the frame with the Nutrition Facts panel')
-            : 'Fill the frame with your plate'}</Text>
+          <Text style={styles.chromeText}>{mode === 'barcode' ? (busy ? translate('camera.lookingUp') : translate('camera.pointAtBarcode'))
+            : mode === 'label' ? (busy ? translate('camera.readingLabel') : translate('camera.fillFrameLabel'))
+            : translate('camera.fillFramePlate')}</Text>
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel={torch ? 'Turn off torch' : 'Turn on torch'}
           accessibilityState={{ selected: torch }} onPress={() => { setTorch(value => !value); haptic('selection'); }} style={styles.roundButton} weight="firm">
@@ -147,13 +148,13 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, 
 
       <View style={styles.bottomBar}>
         {(notice || error || stalled) && <View style={styles.noticePill}><Text style={styles.chromeText}>{error ?? notice ?? stalledMessage}</Text></View>}
-        {mode !== 'barcode' && <Pressable accessibilityRole="button" accessibilityLabel={mode === 'label' ? 'Photograph the label' : 'Take food photo'} disabled={!ready || busy}
+        {mode !== 'barcode' && <Pressable accessibilityRole="button" accessibilityLabel={mode === 'label' ? translate('camera.photographLabel') : translate('camera.takePhoto')} disabled={!ready || busy}
           onPress={() => { void capture(); }} style={[styles.shutter, (!ready || busy) && { opacity: .5 }]} weight="firm">
           <View style={styles.shutterInner} />
         </Pressable>}
-        <Pressable accessibilityRole="button" accessibilityLabel={mode === 'barcode' ? 'Type the barcode instead' : 'Enter food manually'}
+        <Pressable accessibilityRole="button" accessibilityLabel={mode === 'barcode' ? translate('camera.typeBarcode') : translate('camera.enterManually')}
           onPress={onManual} style={styles.manualPill} weight="firm">
-          <Text style={styles.chromeText}>{mode === 'barcode' ? 'Type the barcode instead' : 'Enter food manually'}</Text>
+          <Text style={styles.chromeText}>{mode === 'barcode' ? translate('camera.typeBarcode') : translate('camera.enterManually')}</Text>
         </Pressable>
       </View>
     </View>

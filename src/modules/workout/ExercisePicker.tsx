@@ -5,6 +5,7 @@ import { Text } from '../../theme/primitives';
 import { Pressable } from '../../theme/Pressable';
 import { TextInput } from '../../theme/primitives';
 import { haptic } from '../../theme/haptics';
+import { useT } from '../../i18n';
 import { EXERCISE_CATALOG, type CatalogExercise } from './catalog';
 import { ExerciseHelp } from './ExerciseHelp';
 import { activeFilterCount, equipmentFacets, filterExercises, muscleFacets, muscleLabel, patternFacets, patternLabel, type Facet } from './search';
@@ -48,6 +49,7 @@ export function ExercisePicker({ catalog = EXERCISE_CATALOG, selectedIds, onTogg
   catalog?: readonly CatalogExercise[]; selectedIds: readonly string[];
   onToggle: (id: string) => void; footer: React.ReactNode; onClose?: () => void;
 }) {
+  const t = useT();
   const [term, setTerm] = useState('');
   // Re-filtering 200-odd rows on every keystroke made the list thrash under the keyboard.
   const [query, setQuery] = useState('');
@@ -64,14 +66,14 @@ export function ExercisePicker({ catalog = EXERCISE_CATALOG, selectedIds, onTogg
     <View className="px-5 pt-2">
       <View className="mb-4">
         <View className="mb-2 flex-row items-center justify-between gap-3">
-          <Text className="text-sm font-semibold">Search exercises</Text>
-          {onClose && <Pressable accessibilityRole="button" accessibilityLabel="Close exercise search" onPress={onClose} weight="subtle"
+          <Text className="text-sm font-semibold">{t('train.searchExercises')}</Text>
+          {onClose && <Pressable accessibilityRole="button" accessibilityLabel={t('train.closeSearch')} onPress={onClose} weight="subtle"
             className="h-10 w-10 items-center justify-center rounded-full bg-raised"><Text className="text-lg font-bold">✕</Text></Pressable>}
         </View>
         <View className="flex-row items-center gap-2 rounded-xl border border-border bg-surface px-2">
-          <TextInput accessibilityLabel="Search exercises" value={term} onChangeText={setTerm} autoCorrect={false}
+          <TextInput accessibilityLabel={t('train.searchExercises')} value={term} onChangeText={setTerm} autoCorrect={false}
             placeholder="cable row, split squat…" className="flex-1 px-2 py-3 text-base" />
-          {!!term && <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => { setTerm(''); setQuery(''); haptic('selection'); }}
+          {!!term && <Pressable accessibilityRole="button" accessibilityLabel={t('train.clearSearch')} onPress={() => { setTerm(''); setQuery(''); haptic('selection'); }}
             weight="subtle" className="h-9 w-9 items-center justify-center rounded-full bg-raised"><Text className="font-bold">✕</Text></Pressable>}
         </View>
       </View>

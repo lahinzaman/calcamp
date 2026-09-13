@@ -4,6 +4,7 @@ import { SafeAreaView } from '../../theme/SafeArea';
 import { Text } from '../../theme/primitives';
 import { Action, Choice, Field } from '../../components/FormControls';
 import { haptic } from '../../theme/haptics';
+import { useT, type MessageKey } from '../../i18n';
 import { authStore, useAuthStore } from '../../store/authStore';
 import { nutritionStore } from '../../store/nutritionStore';
 import { updateGoal, updateTargets } from '../../api/profile';
@@ -12,8 +13,8 @@ import {
   type GoalDirection, type LifestyleSurvey,
 } from '../onboarding/budget';
 
-const DIRECTION_LABELS: Record<GoalDirection, string> = {
-  auto: 'Decide for me', lose: 'Lose weight', maintain: 'Maintain', gain: 'Gain weight', recomp: 'Recomposition',
+const DIRECTION_KEYS: Record<GoalDirection, MessageKey> = {
+  auto: 'goal.auto', lose: 'goal.lose', maintain: 'goal.maintain', gain: 'goal.gain', recomp: 'goal.recomp',
 };
 const GOAL_FOR: Record<GoalDirection, 'cut' | 'maintain' | 'bulk'> = {
   auto: 'maintain', lose: 'cut', maintain: 'maintain', gain: 'bulk', recomp: 'maintain',
@@ -21,6 +22,7 @@ const GOAL_FOR: Record<GoalDirection, 'cut' | 'maintain' | 'bulk'> = {
 
 /** Change the goal, the weight behind it, and — as a separate, visible act — the budget. */
 export function GoalEditor({ onClose }: { onClose: () => void }) {
+  const t = useT();
   const profile = useAuthStore(s => s.profile);
   const stored = { ...defaultSurvey, ...((profile?.lifestyle_survey ?? {}) as Partial<LifestyleSurvey>) };
   const [direction, setDirection] = useState<GoalDirection>(stored.goalDirection ?? 'auto');
@@ -63,17 +65,17 @@ export function GoalEditor({ onClose }: { onClose: () => void }) {
   return <Modal visible presentationStyle="pageSheet" animationType="slide" onRequestClose={onClose}>
     <SafeAreaView className="flex-1 bg-background"><KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24, paddingBottom: 60 }}>
-        <Text className="text-sm font-bold tracking-widest">YOUR GOAL</Text>
-        <Text className="mb-5 mt-2 text-3xl font-bold">What are you working towards?</Text>
+        <Text className="text-sm font-bold tracking-widest">{t('goal.eyebrow')}</Text>
+        <Text className="mb-5 mt-2 text-3xl font-bold">{t('goal.title')}</Text>
 
         <Field label="Current weight · lbs" value={weight} onChangeText={setWeight} keyboardType="decimal-pad" />
 
-        <Text className="mb-2 font-bold">Direction</Text>
-        <View className="mb-4 flex-row flex-wrap">{GOAL_DIRECTIONS.map(value => <Choice key={value} label={DIRECTION_LABELS[value]}
+        <Text className="mb-2 font-bold">{t('goal.direction')}</Text>
+        <View className="mb-4 flex-row flex-wrap">{GOAL_DIRECTIONS.map(value => <Choice key={value} label={t(DIRECTION_KEYS[value])}
           selected={direction === value} onPress={() => { setDirection(value); haptic('selection'); }} />)}</View>
 
         {(direction === 'lose' || direction === 'gain') && <>
-          <Text className="mb-2 font-bold">How fast</Text>
+          <Text className="mb-2 font-bold">{t('goal.howFast')}</Text>
           <View className="mb-4 flex-row flex-wrap">{RATE_CHOICES.map(value => <Choice key={value} label={`${value} lb / week`}
             selected={rate === value} onPress={() => { setRate(value); haptic('selection'); }} />)}</View>
         </>}
@@ -81,7 +83,7 @@ export function GoalEditor({ onClose }: { onClose: () => void }) {
         <Field label="Goal weight · lbs (optional)" value={goalWeight} onChangeText={setGoalWeight} keyboardType="decimal-pad" />
 
         {preview && <View className="mb-5 rounded-3xl border border-border bg-surface p-5">
-          <Text className="text-sm font-bold tracking-widest">IF YOU RECALCULATE</Text>
+          <Text className="text-sm font-bold tracking-widest">{t('goal.ifRecalculate')}</Text>
           <Text className="my-2 text-4xl font-bold">{preview.rest.caloriesKcal} kcal</Text>
           <Text>Protein {preview.rest.proteinG} g · Carbs {Math.round(preview.rest.carbsG)} g · Fat {preview.rest.fatG} g</Text>
           <Text className="mt-2 text-sm">{preview.explanation}</Text>
@@ -90,10 +92,10 @@ export function GoalEditor({ onClose }: { onClose: () => void }) {
         {error && <Text accessibilityRole="alert" className="mb-4">{error}</Text>}
         {notice && <Text className="mb-4">{notice}</Text>}
 
-        <Action label={busy ? 'Saving…' : 'Save goal and recalculate my targets'} disabled={busy || !preview} onPress={() => void save(true)} tone="success" />
-        <Action secondary label="Save the goal only, keep my targets" disabled={busy} onPress={() => void save(false)} />
-        <Action secondary label="Retake the setup quiz" disabled={busy} onPress={() => { onClose(); void import('expo-router').then(({ router }) => router.push('/onboarding')); }} />
-        <Action secondary label="Close" onPress={onClose} />
+        <Action label={busy ? t('common.saving') : t('goal.saveAndRecalculate')} disabled={busy || !preview} onPress={() => void save(true)} tone="success" />
+        <Action secondary label={t('goal.saveOnly')} disabled={busy} onPress={() => void save(false)} />
+        <Action secondary label={t('goal.retakeQuiz')} disabled={busy} onPress={() => { onClose(); void import('expo-router').then(({ router }) => router.push('/onboarding')); }} />
+        <Action secondary label={t('common.close')} onPress={onClose} />
       </ScrollView>
     </KeyboardAvoidingView></SafeAreaView>
   </Modal>;

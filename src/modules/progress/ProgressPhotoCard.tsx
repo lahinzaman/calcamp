@@ -3,6 +3,7 @@ import { Image, ScrollView, View } from 'react-native';
 import { Text } from '../../theme/primitives';
 import { Pressable } from '../../theme/Pressable';
 import { Card } from '../insights/AnalyticsCards';
+import { useT } from '../../i18n';
 import { haptic } from '../../theme/haptics';
 import { useAuthStore } from '../../store/authStore';
 import { comparison, deleteCapture, readPhotoDays, removePhoto, type PhotoDay } from './photos';
@@ -11,11 +12,12 @@ const signed = (value: number) => `${value > 0 ? '+' : value < 0 ? '−' : ''}${
 const dayLabel = (date: string) => new Date(`${date}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
 export function ProgressPhotoCard({ index }: { index: number }) {
+  const t = useT();
   const owner = useAuthStore(s => s.session?.user.id) ?? 'anonymous';
   const [days, setDays] = useState<PhotoDay[]>(() => readPhotoDays(owner));
   if (!days.length) return null;
   const change = comparison(days);
-  return <Card title="Progress photos" index={index}>
+  return <Card title={t('trends.progressPhotos')} index={index}>
     {change && <Text className="mb-4">
       {change.days} {change.days === 1 ? 'day' : 'days'} between your first and latest photo
       {change.weightChangeLbs === null ? '.' : `, and ${signed(change.weightChangeLbs)} on the scale.`}

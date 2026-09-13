@@ -24,13 +24,25 @@ export function weekDates(date: string, weekOffset = 0): string[] {
  * A day with no target cannot be judged against one, and a day with no log is not a miss —
  * both stay neutral rather than being coloured as failures.
  */
-export function dayStatus(calories: number | null | undefined, target: number | null): DayStatus {
-  if (calories == null || calories <= 0) return { mark: 'none', label: 'Nothing logged', glyph: '·' };
-  if (target === null) return { mark: 'logged', label: `${Math.round(calories)} kcal logged`, glyph: '●' };
+export type DayLabeller = (key: 'day.nothingLogged' | 'day.logged' | 'day.onTarget' | 'day.under' | 'day.over',
+  params?: Record<string, string | number>) => string;
+const plain: DayLabeller = (key, params) => {
+  const kcal = params?.kcal;
+  switch (key) {
+    case 'day.nothingLogged': return 'Nothing logged';
+    case 'day.logged': return `${kcal} kcal logged`;
+    case 'day.onTarget': return `On target · ${kcal} kcal`;
+    case 'day.under': return `${kcal} kcal under target`;
+    case 'day.over': return `${kcal} kcal over target`;
+  }
+};
+export function dayStatus(calories: number | null | undefined, target: number | null, label: DayLabeller = plain): DayStatus {
+  if (calories == null || calories <= 0) return { mark: 'none', label: label('day.nothingLogged'), glyph: '·' };
+  if (target === null) return { mark: 'logged', label: label('day.logged', { kcal: Math.round(calories) }), glyph: '●' };
   const delta = calories - target;
-  if (Math.abs(delta) <= PERFECT_WINDOW_KCAL) return { mark: 'perfect', label: `On target · ${Math.round(calories)} kcal`, glyph: '✓' };
-  if (delta < 0) return { mark: 'under', label: `${Math.round(-delta)} kcal under target`, glyph: '▾' };
-  return { mark: 'over', label: `${Math.round(delta)} kcal over target`, glyph: '▴' };
+  if (Math.abs(delta) <= PERFECT_WINDOW_KCAL) return { mark: 'perfect', label: label('day.onTarget', { kcal: Math.round(calories) }), glyph: '✓' };
+  if (delta < 0) return { mark: 'under', label: label('day.under', { kcal: Math.round(-delta) }), glyph: '▾' };
+  return { mark: 'over', label: label('day.over', { kcal: Math.round(delta) }), glyph: '▴' };
 }
 
 export const timeOfDay = (ms: number) =>

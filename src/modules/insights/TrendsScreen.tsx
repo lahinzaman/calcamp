@@ -22,8 +22,10 @@ import { MeasurementsCard } from './MeasurementsCard';
 import { ProgressPhotoCard } from '../progress/ProgressPhotoCard';
 import { milestones, summarizeStreak } from '../habits/streaks';
 import { localDateKey } from '../../store/nutritionStore';
-const RANGES = [[28, '4 weeks'], [56, '8 weeks'], [90, '13 weeks']] as const;
+import { useT } from '../../i18n';
+const RANGES = [[28, 'trends.range4'], [56, 'trends.range8'], [90, 'trends.range13']] as const;
 export default function TrendsScreen() {
+  const t = useT();
   const owner = useAuthStore(s => s.session?.user.id);
   const profile = useAuthStore(s => s.profile);
   const targets = useNutritionStore(s => s.dailyTargets?.macros);
@@ -55,21 +57,21 @@ export default function TrendsScreen() {
   return <SafeAreaView edges={['top','left','right']} className="flex-1 bg-background">
     <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 110, maxWidth: 760, width: '100%', alignSelf: 'center' }}>
       <Reveal index={0}>
-        <Text className="text-sm font-bold tracking-widest">YOUR TRENDS</Text>
-        <Text className="mb-1 mt-2 text-4xl font-bold">The longer view</Text>
-        <Text className="mb-4">Single days are noisy. These are the lines that actually move.</Text>
-        <View className="mb-4 flex-row flex-wrap">{RANGES.map(([value, label]) => <Choice key={value} label={label} selected={days === value} onPress={() => setDays(value)} />)}</View>
+        <Text className="text-sm font-bold tracking-widest">{t('trends.eyebrow')}</Text>
+        <Text className="mb-1 mt-2 text-4xl font-bold">{t('trends.title')}</Text>
+        <Text className="mb-4">{t('trends.subtitle')}</Text>
+        <View className="mb-4 flex-row flex-wrap">{RANGES.map(([value, key]) => <Choice key={value} label={t(key)} selected={days === value} onPress={() => setDays(value)} />)}</View>
       </Reveal>
-      {history.isLoading && <LoadingCards label="Loading your history…" />}
-      {history.isError && <Card title="History unavailable" index={1}><Text>We could not reach your cloud diary. Your device data is unaffected — try again when connected.</Text></Card>}
+      {history.isLoading && <LoadingCards label={t('trends.loading')} />}
+      {history.isError && <Card title={t('trends.historyUnavailable')} index={1}><Text>We could not reach your cloud diary. Your device data is unaffected — try again when connected.</Text></Card>}
       {!history.isLoading && !history.isError && <>
-        <Card title="Weight trend" index={1}>
+        <Card title={t('trends.weightTrend')} index={1}>
           <LineChart unit=" lbs" tone="protein"
             raw={weights.map(r => ({ date: r.log_date, value: r.body_weight_lbs! }))}
             trend={estimate?.weightTrend.map(p => ({ date: p.date, value: p.trendedWeightLbs })) ?? []}
             caption="Dots are daily weigh-ins; the line is the smoothed trend that filters out water and food weight." />
         </Card>
-        <Card title="Adaptive expenditure" index={2}>
+        <Card title={t('trends.expenditure')} index={2}>
           {estimate?.status === 'ready' ? <>
             <Text className="text-4xl font-bold">{Math.round(estimate.tdeeKcal!)} kcal</Text>
             <Text className="mb-3 mt-1">Estimated daily expenditure from your logged intake and weight trend — not a target.</Text>
@@ -77,7 +79,7 @@ export default function TrendsScreen() {
               {perDay !== null && Math.abs(perDay) > .001 ? ` Trending ${perDay > 0 ? 'up' : 'down'} about ${Math.abs(perDay * 7).toFixed(2)} lbs per week.` : ' Weight is holding steady.'}</Text>
             {profile?.dynamic_tdee_kcal ? <Text className="mt-3 text-sm">Your onboarding estimate was {Math.round(profile.dynamic_tdee_kcal)} kcal. This measured figure is the better one once you have a few weeks of data.</Text> : null}
           </> : <>
-            <Text className="text-xl font-bold">Still measuring</Text>
+            <Text className="text-xl font-bold">{t('trends.stillMeasuring')}</Text>
             <Text className="mt-2">This needs 14 days that have both a weigh-in and a complete food log, marked adherent. You have {estimate?.adherentDays ?? 0}.</Text>
             <Text className="mt-3 text-sm">Weigh in each morning and mark the day adherent once you have logged everything.</Text>
           </>}
@@ -88,7 +90,7 @@ export default function TrendsScreen() {
           <Text className="mt-2 text-sm">A projection from recent data, not a promise — it moves as your intake and activity change.</Text>
         </Card>}
         <EnergyBalanceCard rows={rows} estimate={estimate} index={5} />
-        <Card title="Daily calories" index={6}>
+        <Card title={t('trends.dailyCalories')} index={6}>
           <BarChart series={calories} target={targets?.caloriesKcal ?? null} tone="carbs" />
           <Text className="mt-2 text-sm">{calories.length} days logged{targets ? '. The dashed line is your target; bars above it are over.' : '.'}</Text>
         </Card>

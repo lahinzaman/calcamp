@@ -18,6 +18,8 @@ import { AccountAccess } from '../account/AccountAccess';
 import { TargetEditor } from './TargetEditor';
 import { GoalEditor } from './GoalEditor';
 import { UnitsCard } from './UnitsCard';
+import { LanguageCard } from './LanguageCard';
+import { useT } from '../../i18n';
 import { ExportControls } from './ExportControls';
 export async function checkService(signal: AbortSignal): Promise<boolean> {
   const base = process.env.EXPO_PUBLIC_BACKEND_URL;
@@ -43,6 +45,7 @@ export default function SettingsScreen() {
   const profile = useAuthStore(state => state.profile);
   const [targets, setTargets] = useState(false); const [feedback, setFeedback] = useState(false);
   const [goal, setGoal] = useState(false); const [, setUnitsTick] = useState(0);
+  const t = useT();
   const survey = (profile?.lifestyle_survey ?? {}) as { goalDirection?: string; rateLbsPerWeek?: number; goalWeightLbs?: number | null };
   const goalLine = [
     profile?.weight_lbs ? `${Number(profile.weight_lbs.toFixed(1))} lbs now` : 'No weight on file',
@@ -56,28 +59,29 @@ export default function SettingsScreen() {
   return <SafeAreaView edges={['top','left','right']} className="flex-1 bg-background">
     <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 110, maxWidth: 760, width: '100%', alignSelf: 'center' }}>
       <Reveal index={0}><Text className="mb-5 text-4xl font-bold">Settings</Text></Reveal>
-      <Section title="Service status" index={1}>
+      <Section title={t('profile.serviceSection')} index={1}>
         <Text accessibilityLiveRegion="polite" className="text-3xl font-bold">{label}</Text>
       </Section>
-      <Section title="Goal & weight" index={2}>
+      <Section title={t('profile.goalSection')} index={2}>
         <Text className="mb-3">{goalLine}</Text>
-        <Action label="Update my goal" onPress={() => setGoal(true)} />
+        <Action label={t('profile.updateGoal')} onPress={() => setGoal(true)} />
       </Section>
-      <Section title="Daily targets" index={2}>
+      <Section title={t('profile.targetsSection')} index={2}>
         <Text className="mb-3">{rest ? `${Math.round(rest.caloriesKcal)} kcal · P ${Math.round(rest.proteinG)} g · C ${Math.round(rest.carbsG)} g · F ${Math.round(rest.fatG)} g` : 'No targets set yet.'}</Text>
-        <Action label="Adjust targets" onPress={() => setTargets(true)} />
+        <Action label={t('profile.adjustTargets')} onPress={() => setTargets(true)} />
       </Section>
-      <Section title="Units" index={3}><UnitsCard onChange={() => setUnitsTick(value => value + 1)} /></Section>
-      <Section title="Appearance" index={3}>
+      <Section title={t('profile.unitsSection')} index={3}><UnitsCard onChange={() => setUnitsTick(value => value + 1)} /></Section>
+      <Section title={t('profile.languageSection')} index={3}><LanguageCard /></Section>
+      <Section title={t('profile.appearanceSection')} index={3}>
         <Text className="mb-3">Choose the surface that is easiest on your eyes.</Text>
         <View className="flex-row flex-wrap">{THEMES.map(theme => <Choice key={theme} label={theme[0].toUpperCase() + theme.slice(1)} selected={theme === mode} onPress={() => useThemeStore.getState().setMode(theme)} />)}</View>
       </Section>
-      <Section title="Notifications" index={4}><PermissionsCard /><NotificationSettings /></Section>
-      <Section title="Apple Health & Health Connect" index={5}><HealthConnectCard /></Section>
+      <Section title={t('profile.notificationsSection')} index={4}><PermissionsCard /><NotificationSettings /></Section>
+      <Section title={t('profile.healthSection')} index={5}><HealthConnectCard /></Section>
       <Reveal index={5}><UpdateControls /></Reveal>
-      <Section title="Your data" index={6}><ExportControls /></Section>
-      <Section title="Help & account" index={7}>
-        <Action secondary label="Send feedback" onPress={() => setFeedback(true)} />
+      <Section title={t('profile.dataSection')} index={6}><ExportControls /></Section>
+      <Section title={t('profile.helpSection')} index={7}>
+        <Action secondary label={t('profile.sendFeedback')} onPress={() => setFeedback(true)} />
         <AccountAccess />
       </Section>
       {targets && <TargetEditor onClose={() => setTargets(false)} />}

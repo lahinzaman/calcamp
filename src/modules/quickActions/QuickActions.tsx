@@ -8,14 +8,15 @@ import { ThemeRoot } from '../../theme/ThemeRoot';
 import { Text } from '../../theme/primitives';
 import { ENTER_STAGGER, SPRING, TIMING } from '../../theme/motion';
 import { haptic } from '../../theme/haptics';
+import { useT, type MessageKey } from '../../i18n';
 import { QuickLogModal, type QuickAction } from './QuickLogModal';
 import { FoodSearchModal } from '../foods/FoodSearchModal';
 type MenuKey = QuickAction | 'search';
-const actions:[MenuKey,string][]=[['search','Search the food database'],['barcode','Scan a barcode'],['label','Scan a nutrition label'],['photo','Photograph a meal'],['quick','Quick add calories'],['manual','Add a food by hand'],['weight','Log your weight']];
+const actions:[MenuKey,MessageKey][]=[['search','fab.search'],['barcode','fab.barcode'],['label','fab.label'],['photo','fab.photo'],['quick','fab.quick'],['manual','fab.manual'],['weight','fab.weight']];
 export function QuickActions() {
   const [open,setOpen]=useState(false); const [pending,setPending]=useState<MenuKey|null>(null);
   const [action,setAction]=useState<MenuKey|null>(null); const insets=useSafeAreaInsets();
-  const path=usePathname(); const bottom=insets.bottom+76;
+  const path=usePathname(); const bottom=insets.bottom+76; const t=useT();
   const turn=useSharedValue(0);
   useEffect(()=>{turn.value=withSpring(open?1:0,SPRING.pop);},[open,turn]);
   const spin=useAnimatedStyle(()=>({transform:[{rotate:`${turn.value*135}deg`}]}));
@@ -33,18 +34,18 @@ export function QuickActions() {
   },[pending]);
   // Remount per route closes camera/action sheets when tabs change.
   return <View pointerEvents="box-none" style={{position:'absolute',inset:0}} key={path}>
-    <Pressable accessibilityRole="button" accessibilityLabel="Open quick actions" accessibilityState={{expanded:open}} onPress={()=>reveal(true)} tone="none" weight="firm" className="h-16 w-16 items-center justify-center rounded-full bg-accent shadow-lg" style={{position:'absolute',right:20,bottom}}><Text className="text-4xl">+</Text></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel={t('fab.open')} accessibilityState={{expanded:open}} onPress={()=>reveal(true)} tone="none" weight="firm" className="h-16 w-16 items-center justify-center rounded-full bg-accent shadow-lg" style={{position:'absolute',right:20,bottom}}><Text className="text-4xl">+</Text></Pressable>
     <Modal visible={open} transparent animationType="none" onDismiss={promote} onRequestClose={()=>reveal(false)}><ThemeRoot transparent>
       <Animated.View entering={FadeIn.duration(TIMING.base).reduceMotion(ReduceMotion.System)} exiting={FadeOut.duration(TIMING.fast).reduceMotion(ReduceMotion.System)} style={{flex:1,backgroundColor:'rgba(0,0,0,.45)'}}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Dismiss quick actions" onPress={()=>reveal(false)} tone="none" style={{position:'absolute',inset:0}} />
+        <Pressable accessibilityRole="button" accessibilityLabel={t('fab.dismiss')} onPress={()=>reveal(false)} tone="none" style={{position:'absolute',inset:0}} />
         <View style={{position:'absolute',bottom,right:20,left:20,alignItems:'flex-end'}}>
-          {actions.map(([key,label],i)=><Animated.View key={key}
+          {actions.map(([key,messageKey],i)=><Animated.View key={key}
             entering={FadeInDown.delay((actions.length-1-i)*ENTER_STAGGER).duration(TIMING.base).reduceMotion(ReduceMotion.System)}
             exiting={FadeOutDown.delay(i*30).duration(TIMING.fast).reduceMotion(ReduceMotion.System)} style={{maxWidth:'100%'}}>
-            <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={()=>choose(key)} weight="firm" tone="none" className="mb-3 min-h-14 justify-center rounded-2xl bg-surface px-5 py-3"><Text className="text-lg font-bold">{label}</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={t(messageKey)} onPress={()=>choose(key)} weight="firm" tone="none" className="mb-3 min-h-14 justify-center rounded-2xl bg-surface px-5 py-3"><Text className="text-lg font-bold">{t(messageKey)}</Text></Pressable>
           </Animated.View>)}
           <Animated.View style={spin}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Close quick actions" onPress={()=>reveal(false)} tone="none" weight="firm" className="h-16 w-16 items-center justify-center rounded-full bg-accent"><Text className="text-4xl">+</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('fab.close')} onPress={()=>reveal(false)} tone="none" weight="firm" className="h-16 w-16 items-center justify-center rounded-full bg-accent"><Text className="text-4xl">+</Text></Pressable>
           </Animated.View>
         </View>
       </Animated.View>

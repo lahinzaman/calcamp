@@ -6,6 +6,7 @@ import { Pressable } from '../../theme/Pressable';
 import { Action, Choice, Field } from '../../components/FormControls';
 import { ProgressBar } from '../../theme/motion';
 import { haptic } from '../../theme/haptics';
+import { useT } from '../../i18n';
 import { useAuthStore } from '../../store/authStore';
 import { exerciseById } from './catalog';
 import { ExerciseHelp } from './ExerciseHelp';
@@ -32,6 +33,7 @@ function Stepper({ label, value, onChange, min, max, step = 1, asRest = false }:
 }
 
 export function RoutineBuilder({ onClose, onSave, existing }: { onClose: () => void; onSave: (routine: WorkoutRoutine) => Promise<void>; existing?: WorkoutRoutine }) {
+  const t = useT();
   const owner = useAuthStore(s => s.session?.user.id) ?? 'anonymous';
   const [step, setStep] = useState<'pick' | 'tune'>(existing ? 'tune' : 'pick');
   const [name, setName] = useState(existing?.name ?? '');
@@ -69,13 +71,13 @@ export function RoutineBuilder({ onClose, onSave, existing }: { onClose: () => v
     return <Modal visible presentationStyle="pageSheet" animationType="slide" onRequestClose={onClose}>
       <SafeAreaView className="flex-1 bg-background">
         <View className="px-5 pt-4">
-          <Text className="text-2xl font-bold">Choose your exercises</Text>
+          <Text className="text-2xl font-bold">{t('train.chooseExercises')}</Text>
           <Text className="mt-1 text-sm">Search or filter down to what your gym actually has. Sets and rest come next.</Text>
         </View>
         <ExercisePicker selectedIds={ids} onToggle={toggle} onClose={onClose} footer={<>
           <Action label={ids.length ? `Set up ${ids.length} exercise${ids.length > 1 ? 's' : ''}` : 'Pick at least one exercise'}
             disabled={!ids.length} onPress={() => setStep('tune')} tone={ids.length ? 'success' : 'none'} />
-          <Action secondary label="Cancel" onPress={onClose} />
+          <Action secondary label={t('common.cancel')} onPress={onClose} />
         </>} />
       </SafeAreaView>
     </Modal>;
@@ -137,7 +139,7 @@ export function RoutineBuilder({ onClose, onSave, existing }: { onClose: () => v
 
         {error && <Text accessibilityRole="alert" className="mb-4">{error}</Text>}
         <Action label={busy ? 'Saving…' : 'Save routine'} disabled={busy} onPress={() => void save()} tone="success" />
-        <Action secondary label="Cancel" onPress={onClose} />
+        <Action secondary label={t('common.cancel')} onPress={onClose} />
       </ScrollView>
     </KeyboardAvoidingView></SafeAreaView>
   </Modal>;

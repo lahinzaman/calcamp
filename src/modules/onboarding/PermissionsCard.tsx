@@ -8,24 +8,26 @@ import { useAuthStore } from '../../store/authStore';
 import { defaultPreferences } from '../notifications/policy';
 import { readPreferences, savePreferences } from '../notifications/preferences';
 import { configureNotifications } from '../notifications/service';
+import { useT } from '../../i18n';
 
 type State = 'idle' | 'asking' | 'granted' | 'refused';
 
 function Row({ title, why, state, label, onPress }: {
   title: string; why: string; state: State; label: string; onPress?: () => void;
 }) {
+  const t = useT();
   return <View className="mb-3 rounded-2xl bg-raised p-4">
     <View className="mb-1 flex-row items-baseline justify-between gap-3">
       <Text className="flex-1 font-bold">{title}</Text>
-      {state === 'granted' && <Text className="text-sm font-bold">On</Text>}
+      {state === 'granted' && <Text className="text-sm font-bold">{t('permissions.on')}</Text>}
     </View>
     <Text className="mb-3 text-sm leading-5">{why}</Text>
     {state !== 'granted' && onPress && <Pressable accessibilityRole="button" accessibilityLabel={label}
       disabled={state === 'asking'} onPress={onPress} weight="firm"
       className="min-h-12 items-center justify-center rounded-xl bg-surface px-4">
-      <Text className="font-semibold">{state === 'asking' ? 'Waiting for your answer…' : state === 'refused' ? 'Ask again' : label}</Text>
+      <Text className="font-semibold">{state === 'asking' ? t('permissions.waiting') : state === 'refused' ? t('permissions.askAgain') : label}</Text>
     </Pressable>}
-    {state === 'refused' && <Text className="mt-2 text-xs">Declined. You can turn this on later in your device Settings.</Text>}
+    {state === 'refused' && <Text className="mt-2 text-xs">{t('permissions.declined')}</Text>}
   </View>;
 }
 
@@ -35,6 +37,7 @@ function Row({ title, why, state, label, onPress }: {
  * up front, having first said what each permission is for.
  */
 export function PermissionsCard() {
+  const t = useT();
   const owner = useAuthStore(s => s.session?.user.id);
   const [camera, requestCamera] = useCameraPermissions();
   const [notifications, setNotifications] = useState<State>('idle');
@@ -52,14 +55,14 @@ export function PermissionsCard() {
   };
 
   return <View className="mb-4 rounded-3xl border border-border bg-surface p-5">
-    <Text className="mb-1 text-sm font-bold tracking-widest">PERMISSIONS</Text>
-    <Text className="mb-4">Two of these make the app work better. Neither is required, and you can change both later.</Text>
-    <Row title="Camera" state={cameraState} label="Allow camera"
-      why="Scan a barcode, photograph a plate, and take progress photos with a weigh-in. Photos you take stay on this device."
+    <Text className="mb-1 text-sm font-bold tracking-widest">{t('permissions.heading')}</Text>
+    <Text className="mb-4">{t('permissions.intro')}</Text>
+    <Row title={t('permissions.camera')} state={cameraState} label={t('permissions.allowCamera')}
+      why={t('permissions.cameraWhy')}
       onPress={() => { void requestCamera().catch(() => {}); haptic('selection'); }} />
-    <Row title="Notifications" state={notifications} label="Allow notifications"
-      why="Meal, training and weekly weigh-in reminders, at times you choose. Nothing is sent until you turn a reminder on."
+    <Row title={t('permissions.notifications')} state={notifications} label={t('permissions.allowNotifications')}
+      why={t('permissions.notificationsWhy')}
       onPress={() => { void askNotifications(); }} />
-    <Text className="text-xs">CalCamp never asks for your microphone — nothing in the app records audio.</Text>
+    <Text className="text-xs">{t('permissions.noMicrophone')}</Text>
   </View>;
 }

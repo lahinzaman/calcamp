@@ -15,6 +15,7 @@ import { exerciseById } from './catalog';
 import type { WorkoutRoutine } from './routines';
 import { useAuthStore } from '../../store/authStore';
 import { Action } from '../../components/FormControls';
+import { useT } from '../../i18n';
 import { Choice } from '../../components/FormControls';
 import { safelyEdit } from '../../components/safelyEdit';
 import { SyncIndicator } from '../../components/SyncIndicator';
@@ -84,6 +85,7 @@ const SetRow = memo(function SetRow({ entry, index, previous, onRemove }: { entr
 });
 
 export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSets?: PreviousSets }) {
+  const t = useT();
   const list = useRef<FlashListRef<WorkoutSet>>(null);
   const remove = useCallback((id: string) => safelyEdit(() => workoutStore.getState().removeSet(id)), []);
   const [program, setProgram] = useState(0);
@@ -155,12 +157,12 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
       <View className="mb-6 flex-row justify-between"><Text className="text-sm font-black tracking-widest text-ink">CALCAMP</Text><Text className="text-xs font-semibold text-ink">TRAINING</Text></View>
       <SyncIndicator />
       {!!recordNames.length && <View className="my-3 rounded-2xl bg-surface p-4">
-        <Text className="font-bold">New personal record{recordNames.length > 1 ? 's' : ''}</Text>
+        <Text className="font-bold">{t('train.newRecord')}</Text>
         {recordNames.map(record => <Text key={`${record.exerciseId}:${record.kind}`} className="mt-2 text-sm text-ink">{record.name} · {record.kind === 'weight' ? 'heaviest set' : 'estimated 1RM'} {Math.round(record.value)} lbs{record.previous ? ` (was ${Math.round(record.previous)})` : ''}</Text>)}
       </View>}
       <ImportedWorkouts />
-      <Text className="text-4xl font-bold tracking-tight text-ink">{session?.name ?? 'Make progress.'}</Text>
-      <Text className="mt-2 text-base text-ink">{session ? 'One focused set at a time.' : 'Show up. Log your lifts. Build on last time.'}</Text>
+      <Text className="text-4xl font-bold tracking-tight text-ink">{session?.name ?? t('train.title')}</Text>
+      <Text className="mt-2 text-base text-ink">{session ? t('train.subtitleActive') : t('train.subtitleIdle')}</Text>
       {pending > 0 && <Pressable accessibilityRole="button" disabled={syncStatus === 'saving'} onPress={() => void workoutStore.getState().savePendingWorkouts()} className="mt-4 rounded-xl bg-surface p-4"><Text className="font-semibold">{syncStatus === 'saving' ? 'Saving workouts…' : `Save ${pending} pending workout(s)`}</Text></Pressable>}
       {syncError && <Text accessibilityRole="alert" className="mt-3 text-sm text-ink">{syncError}</Text>}
       {syncStatus === 'saved' && <Text className="mt-3 text-sm text-ink">Workouts saved to Supabase.</Text>}
@@ -168,17 +170,17 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
         {!plans.length ? <>
           <Text className="text-2xl font-bold text-ink">Build your first routine</Text>
           <Text className="mt-3 leading-6 text-ink">CalCamp does not ship a template, because the split that works is the one you will actually run. Pick your exercises, set your own sets and rest, and we will check the weekly volume as you go.</Text>
-          <Action label="Create a routine" onPress={() => setBuilder(true)} />
+          <Action label={t('train.createRoutine')} onPress={() => setBuilder(true)} />
         </> : <>
         <Text className="text-xs font-bold uppercase tracking-widest text-ink">Ready when you are</Text>
         <Text className="mt-4 text-2xl font-bold text-ink">{plan.name}</Text>
         <Text className="mt-3 leading-6 text-ink">{plan.focus}. Sets, rest and rep ranges come from the routine — change them any time.</Text>
         <View className="mt-4 flex-row flex-wrap">{plans.map((plan, index) => <Choice key={plan.name} label={plan.name} selected={program === index} onPress={() => setProgram(index)} />)}</View>
-        <Pressable accessibilityRole="button" onPress={() => safelyEdit(start)} className="mt-6 items-center rounded-2xl bg-accent p-4"><Text className="font-bold text-ink">Start session</Text></Pressable>
-        <Action secondary label="Create another routine" onPress={() => setBuilder(true)} />
+        <Pressable accessibilityRole="button" onPress={() => safelyEdit(start)} className="mt-6 items-center rounded-2xl bg-accent p-4"><Text className="font-bold text-ink">{t('train.startSession')}</Text></Pressable>
+        <Action secondary label={t('train.createAnother')} onPress={() => setBuilder(true)} />
         </>}
         <TrainingTips routines={routines} experience={experience} lifts={lifts} volumeLog={volumeLog} />
-        <Action secondary label="Training history & records" onPress={() => router.push('/workouts')} />
+        <Action secondary label={t('train.history')} onPress={() => router.push('/workouts')} />
         <VolumeTrend log={volumeLog} />
         {routineError && <Text>{routineError}</Text>}
         <View className="gap-2">{(plan?.lifts ?? []).map(e => <View key={e.id} className="flex-row items-center gap-3"><Text className="flex-1">{e.name}</Text><ExerciseHelp exercise={e} /></View>)}</View>
@@ -188,15 +190,15 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
         <View className="my-6 flex-row flex-wrap gap-3">
           <View className="items-center rounded-2xl bg-surface p-4" style={{ flexGrow: 1, flexBasis: 140 }}>
             <Text className="text-3xl font-bold" style={{ fontVariant: ['tabular-nums'] }}>{sets.filter(entry => entry.completedAtMs !== null).length}</Text>
-            <Text className="mt-1 text-xs">Completed sets</Text></View>
+            <Text className="mt-1 text-xs">{t('train.completedSets')}</Text></View>
           <View className="items-center rounded-2xl bg-surface p-4" style={{ flexGrow: 1, flexBasis: 140 }}>
             <Text className="text-3xl font-bold" style={{ fontVariant: ['tabular-nums'] }}>{Math.round(volume).toLocaleString()}</Text>
-            <Text className="mt-1 text-xs">Volume · lbs</Text></View>
+            <Text className="mt-1 text-xs">{t('train.volume')}</Text></View>
         </View>
         <View className="mb-2 flex-row items-center justify-between gap-3">
-          <Text className="flex-1 text-sm font-bold tracking-widest">EXERCISES</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Reorder exercises" onPress={() => setOrdering(true)} weight="subtle"
-            className="min-h-11 justify-center rounded-full bg-surface px-4"><Text className="text-sm font-semibold">Reorder</Text></Pressable>
+          <Text className="flex-1 text-sm font-bold tracking-widest">{t('train.exercises')}</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('train.reorder')} onPress={() => setOrdering(true)} weight="subtle"
+            className="min-h-11 justify-center rounded-full bg-surface px-4"><Text className="text-sm font-semibold">{t('train.reorder')}</Text></Pressable>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-5" contentContainerStyle={{ gap: 8, paddingRight: 16 }}>
           {sequence.map((entry, index) => <Pressable key={entry.id} accessibilityRole="tab" accessibilityLabel={entry.exercise.name}
@@ -217,7 +219,7 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
       </>}
       </>}
       ListFooterComponent={session ? <>
-        {active && <Pressable accessibilityRole="button" onPress={() => safelyEdit(() => workoutStore.getState().addSet({ id: localId(), sessionExerciseId: active.id }))} className="mt-3 items-center rounded-xl bg-raised p-4"><Text className="font-bold text-ink">+ Add set</Text></Pressable>
+        {active && <Pressable accessibilityRole="button" onPress={() => safelyEdit(() => workoutStore.getState().addSet({ id: localId(), sessionExerciseId: active.id }))} className="mt-3 items-center rounded-xl bg-raised p-4"><Text className="font-bold text-ink">{t('train.addSet')}</Text></Pressable>
         }
         <RestTimerPanel />
         <SessionControls completedSets={sets.filter(entry => entry.completedAtMs !== null).length} volumeLbs={volume}

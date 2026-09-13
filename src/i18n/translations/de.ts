@@ -103,4 +103,6 @@ export const de: Partial<Catalogue> = {
   'trends.cloudUnavailable': 'Dein Cloud-Tagebuch war nicht erreichbar. Die Daten auf dem Gerät sind unberührt — versuche es erneut, sobald du verbunden bist.',
   'trends.expenditureNote': 'Geschätzter Tagesverbrauch aus deiner erfassten Zufuhr und deinem Gewichtstrend — kein Ziel.',
   'trends.weighInNote': 'Wiege dich jeden Morgen und markiere den Tag als eingehalten, sobald du alles erfasst hast.',
+  'food.nutrients': 'Nährstoffe',
+  'food.brandedHeading': 'MARKEN & VERPACKTES · USDA',
 };

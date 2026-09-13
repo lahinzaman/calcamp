@@ -103,4 +103,6 @@ export const ar: Partial<Catalogue> = {
   'trends.cloudUnavailable': 'تعذّر الوصول إلى سجلك السحابي. بيانات جهازك لم تتأثر — أعد المحاولة عند الاتصال.',
   'trends.expenditureNote': 'الإنفاق اليومي المقدَّر من مدخولك المسجّل ومسار وزنك — وليس هدفًا.',
   'trends.weighInNote': 'زِن نفسك كل صباح، وضع علامة الالتزام على اليوم بعد أن تسجّل كل شيء.',
+  'food.nutrients': 'عنصرًا غذائيًا',
+  'food.brandedHeading': 'العلامات التجارية والمعلّبات · USDA',
 };

@@ -103,4 +103,6 @@ export const it: Partial<Catalogue> = {
   'trends.cloudUnavailable': 'Non è stato possibile raggiungere il diario nel cloud. I dati sul dispositivo non sono toccati: riprova quando sei connesso.',
   'trends.expenditureNote': 'Dispendio giornaliero stimato dalle calorie registrate e dall’andamento del peso: non è un obiettivo.',
   'trends.weighInNote': 'Pesati ogni mattina e segna il giorno come rispettato quando hai registrato tutto.',
+  'food.nutrients': 'nutrienti',
+  'food.brandedHeading': 'MARCHI E CONFEZIONATI · USDA',
 };

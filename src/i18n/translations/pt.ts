@@ -103,4 +103,6 @@ export const pt: Partial<Catalogue> = {
   'trends.cloudUnavailable': 'Não foi possível aceder ao seu diário na nuvem. Os dados no dispositivo não são afetados — tente de novo quando tiver ligação.',
   'trends.expenditureNote': 'Gasto diário estimado a partir do que registou e da tendência do seu peso — não é um objetivo.',
   'trends.weighInNote': 'Pese-se todas as manhãs e marque o dia como cumprido assim que registar tudo.',
+  'food.nutrients': 'nutrientes',
+  'food.brandedHeading': 'MARCAS E EMBALADOS · USDA',
 };

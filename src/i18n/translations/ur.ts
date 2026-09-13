@@ -103,4 +103,6 @@ export const ur: Partial<Catalogue> = {
   'trends.cloudUnavailable': 'آپ کے کلاؤڈ روزنامچے تک رسائی نہیں ہو سکی۔ آلے کا ڈیٹا محفوظ ہے — رابطہ بحال ہونے پر دوبارہ کوشش کریں۔',
   'trends.expenditureNote': 'آپ کے درج کردہ استعمال اور وزن کے رجحان سے اندازہ شدہ روزانہ خرچ — یہ ہدف نہیں ہے۔',
   'trends.weighInNote': 'ہر صبح وزن کریں، اور سب کچھ درج کر لینے پر اُس دن کو مکمل نشان زد کریں۔',
+  'food.nutrients': 'غذائی اجزا',
+  'food.brandedHeading': 'برانڈز اور پیک شدہ · USDA',
 };

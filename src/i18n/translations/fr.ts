@@ -103,4 +103,6 @@ export const fr: Partial<Catalogue> = {
   'trends.cloudUnavailable': 'Impossible d’atteindre votre journal en ligne. Les données de votre appareil ne sont pas touchées — réessayez une fois connecté.',
   'trends.expenditureNote': 'Dépense quotidienne estimée à partir de vos apports enregistrés et de votre tendance de poids — ce n’est pas un objectif.',
   'trends.weighInNote': 'Pesez-vous chaque matin et marquez la journée comme respectée une fois tout enregistré.',
+  'food.nutrients': 'nutriments',
+  'food.brandedHeading': 'MARQUES ET EMBALLÉS · USDA',
 };

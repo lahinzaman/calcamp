@@ -100,6 +100,8 @@ export const en = {
   'food.unavailable': 'Food search is unavailable right now. Try again, or add the food by hand.',
   'food.usdaHeading': 'USDA FOOD DATA',
   'food.packagedHeading': 'PACKAGED FOODS · CROWD-SOURCED',
+  'food.nutrients': 'nutrients',
+  'food.brandedHeading': 'BRANDED & PACKAGED · USDA',
   'food.drinksHeading': 'DRINKS',
   'food.createRecipe': 'Create a recipe',
   'food.noRecipes': 'No recipes yet. Build one from foods you have already logged and it becomes a single tap.',

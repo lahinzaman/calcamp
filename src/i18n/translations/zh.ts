@@ -103,4 +103,6 @@ export const zh: Partial<Catalogue> = {
   'trends.cloudUnavailable': '无法连接到云端记录。本机数据不受影响——恢复网络后请重试。',
   'trends.expenditureNote': '根据你记录的摄入与体重趋势估算的每日消耗——这不是目标值。',
   'trends.weighInNote': '每天早晨称重，并在记录完当天所有内容后把这一天标为达标。',
+  'food.nutrients': '种营养素',
+  'food.brandedHeading': '品牌与包装食品 · USDA',
 };

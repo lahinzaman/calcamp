@@ -103,4 +103,6 @@ export const ko: Partial<Catalogue> = {
   'trends.cloudUnavailable': '클라우드 기록에 연결하지 못했습니다. 기기에 있는 데이터는 그대로입니다 — 연결된 뒤 다시 시도하세요.',
   'trends.expenditureNote': '기록한 섭취량과 체중 추이로 추정한 하루 소비량입니다 — 목표치가 아닙니다.',
   'trends.weighInNote': '매일 아침 체중을 재고, 그날 기록을 모두 마치면 그 날을 달성으로 표시하세요.',
+  'food.nutrients': '가지 영양소',
+  'food.brandedHeading': '브랜드 및 포장식품 · USDA',
 };

@@ -11,6 +11,7 @@ import { nutritionStore } from '../../store/nutritionStore';
 import { useAuthStore } from '../../store/authStore';
 import { searchFoods, type SearchResult } from '../../api/foodSearch';
 import { QUALITY_LABELS, UsdaRateLimited, searchUsdaFoods } from '../../api/usda';
+import { searchBundledFoods, toSearchResult } from '../../data/usdaFoods';
 import { MEAL_LABELS, MEAL_SLOTS, mealForHour, scaleMacros, type MealSlot } from '../../types/foodEntry';
 import { orderFoods, readSavedFoods, rememberFood, toggleFavorite, forgetFood, type SavedFood } from './savedFoods';
 import { foodEmoji } from '../dining/foodEmoji';
@@ -49,6 +50,12 @@ export function FoodLibrary({ meal, onDone, footer }: { meal?: MealSlot; onDone:
   const list = useMemo(() => orderFoods(saved, tab === 'recent' || tab === 'frequent' || tab === 'favorite' ? tab : 'recent'), [saved, tab]);
   // The drinks catalogue is bundled, so it answers instantly and works with no connection.
   const drinkMatches = useMemo(() => tab === 'search' ? searchDrinks(term.trim()) : [], [tab, term]);
+  const bundled = useMemo(() => tab === 'search' ? searchBundledFoods(term.trim()).map(toSearchResult) : [], [tab, term]);
+  // The live API repeats much of what is bundled; drop those rows rather than list them twice.
+  const branded = useMemo(() => {
+    const known = new Set(bundled.map(food => food.name.toLowerCase()));
+    return (usda.data ?? []).filter(food => !known.has(food.name.toLowerCase()));
+  }, [usda.data, bundled]);
   return <>
       <View className="mb-3 flex-row flex-wrap">{TABS.map(([value, messageKey]) => <Choice key={value} label={t(messageKey)} selected={tab === value} onPress={() => setTab(value)} />)}</View>
       {tab === 'search' && <>
@@ -62,16 +69,22 @@ export function FoodLibrary({ meal, onDone, footer }: { meal?: MealSlot; onDone:
         </>}
         {(results.isLoading || usda.isLoading) && <LoadingCards label="Searching…" />}
         {usda.error instanceof UsdaRateLimited && <Text className="mb-3 text-sm">{usda.error.message}</Text>}
-        {!!usda.data?.length && <>
+        {!!bundled.length && <>
           <Text className="mb-2 text-sm font-bold tracking-widest">{t('food.usdaHeading')}</Text>
-          {usda.data.map(result => <Row key={result.key} title={result.name}
-            subtitle={`${result.brand ? `${result.brand} · ` : ''}${Math.round(result.macros.caloriesKcal)} kcal per ${result.servingLabel} · ${Object.keys(result.micros).length} nutrients · ${QUALITY_LABELS[(result.quality ?? 'reference') as 'lab']}`}
+          {bundled.map(result => <Row key={result.key} title={result.name}
+            subtitle={`${Math.round(result.macros.caloriesKcal)} kcal · ${result.servingLabel} · ${Object.keys(result.micros).length} ${t('food.nutrients')}`}
             onPress={() => setChosen({ name: result.name, servingLabel: result.servingLabel, macros: result.macros, micros: result.micros, source: 'custom' })} />)}
         </>}
-        {results.isError && !usda.data?.length && <Text accessibilityRole="alert" className="mb-3">{t('food.unavailable')}</Text>}
-        {results.data?.length === 0 && !usda.data?.length && !drinkMatches.length && <Text className="mb-3">{t('food.noResults', { query })}</Text>}
+        {!!branded.length && <>
+          <Text className="mb-2 mt-2 text-sm font-bold tracking-widest">{t('food.brandedHeading')}</Text>
+          {branded.map(result => <Row key={result.key} title={result.name}
+            subtitle={`${result.brand ? `${result.brand} · ` : ''}${Math.round(result.macros.caloriesKcal)} kcal per ${result.servingLabel} · ${Object.keys(result.micros).length} ${t('food.nutrients')} · ${QUALITY_LABELS[(result.quality ?? 'reference') as 'lab']}`}
+            onPress={() => setChosen({ name: result.name, servingLabel: result.servingLabel, macros: result.macros, micros: result.micros, source: 'custom' })} />)}
+        </>}
+        {results.isError && !bundled.length && !branded.length && <Text accessibilityRole="alert" className="mb-3">{t('food.unavailable')}</Text>}
+        {results.data?.length === 0 && !bundled.length && !branded.length && !drinkMatches.length && <Text className="mb-3">{t('food.noResults', { query })}</Text>}
         {!!results.data?.length && <Text className="mb-2 mt-2 text-sm font-bold tracking-widest">{t('food.packagedHeading')}</Text>}
-        {results.data?.map(result => <Row key={result.key} title={result.name} subtitle={`${result.brand ? `${result.brand} · ` : ''}${Math.round(result.macros.caloriesKcal)} kcal per ${result.servingLabel} · ${Object.keys(result.micros).length} nutrients`}
+        {results.data?.map(result => <Row key={result.key} title={result.name} subtitle={`${result.brand ? `${result.brand} · ` : ''}${Math.round(result.macros.caloriesKcal)} kcal per ${result.servingLabel} · ${Object.keys(result.micros).length} ${t('food.nutrients')}`}
           onPress={() => setChosen({ name: result.name, servingLabel: result.servingLabel, macros: result.macros, micros: result.micros, source: 'custom' })} />)}
       </>}
       {tab === 'recipe' && <>

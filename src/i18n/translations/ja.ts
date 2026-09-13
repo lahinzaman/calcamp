@@ -103,4 +103,6 @@ export const ja: Partial<Catalogue> = {
   'trends.cloudUnavailable': 'クラウドの記録に接続できませんでした。端末内のデータは影響を受けていません。接続できたら再試行してください。',
   'trends.expenditureNote': '記録した摂取量と体重の推移から推定した1日の消費量です。目標値ではありません。',
   'trends.weighInNote': '毎朝体重を量り、その日の記録をすべて終えたら「達成」として印を付けてください。',
+  'food.nutrients': '種類の栄養素',
+  'food.brandedHeading': 'ブランド・加工食品 · USDA',
 };

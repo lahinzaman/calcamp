@@ -9,13 +9,15 @@ import { palettes } from '../theme/palette';
 export function Field({ label, onFocus, onBlur, ...props }: TextInputProps & { label: string }) {
   const mode = useThemeStore(s => s.mode); const palette = palettes[mode];
   const focus = useSharedValue(0);
+  // Colour only. The focus ring used to also scale the box by 0.6%, which re-rasterised the
+  // text inside it at a fractional scale: glyphs blurred, drifted off the baseline, and clipped
+  // at the rounded edges — all of it while you were typing, which is when it was least welcome.
   const ring = useAnimatedStyle(() => ({
     borderColor: interpolateColor(focus.value, [0, 1], [palette.border, palette.protein]),
-    transform: [{ scale: 1 + focus.value * .006 }],
   }));
   return <View className="mb-4 gap-2"><Text className="text-sm font-semibold text-ink">{label}</Text>
     <Animated.View style={[{ borderWidth: 1, borderRadius: 12, backgroundColor: palette.surface }, ring]}>
-      <TextInput accessibilityLabel={label} placeholderTextColor="#71717a" {...props}
+      <TextInput accessibilityLabel={label} {...props}
         onFocus={event => { focus.value = withTiming(1, { duration: TIMING.fast, reduceMotion: ReduceMotion.System }); onFocus?.(event); }}
         onBlur={event => { focus.value = withTiming(0, { duration: TIMING.base, reduceMotion: ReduceMotion.System }); onBlur?.(event); }}
         className="px-4 py-3 text-base text-ink" />

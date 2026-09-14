@@ -13,5 +13,14 @@ export const Text = forwardRef<NativeText, TextProps>(function CalCampText({ sty
 });
 export const TextInput = forwardRef<NativeInput, TextInputProps>(function CalCampInput({ style, ...props }, ref) {
   const mode = useThemeStore(s => s.mode);
-  return <NativeInput ref={ref} {...props} placeholderTextColor={palettes[mode].ink} selectionColor={palettes[mode].protein} style={[{ minHeight: 48, fontSize: 16, paddingVertical: 12 }, style, typography(style, props.className), { color: palettes[mode].ink }]} />;
+  const palette = palettes[mode];
+  // placeholderTextColor sits BEFORE the spread so a caller can still override it. It used to
+  // sit after, which both ignored the caller and drew the placeholder in full ink — a hint
+  // indistinguishable from text you had already typed.
+  return <NativeInput ref={ref} placeholderTextColor={palette.muted} {...props} selectionColor={palette.protein}
+    style={[{ minHeight: 48, fontSize: 16, paddingVertical: 12,
+      // A single-line box taller than its text lays out from the top on Android, leaving the
+      // text sitting high against the border instead of centred in it.
+      textAlignVertical: props.multiline ? 'top' : 'center' },
+      style, typography(style, props.className), { color: palette.ink }]} />;
 });

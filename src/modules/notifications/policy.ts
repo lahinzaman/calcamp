@@ -32,7 +32,7 @@ export function reminderPlan(p: NotificationPreferences, profile: UserProfile | 
   if (p.workoutReminders && profile?.is_advanced_track) {
     const [hour, minute] = p.workoutTime.split(':').map(Number);
     const days = [...new Set(profile.training_days)].sort((a, b) => (a + 6) % 7 - (b + 6) % 7);
-    days.forEach((day, index) => { if (Number.isInteger(day) && day >= 0 && day <= 6) result.push({ id: `workout-${day}`, kind: 'workout', title: `Time for ${DEFAULT_UPPER_LOWER[index]?.name ?? 'your workout'}`, body: 'Open your training log when you are ready.', hour, minute, weekday: day + 1 }); });
+    days.forEach((day, index) => { if (Number.isInteger(day) && day >= 0 && day <= 6) result.push({ id: `workout-${day}`, kind: 'workout', title: `Time for ${DEFAULT_UPPER_LOWER[index % DEFAULT_UPPER_LOWER.length].name}`, body: 'Open your training log when you are ready.', hour, minute, weekday: day + 1 }); });
   }
   return result;
 }

@@ -387,11 +387,11 @@ alter table public.users
   add constraint training_days_valid check (public.valid_training_days(training_days)),
   add constraint onboarding_profile_complete check (onboarding_completed_at is null or
     (height_cm is not null and weight_kg is not null and activity_level is not null and goal is not null
-      and (not is_advanced_track or cardinality(training_days) = 4))),
+      and (not is_advanced_track or cardinality(training_days) between 1 and 7))),
   add constraint preworkout_allocation_valid check (not preworkout_fast_carbs or
     (is_advanced_track and training_targets is not null and preworkout_carbs_g > 0
       and preworkout_carbs_g <= (training_targets->>'carbsG')::numeric));
-comment on column public.users.training_days is 'Local weekday numbers, Sunday=0. Advanced track assigns Upper A, Lower A, Upper B, Lower B in Monday-to-Sunday order.';
+comment on column public.users.training_days is 'Local weekday numbers, Sunday=0. Advanced track needs one to seven distinct days; the Upper/Lower names cycle over however many are chosen.';
 comment on column public.users.preworkout_carbs_g is 'Allocation within the training-day carbohydrate target, not extra calories.';
 
 -- Keep only the latest report from each voter in the 30-minute window.

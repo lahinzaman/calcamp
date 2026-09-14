@@ -30,8 +30,9 @@ export function validateOnboarding(profile: OnboardingProfile) {
   if (!Number.isFinite(profile.height_inches) || profile.height_inches! < 12 || profile.height_inches! > 118
     || !Number.isFinite(profile.weight_lbs) || profile.weight_lbs! < 2 || profile.weight_lbs! > 2204) throw new Error('Enter height in feet/inches and weight in lbs.');
   if (!ACTIVITY_LEVELS.includes(profile.activity_level!) || !GOALS.includes(profile.goal!)) throw new Error('Choose an activity level and goal.');
-  if (profile.is_advanced_track && (profile.training_days.length !== 4 || new Set(profile.training_days).size !== 4
-    || profile.training_days.some(day => !Number.isInteger(day) || day < 0 || day > 6))) throw new Error('Choose four distinct training days.');
+  if (profile.is_advanced_track && (profile.training_days.length < 1 || profile.training_days.length > 7
+    || new Set(profile.training_days).size !== profile.training_days.length
+    || profile.training_days.some(day => !Number.isInteger(day) || day < 0 || day > 6))) throw new Error('Choose between one and seven distinct training days.');
   for (const target of [profile.training_targets, profile.rest_targets]) {
     if (target && (Object.keys(target).length !== 4 || (['caloriesKcal', 'proteinG', 'carbsG', 'fatG'] as const).some(key => !Number.isFinite(target[key]) || target[key] < 0 || target[key] > 20000) || target.caloriesKcal <= 0)) throw new Error('Enter valid daily targets or leave every target field blank.');
   }

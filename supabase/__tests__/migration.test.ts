@@ -287,3 +287,65 @@ test('Phase 14 migration removes gym busyness and frees push registrations of it
     });
   } finally { await db.close(); }
 });
+
+const TRAINING_DAYS_MIGRATION = '20260913120000_phase15_flexible_training_days.sql';
+/** The constraint as deployed before this migration: advanced profiles had to name exactly four days. */
+const FOUR_DAY_CONSTRAINT = `
+  alter table public.users drop constraint onboarding_profile_complete;
+  alter table public.users add constraint onboarding_profile_complete check (onboarding_completed_at is null or
+    (height_cm is not null and weight_kg is not null and activity_level is not null and goal is not null
+      and (not is_advanced_track or cardinality(training_days) = 4)));`;
+
+test('Phase 15 migration frees the training schedule without stranding the profiles already saved', async (t) => {
+  const db = new PGlite();
+  try {
+    await db.exec(`
+      create role anon; create role authenticated; create role service_role bypassrls;
+      create schema auth; create table auth.users (id uuid primary key);
+      create function auth.uid() returns uuid language sql stable as
+        $$select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid$$;
+      grant usage on schema auth to anon, authenticated, service_role;
+      grant execute on function auth.uid() to anon, authenticated, service_role;
+    `);
+    await db.exec(await readFile(new URL('../schema.sql', import.meta.url), 'utf8'));
+    await db.exec(FOUR_DAY_CONSTRAINT);
+    await db.exec(`insert into auth.users (id) values ('${alice}'); insert into public.users (id) values ('${alice}');`);
+    const complete = `update public.users set height_cm = 180, weight_kg = 80, activity_level = 'moderate',
+      goal = 'maintain', is_advanced_track = true, training_days = $1, onboarding_completed_at = now()`;
+
+    await t.test('the deployed constraint is the one this migration is replacing', async () => {
+      await db.query(complete, [[1, 2, 4, 5]]);
+      await assert.rejects(db.query('update public.users set training_days = $1', [[1, 3, 5]]), { constraint: 'onboarding_profile_complete' });
+    });
+
+    await db.exec(await readFile(new URL(`../migrations/${TRAINING_DAYS_MIGRATION}`, import.meta.url), 'utf8'));
+
+    await t.test('any schedule of one to seven days is accepted afterwards, and an empty one still is not', async () => {
+      // The four-day profile written before the migration is untouched and still valid.
+      assert.equal((await db.query<{ days: number[] }>('select training_days as days from public.users')).rows[0].days.length, 4);
+      for (const days of [[3], [1, 3, 5], [1, 2, 3, 5, 6], [0, 1, 2, 3, 4, 5, 6]]) await db.query('update public.users set training_days = $1', [days]);
+      await assert.rejects(db.query('update public.users set training_days = $1', [[]]), { constraint: 'onboarding_profile_complete' });
+      // Distinctness and the weekday range are still the separate check they always were.
+      await assert.rejects(db.query('update public.users set training_days = $1', [[1, 1, 3]]), { constraint: 'training_days_valid' });
+      await assert.rejects(db.query('update public.users set training_days = $1', [[7]]), { constraint: 'training_days_valid' });
+    });
+
+    await t.test('a bootstrapped database already carries the migrated constraint', async () => {
+      const fresh = new PGlite();
+      try {
+        await fresh.exec(`
+          create role anon; create role authenticated; create role service_role bypassrls;
+          create schema auth; create table auth.users (id uuid primary key);
+          create function auth.uid() returns uuid language sql stable as
+            $$select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid$$;
+          grant usage on schema auth to anon, authenticated, service_role;
+          grant execute on function auth.uid() to anon, authenticated, service_role;
+        `);
+        await fresh.exec(await readFile(new URL('../schema.sql', import.meta.url), 'utf8'));
+        const definition = async (instance: PGlite) => (await instance.query<{ src: string }>(
+          `select pg_get_constraintdef(oid) as src from pg_constraint where conname = 'onboarding_profile_complete'`)).rows[0].src;
+        assert.equal(await definition(db), await definition(fresh));
+      } finally { await fresh.close(); }
+    });
+  } finally { await db.close(); }
+});

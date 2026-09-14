@@ -199,11 +199,12 @@ export const QUESTIONS: QuizQuestion[] = [
   },
   {
     id: 'split', kind: 'weekdays', applies: draft => draft.is_advanced_track,
-    prompt: 'Which four days will you train?',
-    helper: 'Rest and training days get different targets, keeping the weekly total the same.',
+    prompt: 'Which days will you train?',
+    helper: 'Pick as many as you actually train. Rest and training days get different targets, keeping the weekly total the same.',
     read: draft => draft.training_days,
     write: (_draft, value: number[]) => ({ training_days: value }),
-    problem: draft => draft.training_days.length === 4 ? null : `Choose exactly four days — you have ${draft.training_days.length}.`,
+    problem: draft => draft.training_days.length >= 1 ? null
+      : 'Pick at least one training day, or go back and choose "Keep it simple" for one target every day.',
   },
   {
     id: 'preworkout', kind: 'choice', applies: draft => draft.is_advanced_track,

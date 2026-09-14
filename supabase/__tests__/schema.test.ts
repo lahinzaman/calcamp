@@ -188,6 +188,10 @@ test('fresh Supabase schema: permissions, nutrition constraints, and workout int
         is_advanced_track = true, training_days = array[1,2,4,5], training_targets = '{"caloriesKcal":2400,"proteinG":160,"carbsG":300,"fatG":60}',
         preworkout_fast_carbs = true, preworkout_carbs_g = 30, onboarding_completed_at = now()`);
       await fails('update public.users set preworkout_carbs_g = 301');
+      // Four days was never a rule about training, only about one split. Any real schedule is allowed.
+      await db.exec('update public.users set training_days = array[0,1,2,3,5,6]');
+      await db.exec('update public.users set training_days = array[3]');
+      await fails("update public.users set training_days = '{}'");
       await fails('update public.users set is_advanced_track = false');
     });
     await t.test('Phase 5 atomic nutrition deltas deduplicate retries and isolate receipts', async () => {

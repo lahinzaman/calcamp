@@ -7,6 +7,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, __DEV__: true });
 
 let granted = false; let canAskAgain = true; let cameraAsks = 0;
 let configured: { enabled: boolean; request: boolean } | null = null; let notificationsFail = false;
+let actuallyGranted = false;
 mock.module('nativewind', { namedExports: { cssInterop: () => {}, vars: (v: unknown) => v } });
 mock.module('react-native-reanimated', reanimatedMock);
 mock.module('react-native', { namedExports: {
@@ -19,7 +20,8 @@ mock.module('../notifications/service', { namedExports: {
   configureNotifications: async (_owner: string, preferences: { enabled: boolean }, _profile: unknown, request: boolean) => {
     if (notificationsFail) throw new Error('denied');
     configured = { enabled: preferences.enabled, request };
-  } } });
+  },
+  notificationsGranted: async () => actuallyGranted } });
 mock.module('../notifications/preferences', { namedExports: { readPreferences: () => ({}), savePreferences: () => {} } });
 mock.module('../../store/authStore', { namedExports: {
   useAuthStore: (select: (state: unknown) => unknown) => select({ session: { user: { id: 'alice' } } }) } });
@@ -31,7 +33,7 @@ const text = () => JSON.stringify(view!.toJSON());
 const press = async (label: string) => { await act(async () => view!.root.findByProps({ accessibilityLabel: label }).props.onPress()); };
 afterEach(async () => {
   await act(async () => view?.unmount()); view = undefined;
-  granted = false; canAskAgain = true; cameraAsks = 0; configured = null; notificationsFail = false;
+  granted = false; canAskAgain = true; cameraAsks = 0; configured = null; notificationsFail = false; actuallyGranted = false;
 });
 const render = async () => { await act(async () => { view = create(<PermissionsCard />); }); };
 
@@ -60,6 +62,24 @@ test('a refusal is recoverable and points at device settings', async () => {
   assert.ok(text().includes('device Settings'));
   await press('Allow notifications');
   assert.ok(text().includes('device Settings'), 'asking again is still offered');
+});
+
+test('push registration failing on a simulator is not reported as the person refusing', async () => {
+  // configureNotifications throws once local reminders are scheduled but push cannot register.
+  // The permission was granted; saying "declined" sends people to Settings to fix nothing.
+  notificationsFail = true; actuallyGranted = true;
+  await render();
+  await press('Allow notifications');
+  assert.ok(text().includes('On'), 'the row reports the permission it actually holds');
+  assert.ok(!text().includes('device Settings'));
+});
+
+test('a camera request that resolves without granting says so instead of looking inert', async () => {
+  await render();
+  await press('Allow camera');
+  assert.equal(cameraAsks, 1);
+  // canAskAgain is still true, so nothing used to change on screen and the button looked dead.
+  assert.ok(text().includes('device Settings'));
 });
 
 test('the app says plainly that it never wants the microphone', async () => {

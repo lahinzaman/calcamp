@@ -8,6 +8,7 @@ import { Reveal } from '../../theme/motion';
 import { haptic } from '../../theme/haptics';
 import { useOnboardingStore } from '../../store/onboardingStore';
 import { authStore, useAuthStore } from '../../store/authStore';
+import { signOutWithDeviceCleanup } from '../notifications/logout';
 import { completeOnboarding } from '../../api/profile';
 import { heightLabel } from '../../lib/units';
 import { applyStartingBudget, defaultSurvey, startingBudget } from './budget';
@@ -21,6 +22,9 @@ function Plan({ label, macros, note }: { label: string; macros: MacroTotals; not
     {note && <Text className="mt-2 text-sm">{note}</Text>}
   </View>;
 }
+const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`;
+const scheduleNote = (trainingDays: number) => `${plural(trainingDays, 'training day')} and ${plural(7 - trainingDays, 'rest day')}`;
+
 export default function ReviewScreen() {
   const { draft, reset } = useOnboardingStore();
   const session = useAuthStore(s => s.session);
@@ -36,7 +40,11 @@ export default function ReviewScreen() {
         : applyStartingBudget(draft);
       const profile = await completeOnboarding({ ...input, ...(!draft.is_advanced_track ? { training_days: [], training_targets: null, preworkout_fast_carbs: false, preworkout_carbs_g: 0 } : {}) });
       authStore.getState().setProfile(profile); reset(); haptic('success');
-    } catch { setError('Could not save your profile. Check your answers and connection, then retry.'); haptic('error'); }
+    } catch (cause) {
+      const message = cause instanceof Error && cause.message ? cause.message
+        : 'Could not save your profile. Check your answers and connection, then retry.';
+      setError(message); haptic('error');
+    }
     finally { setBusy(false); }
   };
   return <SafeAreaView edges={['left','right','bottom']} className="flex-1 bg-background">
@@ -52,9 +60,9 @@ export default function ReviewScreen() {
           {budget.weeksToGoal !== null && <View className="mb-4 rounded-2xl bg-raised p-4"><Text className="font-bold">About {budget.weeksToGoal} weeks to your goal weight</Text><Text className="mt-1 text-sm">An estimate at today's rate. It will move as your real data comes in.</Text></View>}
         </Reveal>
         <Reveal index={2}>
-          {draft.is_advanced_track
-            ? <><Plan label="Training days" macros={budget.training} note="Four training days and three rest days, holding the same weekly energy." /><Plan label="Rest days" macros={budget.rest} /></>
-            : <Plan label="Every day" macros={budget.rest} />}
+          {draft.is_advanced_track && budget.trainingDayCount > 0 && budget.trainingDayCount < 7
+            ? <><Plan label="Training days" macros={budget.training} note={`${scheduleNote(budget.trainingDayCount)}, holding the same weekly energy.`} /><Plan label="Rest days" macros={budget.rest} /></>
+            : <Plan label="Every day" macros={budget.rest} note={draft.is_advanced_track && budget.trainingDayCount >= 7 ? 'You train every day, so there is no rest day to shift energy onto.' : undefined} />}
           <Text className="mb-2 text-sm">Estimated daily expenditure {budget.tdeeKcal} kcal · resting {Math.round(budget.restingKcal)} kcal.</Text>
           <Text className="mb-5 text-sm">{budget.explanation}</Text>
         </Reveal>
@@ -64,6 +72,10 @@ export default function ReviewScreen() {
       {!session && <Text className="mb-4 rounded-xl bg-raised p-4">Sign in to save this plan. Your answers are kept on this device meanwhile.</Text>}
       <Action label={busy ? 'Saving…' : 'Start using CalCamp'} disabled={!session || busy} onPress={() => void save()} tone="success" />
       <Action secondary label="Change my answers" onPress={() => router.replace('/onboarding')} />
+      {/* A signed-in account whose profile has never saved lands back here on every launch.
+          Without this there is no route to the sign-in screen from inside onboarding at all. */}
+      {!!session && <Action secondary label="Sign out and use a different account" disabled={busy}
+        onPress={() => { authStore.getState().setPendingSignup(null); void signOutWithDeviceCleanup(); }} />}
     </ScrollView>
   </SafeAreaView>;
 }

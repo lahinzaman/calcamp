@@ -28,6 +28,18 @@ export async function removePushRegistration(owner: string) {
   await verifyOwner(owner); const { error } = await getSupabase().rpc('set_push_installation', { p_owner: owner, p_installation: installation(), p_registration: null });
   if (error) throw new Error('Push registration could not be removed. Try again when connected.');
 }
+/**
+ * Whether the system would deliver a notification right now. `configureNotifications` also
+ * throws for outcomes that are not a refusal — a simulator with no push, an unlinked EAS
+ * project, a registration upload that failed — so a caller that needs to know whether the
+ * person said yes has to ask, rather than read it off an exception.
+ */
+export async function notificationsGranted() {
+  try {
+    const permission = await Notifications.getPermissionsAsync();
+    return permission.granted || permission.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
+  } catch { return false; }
+}
 export function configureNotifications(owner: string, preferences: NotificationPreferences, profile: UserProfile | null, request = false) {
   return serialize(async () => {
     await verifyOwner(owner);

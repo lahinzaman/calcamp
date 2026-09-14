@@ -17,6 +17,24 @@ export async function loadProfile(userId: string): Promise<UserProfile | null> {
   if (data) durableStorage.set(`profile:${userId}`, JSON.stringify(data)); else durableStorage.remove(`profile:${userId}`);
   return data ? fromDatabase(data) : null;
 }
+/**
+ * A rejected save is almost never a connection problem, and saying so sends people to retry
+ * something that will fail identically. The database names what it objected to; this says it
+ * back in words, and keeps the raw message when it is something not seen before.
+ */
+export function saveProblem(error: { message?: string; code?: string; details?: string; hint?: string }): string {
+  const text = `${error.message ?? ''} ${error.details ?? ''}`;
+  if (text.includes('onboarding_profile_complete')) {
+    return 'The server rejected your training schedule. Its database is a version behind this app — apply the latest Supabase migration, then retry.';
+  }
+  if (text.includes('training_days_valid')) return 'Choose between one and seven different training days.';
+  if (text.includes('preworkout_allocation_valid')) return 'Your pre-workout carbohydrates do not fit inside your training-day carb target.';
+  if (error.code === '23503') return 'This account is not fully signed up yet. Confirm your email address, sign in again, then retry.';
+  if (error.code === '42501' || error.code === 'PGRST301') return 'This session is not allowed to save a profile. Sign out and back in, then retry.';
+  if (error.code === '23514') return `One of your answers is outside what the server accepts${error.message ? `: ${error.message}` : '.'}`;
+  return `Your profile could not be saved${error.message ? `: ${error.message}` : '.'} Check your connection and try again.`;
+}
+
 export async function completeOnboarding(input: OnboardingProfile): Promise<UserProfile> {
   validateOnboarding(input);
   const client = getSupabase(); const { data: auth, error: authError } = await client.auth.getUser();
@@ -24,7 +42,7 @@ export async function completeOnboarding(input: OnboardingProfile): Promise<User
   const { height_inches, weight_lbs, ...rest } = input;
   const { data, error } = await client.from('users').upsert({ ...rest, height_cm: inchesToCm(height_inches!), weight_kg: lbsToKg(weight_lbs!), id: auth.user.id,
     onboarding_completed_at: new Date().toISOString() }, { onConflict: 'id' }).select(columns).single();
-  if (error) throw new Error('Your profile could not be saved. Check your connection and try again.');
+  if (error) throw new Error(saveProblem(error));
   durableStorage.set(`profile:${auth.user.id}`, JSON.stringify(data));
   return fromDatabase(data);
 }

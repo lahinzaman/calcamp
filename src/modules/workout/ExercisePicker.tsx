@@ -1,6 +1,6 @@
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { Text } from '../../theme/primitives';
 import { Pressable } from '../../theme/Pressable';
 import { TextInput } from '../../theme/primitives';
@@ -58,6 +58,10 @@ export function ExercisePicker({ catalog = EXERCISE_CATALOG, selectedIds, onTogg
   const [filters, setFilters] = useState<Record<Group, string[]>>({ muscles: [], equipment: [], patterns: [] });
   const facets = useMemo(() => ({ muscles: muscleFacets(catalog), equipment: equipmentFacets(catalog), patterns: patternFacets(catalog) }), [catalog]);
   const matches = useMemo(() => filterExercises(catalog, { query, ...filters }), [catalog, query, filters]);
+  // Narrowing 232 exercises to a handful while scrolled halfway down left the list parked past
+  // its own end, showing nothing. New results start at the top.
+  const list = useRef<FlashListRef<CatalogExercise>>(null);
+  useEffect(() => { list.current?.scrollToOffset({ offset: 0, animated: false }); }, [query, filters]);
   const count = activeFilterCount(filters);
   const toggleFilter = (group: Group, value: string) => setFilters(current => ({ ...current,
     [group]: current[group].includes(value) ? current[group].filter(item => item !== value) : [...current[group], value] }));
@@ -88,7 +92,7 @@ export function ExercisePicker({ catalog = EXERCISE_CATALOG, selectedIds, onTogg
     </View>
     {matches.length === 0
       ? <View className="flex-1 items-center justify-center px-8"><Text className="text-center">Nothing matches that. Clear a filter or search for a shorter word.</Text></View>
-      : <FlashList data={matches} keyExtractor={exercise => exercise.id} keyboardShouldPersistTaps="always" keyboardDismissMode="none"
+      : <FlashList ref={list} data={matches} keyExtractor={exercise => exercise.id} keyboardShouldPersistTaps="always" keyboardDismissMode="on-drag"
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
           renderItem={({ item }) => <ExerciseRow exercise={item} chosen={selectedIds.includes(item.id)} onToggle={onToggle} />} />}
     <View className="gap-2 px-5 pb-4">{footer}</View>

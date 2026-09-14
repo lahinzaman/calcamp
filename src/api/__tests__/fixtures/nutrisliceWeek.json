@@ -1,0 +1,136 @@
+{
+ "days": [
+  {
+   "date": "2026-09-13",
+   "menu_items": [
+    {
+     "id": 197777425,
+     "is_section_title": true,
+     "is_station_header": true,
+     "text": "BAGELS",
+     "serving_size": null,
+     "serving_size_amount": null,
+     "serving_size_unit": null,
+     "food": null
+    },
+    {
+     "id": 197777426,
+     "is_section_title": false,
+     "is_station_header": false,
+     "text": "",
+     "serving_size": null,
+     "serving_size_amount": 1,
+     "serving_size_unit": "each",
+     "food": {
+      "id": 1926342,
+      "name": "ASSORTED BAGELS",
+      "rounded_nutrition_info": {
+       "calories": 353,
+       "g_fat": 2.1,
+       "g_saturated_fat": 0.3,
+       "g_trans_fat": null,
+       "mg_cholesterol": 0,
+       "g_carbs": 70,
+       "g_added_sugar": null,
+       "g_sugar": null,
+       "mg_potassium": null,
+       "mg_sodium": 688,
+       "g_fiber": 3,
+       "g_protein": 12,
+       "mg_iron": 3.9,
+       "mg_calcium": 95.3,
+       "mg_vitamin_c": null,
+       "iu_vitamin_a": null,
+       "re_vitamin_a": null,
+       "mcg_vitamin_a": null,
+       "mg_vitamin_d": null,
+       "mcg_vitamin_d": null
+      },
+      "serving_size_info": {
+       "serving_size_amount": "1",
+       "serving_size_unit": "each"
+      }
+     }
+    },
+    {
+     "id": 197883717,
+     "is_section_title": false,
+     "is_station_header": false,
+     "text": "",
+     "serving_size": null,
+     "serving_size_amount": 1,
+     "serving_size_unit": "ea",
+     "food": {
+      "id": 1926477,
+      "name": "FRESH FRUIT TO GO",
+      "rounded_nutrition_info": {
+       "calories": null,
+       "g_fat": null,
+       "g_saturated_fat": null,
+       "g_trans_fat": null,
+       "mg_cholesterol": null,
+       "g_carbs": null,
+       "g_added_sugar": null,
+       "g_sugar": null,
+       "mg_potassium": null,
+       "mg_sodium": null,
+       "g_fiber": null,
+       "g_protein": null,
+       "mg_iron": null,
+       "mg_calcium": null,
+       "mg_vitamin_c": null,
+       "iu_vitamin_a": null,
+       "re_vitamin_a": null,
+       "mcg_vitamin_a": null,
+       "mg_vitamin_d": null,
+       "mcg_vitamin_d": null
+      },
+      "serving_size_info": {
+       "serving_size_amount": "1",
+       "serving_size_unit": "ea"
+      }
+     }
+    },
+    {
+     "id": 197777441,
+     "is_section_title": false,
+     "is_station_header": false,
+     "text": "",
+     "serving_size": null,
+     "serving_size_amount": 3,
+     "serving_size_unit": "oz",
+     "food": {
+      "id": 1938530,
+      "name": "COOKED CHICKEN STRIPS",
+      "rounded_nutrition_info": {
+       "calories": 114,
+       "g_fat": 4.2,
+       "g_saturated_fat": 0.8,
+       "g_trans_fat": 0,
+       "mg_cholesterol": 54,
+       "g_carbs": 0,
+       "g_added_sugar": null,
+       "g_sugar": 0,
+       "mg_potassium": null,
+       "mg_sodium": 99,
+       "g_fiber": 0,
+       "g_protein": 18,
+       "mg_iron": 0.3,
+       "mg_calcium": 4.3,
+       "mg_vitamin_c": null,
+       "iu_vitamin_a": null,
+       "re_vitamin_a": null,
+       "mcg_vitamin_a": null,
+       "mg_vitamin_d": null,
+       "mcg_vitamin_d": null
+      },
+      "serving_size_info": {
+       "serving_size_amount": "3",
+       "serving_size_unit": "oz"
+      }
+     }
+    }
+   ]
+  }
+ ]
+}

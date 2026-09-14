@@ -1,6 +1,10 @@
 import { durableStorage } from '../sync/storage';
 import type { MacroTotals, MicronutrientTotals, NutrientKey } from '../../types/nutrition';
-export interface RecipeItem { name: string; servings: number; macros: MacroTotals; micros: MicronutrientTotals }
+export interface RecipeItem {
+  name: string; servings: number; macros: MacroTotals; micros: MicronutrientTotals;
+  /** Where this row's figures came from — shown so an imported estimate is visible as one. */
+  note?: string;
+}
 export interface Recipe { id: string; name: string; yieldServings: number; items: RecipeItem[]; updatedAtMs: number }
 const key = (owner: string) => `recipes:${owner}`;
 export function readRecipes(owner: string): Recipe[] {

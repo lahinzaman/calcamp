@@ -2,6 +2,7 @@ import { createAccountRouter } from './account';
 import { config } from 'dotenv';
 import { resolve } from 'node:path';
 import { createVisionProxyRouter } from './vision-proxy';
+import { createRecipeProxyRouter } from './recipe-proxy';
 import express from 'express';
 import { createClient } from '@supabase/supabase-js';
 import { apiErrors, requestTelemetry, structuredLimit } from './http';
@@ -39,6 +40,7 @@ export function createApp(options: { pingDatabase?: () => Promise<boolean> } = {
   app.use('/api/account', createAccountRouter());
   app.use('/api/campus', createCampusProxyRouter());
   app.use('/api/vision', createVisionProxyRouter());
+  app.use('/api/recipe', createRecipeProxyRouter());
   app.use('/api/nutrislice', createNutrisliceFallbackRouter());
   app.use((_req, res) => { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Route not found.' } }); });
   app.use(apiErrors);

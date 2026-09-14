@@ -62,3 +62,26 @@ Macros describe the whole portion. They are the model's own estimate: the client
 replaces them with USDA figures wherever the name resolves to a bundled food, and
 labels the row as estimated where it does not. A response with no usable row is a
 failed recognition (502), never a meal of zero calories.
+
+## Recipe import
+
+`POST /api/recipe` takes `{ "url": "https://…" }` and answers with the recipe that page
+describes:
+
+```json
+{ "title": "Sunday Chili", "servings": 6,
+  "ingredients": [{ "name": "beef, ground, cooked", "grams": 907,
+                    "macros": { "caloriesKcal": 2168, "proteinG": 236, "carbsG": 0, "fatG": 127 } }],
+  "note": null }
+```
+
+Gram weights are for the **whole recipe**, not per serving. Macros are the model's own
+estimate: the client replaces them with USDA figures wherever the name resolves to a bundled
+food, and labels the row an estimate where it does not — the same resolution the photo and
+description flows use, and the reason it happens client-side (the 3.3 MB USDA bundle ships
+with the app, not the server).
+
+The page is fetched **server-side**, so the address is treated as hostile: http(s) only, DNS
+resolved and every answer checked against the private, loopback, link-local and carrier ranges,
+redirects followed by hand with each hop re-checked, three hops maximum, 2 MB and 15 seconds.
+It reuses `OPENAI_API_KEY`; no extra configuration.

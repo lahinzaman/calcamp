@@ -19,6 +19,7 @@ import { orderFoods, readSavedFoods, rememberFood, toggleFavorite, forgetFood, t
 import { foodEmoji } from '../dining/foodEmoji';
 import { RecipeBuilder } from './RecipeBuilder';
 import { deleteRecipe, perServing, readRecipes, type Recipe } from './recipes';
+import { RecipeImportError, importRecipe, toRecipeDraft } from '../../api/recipeImport';
 import { DINING_HALL_SLUGS, MEAL_TYPE_LABELS, useDiningMenu } from './useDiningMenu';
 import { DINING_HALLS } from '../../types/campus';
 import { MEAL_TYPES, type DailyMenuItem } from '../../types/nutrislice';
@@ -58,6 +59,11 @@ export function FoodLibrary({ meal, onDone, footer, header }: {
   const [chosen, setChosen] = useState<Candidate | null>(null);
   const [recipes, setRecipes] = useState<Recipe[]>(() => readRecipes(owner));
   const [building, setBuilding] = useState<Recipe | 'new' | null>(null);
+  const [recipeUrl, setRecipeUrl] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const importRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => importRequest.current?.abort(), []);
   // Two delays, not one. The bundled catalogues answer in under a millisecond but still rebuild
   // every visible row, so they wait long enough to skip the keystrokes in between; the network
   // waits longer again. Before this the local lists ran on the raw term and the list thrashed
@@ -129,6 +135,7 @@ export function FoodLibrary({ meal, onDone, footer, header }: {
       }
     }
     if (tab === 'recipe') {
+      if (importError) out.push({ kind: 'note', id: 'note-import', alert: true, text: importError });
       if (!recipes.length) out.push({ kind: 'note', id: 'note-recipes', text: t('food.noRecipes') });
       for (const recipe of recipes) {
         const single = perServing(recipe);
@@ -163,8 +170,27 @@ export function FoodLibrary({ meal, onDone, footer, header }: {
     }
     return out;
   }, [tab, t, drinkMatches, results.isLoading, results.isError, results.data, usda.isLoading, usda.error,
-      bundled, branded, localQuery, recipes, category, list, owner,
+      bundled, branded, localQuery, recipes, category, list, owner, importError,
       dining.isPending, dining.isError, dining.emptyReason, dining.groups]);
+
+  /** Reads the page server-side, resolves it against USDA, and opens the builder on the draft. */
+  const runImport = async () => {
+    if (importing || !recipeUrl.trim()) return;
+    importRequest.current?.abort();
+    const controller = new AbortController(); importRequest.current = controller;
+    setImporting(true); setImportError(null);
+    try {
+      const imported = await importRecipe(recipeUrl.trim(), controller.signal);
+      if (controller.signal.aborted) return;
+      const { recipe, estimated } = toRecipeDraft(imported);
+      setBuilding(recipe); setRecipeUrl('');
+      const caveats = [imported.note, estimated ? `${estimated} ${estimated === 1 ? 'ingredient' : 'ingredients'} had no USDA match and carry an estimate.` : null].filter(Boolean);
+      if (caveats.length) confirmToast(caveats.join(' '));
+    } catch (cause) {
+      if (controller.signal.aborted) return;
+      setImportError(cause instanceof RecipeImportError ? cause.message : 'That recipe could not be imported. Build it by hand instead.');
+    } finally { if (!controller.signal.aborted) setImporting(false); }
+  };
 
   return <View className="flex-1">
     {/* Tabs and the search field stay put. Scrolling a long result list used to carry them off
@@ -174,6 +200,13 @@ export function FoodLibrary({ meal, onDone, footer, header }: {
       <View className="mb-3 flex-row flex-wrap">{TABS.map(([value, messageKey]) => <Choice key={value} label={t(messageKey)} selected={tab === value} onPress={() => setTab(value)} />)}</View>
       {tab === 'search' && <Field label={t('food.searchLabel')} value={term} onChangeText={setTerm} autoCorrect={false}
         placeholder="Greek yogurt, chicken breast, Tito's, Bud Light…" />}
+      {tab === 'recipe' && <>
+        <Text className="mb-2 text-sm">Paste a recipe's web address and it is read into a draft you can check before saving. Nothing is saved until you do.</Text>
+        <Field label="Recipe address" value={recipeUrl} onChangeText={text => { setRecipeUrl(text); setImportError(null); }}
+          autoCapitalize="none" autoCorrect={false} keyboardType="url" placeholder="https://…" />
+        <Action secondary label={importing ? 'Reading the page…' : 'Import from a link'}
+          disabled={importing || !recipeUrl.trim()} onPress={() => { void runImport(); }} />
+      </>}
       {tab === 'dining' && <>
         <View className="mb-3 flex-row flex-wrap">{DINING_HALL_SLUGS.map(value => <Choice key={value} label={DINING_HALLS[value]}
           selected={dining.hall === value} onPress={() => dining.setHall(value)} />)}</View>

@@ -2,7 +2,7 @@ import { Router, json, type ErrorRequestHandler } from 'express';
 import cors from 'cors';
 import OpenAI from 'openai';
 import { structuredLimit as rateLimit } from './http';
-import { createClient } from '@supabase/supabase-js';
+import { verifyBearer } from './supabase-auth';
 
 /** One recognised food. Macros are the model's own estimate for `grams`, replaced client-side
  *  by USDA figures wherever the name resolves to a bundled food. */
@@ -137,18 +137,7 @@ export interface VisionProxyOptions {
 }
 export function createVisionProxyRouter(options: VisionProxyOptions = {}) {
   const router = Router();
-  const authenticate = options.authenticate ?? (async (bearer: string) => {
-    const url = process.env.SUPABASE_URL;
-    const key = process.env.SUPABASE_PUBLISHABLE_KEY;
-    if (!url || !key) return null;
-    const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false },
-      global: { fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(10_000) }) } });
-    const { data, error } = await client.auth.getUser(bearer);
-    if (error || !data.user) return null;
-    const scoped = createClient(url, key, { auth: { persistSession: false }, global: { headers: { Authorization: `Bearer ${bearer}` }, fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(10000) }) } });
-    const active = await scoped.rpc('account_accepts_requests');
-    return !active.error && active.data === true ? data.user.id : null;
-  });
+  const authenticate = options.authenticate ?? verifyBearer;
   // One server-side key serves every signed-in user; nothing is provisioned per account.
   const apiKey = options.apiKey ?? (() => process.env.OPENAI_API_KEY);
   const model = options.model ?? (process.env.OPENAI_VISION_MODEL || DEFAULT_MODEL);

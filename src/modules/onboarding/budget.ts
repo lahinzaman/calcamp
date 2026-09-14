@@ -40,18 +40,65 @@ export interface StartingBudget {
   /** Set when the requested rate was reduced for safety, so the UI can say so plainly. */
   limitedBy: string | null;
   weeksToGoal: number | null;
+  /** Distinct training days behind the split above; 0 on the simple track, where every day is the same. */
+  trainingDayCount: number;
+}
+
+/** Distinct, in-range weekday numbers, so a malformed list cannot inflate the schedule. */
+export function countTrainingDays(days: readonly number[] | null | undefined) {
+  return new Set((days ?? []).filter(day => Number.isInteger(day) && day >= 0 && day <= 6)).size;
+}
+
+/**
+ * Splits a daily average into a training-day and a rest-day figure covering the same week.
+ * Training days rise by 90 kcal where the schedule affords it. The rise is paid for out of the
+ * rest days, so a week with few rest days eases it back rather than gutting the ones that remain:
+ * no rest day falls more than a tenth below the average. A week with no rest day — or none with
+ * training — has nothing to shift between, and both figures stay at the average.
+ */
+export function dayCalories(average: number, trainingDays: number) {
+  const restDays = 7 - trainingDays;
+  if (trainingDays <= 0 || restDays <= 0) return { trainingCalories: average, restCalories: average };
+  // Rounded down before it is multiplied back out, so the cap holds after the rest-day figure is rounded.
+  const rise = Math.floor(Math.min(90, average * .1 * restDays / trainingDays));
+  const trainingCalories = Math.round(average + rise);
+  const restCalories = Math.round(average - (trainingCalories - average) * trainingDays / restDays);
+  return { trainingCalories, restCalories };
 }
 
 /** Absolute intake floors below which a self-directed plan should not go. */
 const FLOOR = { female: 1200, male: 1500, unspecified: 1300 } as const;
-/** Protein per lb of body weight, and fat as a share of calories, by diet style. */
-const SPLITS: Record<DietStyle, { proteinPerLb: number; fatShare: number }> = {
-  balanced: { proteinPerLb: 0.8, fatShare: 0.28 },
-  high_protein: { proteinPerLb: 1.0, fatShare: 0.25 },
-  lower_carb: { proteinPerLb: 0.9, fatShare: 0.40 },
-  higher_carb: { proteinPerLb: 0.75, fatShare: 0.22 },
-  plant_forward: { proteinPerLb: 0.8, fatShare: 0.30 },
+/**
+ * Protein and fat are set per pound of body weight, not as a share of calories: a smaller
+ * deficit should not mean less protein, and it is body weight that lean mass has to be
+ * defended across. Fat is a flat 0.3 g/lb; protein sits in a band, 0.9–1.0 g/lb building and
+ * 0.7–0.8 g/lb cutting or holding. Diet style only chooses where inside that band to sit.
+ */
+const FAT_PER_LB = 0.3;
+const PROTEIN_BAND = { bulk: [0.9, 1.0], other: [0.7, 0.8] } as const;
+/** 0 sits at the bottom of the band, 1 at the top. */
+const PROTEIN_LEAN: Record<DietStyle, number> = {
+  balanced: 0.5, high_protein: 1, lower_carb: 1, higher_carb: 0, plant_forward: 0,
 };
+export function proteinPerLb(dietStyle: DietStyle, bulking: boolean) {
+  const [low, high] = PROTEIN_BAND[bulking ? 'bulk' : 'other'];
+  return low + (high - low) * PROTEIN_LEAN[dietStyle];
+}
+
+/**
+ * Carbohydrate is whatever the calorie target has left. At a low target on a heavy frame the
+ * two fixed grams-per-pound figures can ask for more energy than the day contains, so they are
+ * eased back together — keeping their ratio — rather than letting carbohydrate go negative.
+ */
+export function macroSplit(kcal: number, weightLbs: number, dietStyle: DietStyle, bulking: boolean): MacroTotals {
+  let proteinG = weightLbs * proteinPerLb(dietStyle, bulking);
+  let fatG = weightLbs * FAT_PER_LB;
+  const fixed = proteinG * 4 + fatG * 9;
+  const ceiling = kcal * 0.9;
+  if (fixed > ceiling && fixed > 0) { const shrink = ceiling / fixed; proteinG *= shrink; fatG *= shrink; }
+  proteinG = Math.round(proteinG); fatG = Math.round(fatG);
+  return { caloriesKcal: kcal, proteinG, fatG, carbsG: Math.max(0, kcal - proteinG * 4 - fatG * 9) / 4 };
+}
 
 /** The weekly change the user actually asked for, in lbs; 0 for maintain, recomp and auto. */
 export function intendedWeeklyChange(s: LifestyleSurvey | undefined | null) {
@@ -117,25 +164,17 @@ export function startingBudget(p: OnboardingProfile): StartingBudget {
   let average = Math.round(tdeeKcal + change);
   if (average < floor) { average = floor; limit(`This plan holds at ${floor} kcal, which is your estimated resting need — going below it is not something an app should recommend.`); }
 
-  // Four training days / three rest days preserve the same weekly energy.
-  const trainingCalories = p.is_advanced_track ? average + 90 : average;
-  const restCalories = p.is_advanced_track ? average - 120 : average;
-  const style = SPLITS[s.dietStyle ?? 'balanced'];
-  // Protein rises in a deficit, where lean mass is what is at risk.
-  const proteinPerLb = style.proteinPerLb + (change < 0 ? .1 : 0);
-  const macros = (kcal: number): MacroTotals => {
-    const proteinG = Math.round(Math.min(p.weight_lbs! * proteinPerLb, kcal * .35 / 4));
-    const fatG = Math.round(kcal * style.fatShare / 9);
-    const carbsG = (kcal - proteinG * 4 - fatG * 9) / 4;
-    return { caloriesKcal: kcal, proteinG, carbsG, fatG };
-  };
+  const trainingDayCount = p.is_advanced_track ? countTrainingDays(p.training_days) : 0;
+  const { trainingCalories, restCalories } = dayCalories(average, trainingDayCount);
+  const bulking = change > 0;
+  const macros = (kcal: number) => macroSplit(kcal, p.weight_lbs!, s.dietStyle ?? 'balanced', bulking);
   const weeklyChangeLbs = (average - tdeeKcal) * 7 / 3500;
   const goalWeight = s.goalWeightLbs ?? null;
   const weeksToGoal = goalWeight !== null && Math.abs(weeklyChangeLbs) > .01
     && Math.sign(goalWeight - p.weight_lbs!) === Math.sign(weeklyChangeLbs)
     ? Math.ceil(Math.abs(goalWeight - p.weight_lbs!) / Math.abs(weeklyChangeLbs)) : null;
   return {
-    tdeeKcal, restingKcal, rest: macros(restCalories), training: macros(trainingCalories), weeklyChangeLbs, limitedBy, weeksToGoal,
+    tdeeKcal, restingKcal, rest: macros(restCalories), training: macros(trainingCalories), weeklyChangeLbs, limitedBy, weeksToGoal, trainingDayCount,
     direction: weeklyChangeLbs > 0 ? 'gradual increase' : weeklyChangeLbs < 0 ? 'gradual decrease' : 'steady',
     explanation: s.metabolicSex === 'unspecified'
       ? 'A midpoint metabolic estimate has wider uncertainty. Your logged intake and weight trend will refine it.'

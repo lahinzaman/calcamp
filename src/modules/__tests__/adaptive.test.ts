@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { isReviewDue, daysUntilReview, nextTarget, MAX_STEP_KCAL } from '../nutrition/adaptive';
-import { startingBudget, defaultSurvey, RATE_CHOICES } from '../onboarding/budget';
+import { startingBudget, defaultSurvey, RATE_CHOICES, macroSplit, proteinPerLb } from '../onboarding/budget';
 import type { TdeeEstimate } from '../nutrition/tdee';
 
 const estimate = (over: Partial<TdeeEstimate> = {}): TdeeEstimate => ({
@@ -98,6 +98,33 @@ test('explicit goals drive the budget, and unsafe rates are eased back and expla
   const tired = startingBudget({ ...profile, lifestyle_survey: { ...base, goalDirection: 'lose', rateLbsPerWeek: 1, recovery: 'tired' } });
   assert.equal(tired.weeklyChangeLbs, 0);
   assert.match(tired.limitedBy!, /tired/);
+});
+
+test('protein and fat are set per pound of body weight, and carbohydrate takes what is left', () => {
+  // The rule, stated: 0.9-1.0 g/lb protein building, 0.7-0.8 cutting or holding, 0.3 g/lb fat
+  // throughout. Diet style only chooses where inside the protein band to sit.
+  for (const style of ['balanced', 'high_protein', 'lower_carb', 'higher_carb', 'plant_forward'] as const) {
+    assert.ok(proteinPerLb(style, true) >= 0.9 && proteinPerLb(style, true) <= 1, style);
+    assert.ok(proteinPerLb(style, false) >= 0.7 && proteinPerLb(style, false) <= 0.8, style);
+  }
+  assert.equal(proteinPerLb('high_protein', false), 0.8);
+  assert.equal(proteinPerLb('higher_carb', false), 0.7);
+
+  const cut = macroSplit(2000, 180, 'balanced', false);
+  assert.equal(cut.proteinG, 135); assert.equal(cut.fatG, 54);
+  assert.equal(cut.proteinG * 4 + cut.carbsG * 4 + cut.fatG * 9, 2000);
+  // The same body eating more gets more protein per pound, and the rest of the rise as carbs.
+  const bulk = macroSplit(2800, 180, 'balanced', true);
+  assert.equal(bulk.proteinG, 171); assert.equal(bulk.fatG, 54);
+  assert.ok(bulk.carbsG > cut.carbsG);
+
+  // Grams per pound do not care about the calorie target, so a heavy frame on a low one can ask
+  // for more energy than the day holds. Both ease back together rather than carbs going negative.
+  const squeezed = macroSplit(1500, 300, 'balanced', false);
+  assert.ok(squeezed.carbsG >= 0);
+  assert.ok(squeezed.proteinG / 300 < 0.7 && squeezed.fatG / 300 < 0.3, 'both were eased, not just one');
+  assert.ok(Math.abs((squeezed.proteinG / 0.75) / (squeezed.fatG / 0.3) - 300 / 300) < 0.1, 'their ratio held');
+  assert.equal(squeezed.proteinG * 4 + squeezed.carbsG * 4 + squeezed.fatG * 9, 1500);
 });
 
 test('every diet style still balances macros to its calorie target, and goal ETA is directional', () => {

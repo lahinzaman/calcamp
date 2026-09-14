@@ -5,9 +5,12 @@ import { SafeAreaView } from '../../theme/SafeArea';
 import { Text } from '../../theme/primitives';
 import { Action, Field } from '../../components/FormControls';
 import { nutritionStore } from '../../store/nutritionStore';
+import { confirmToast } from '../../components/Toast';
 import { gramsToOz, ozToGrams } from '../../lib/units';
 import { readUnits, readWeight, showWeight, weightUnit } from '../settings/measurementUnits';
-import { useFoodVision } from '../vision/useFoodVision';
+import { MAX_ANGLES, useFoodVision } from '../vision/useFoodVision';
+import { MealReview } from '../vision/MealReview';
+import type { RecognizedItem } from '../vision/resolveItems';
 import { lookupBarcode } from './barcode';
 import { LabelUnavailable, recognizeLabel } from './recognizeLabel';
 import { missingMacros } from './nutritionLabel';
@@ -16,8 +19,8 @@ import { addPhotos } from '../progress/photos';
 import { useAuthStore } from '../../store/authStore';
 import { localDateKey } from '../../store/nutritionStore';
 import type { MacroTotals } from '../../types/nutrition';
-export type QuickAction = 'photo'|'barcode'|'label'|'manual'|'weight'|'quick';
-const names:Record<QuickAction,string>={photo:'AI Photo Log',barcode:'Barcode Scanner',label:'Scan a Nutrition Label',manual:'Manual Food Log',weight:'Update Body Weight',quick:'Quick Add Calories'};
+export type QuickAction = 'photo'|'barcode'|'label'|'manual'|'weight'|'quick'|'describe';
+const names:Record<QuickAction,string>={photo:'AI Photo Log',barcode:'Barcode Scanner',label:'Scan a Nutrition Label',manual:'Manual Food Log',weight:'Update Body Weight',quick:'Quick Add Calories',describe:'Describe Your Meal'};
 const macroFields=[['caloriesKcal','Calories · kcal'],['proteinG','Protein · g'],['fatG','Fats · g'],['carbsG','Carbs · g']] as const;
 /** Distinguish "this build has no provider" from "the request failed" — they need different actions. */
 export function visionMessage(code: string | undefined) {
@@ -37,6 +40,8 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
   const bounds={min:showWeight(70,units,0),max:showWeight(700,units,0)};
   const owner=useAuthStore(s=>s.session?.user.id)??'anonymous';
   const locked=useRef(false); const alive=useRef(true); const request=useRef<AbortController|null>(null); const vision=useFoodVision();
+  const [angles,setAngles]=useState<string[]>([]);
+  const [described,setDescribed]=useState('');
   const [reference,setReference]=useState<{grams:number;macros:MacroTotals}|null>(null);
   useEffect(()=>()=>{alive.current=false;request.current?.abort();},[]);
   const fill=(food:{grams:number;macros:MacroTotals},label:string,source:string)=>{
@@ -66,14 +71,39 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
       setError(cause instanceof LabelUnavailable?cause.message:'That label could not be read. Try again, or enter it by hand.');}}
     finally{locked.current=false;if(alive.current)setBusy(false);}
   };
-  const capture=async(base64:string)=>{
-    if(locked.current)return;locked.current=true;setBusy(true);setError(null);
-    try{const photo={base64};if(!alive.current)return;if(!photo?.base64)throw new Error();
-      const result=await vision.analyze({base64:photo.base64,mimeType:'image/jpeg'});if(!alive.current)return;
-      if(result)fill({grams:result.portion_size_grams,macros:result.macros},'Photo meal','AI estimate · adjust the portion and confirm all values before logging.');
-      else{setEditing(true);setError(visionMessage(vision.error?.code));}}
-    catch{if(alive.current)setError('The camera could not capture a photo. Try again or enter the meal manually.');}
+  // Angles accumulate; nothing is sent until the user says they have enough.
+  const capture=(base64:string)=>{setError(null);setAngles(list=>list.length>=MAX_ANGLES?list:[...list,base64]);};
+  const estimate=async(note?:string)=>{
+    if(locked.current||!angles.length)return;locked.current=true;setBusy(true);setError(null);
+    try{
+      const result=await vision.analyze(angles.map(base64=>({base64,mimeType:'image/jpeg' as const})),note);
+      if(!alive.current)return;
+      if(result)setEditing(true);
+      else{setEditing(true);setError(visionMessage(vision.error?.code));}
+    }catch{if(alive.current)setError('That meal could not be estimated. Try again or enter it manually.');}
     finally{locked.current=false;if(alive.current)setBusy(false);}
+  };
+  // A meal in words takes the same route as a photographed one: the model extracts the foods,
+  // the bundled USDA data supplies the numbers, and the same editable rows come back.
+  const describe=async()=>{
+    if(locked.current||!described.trim())return;locked.current=true;setBusy(true);setError(null);
+    try{
+      const result=await vision.describe(described.trim());
+      if(!alive.current)return;
+      setEditing(true);
+      if(!result)setError(visionMessage(vision.error?.code));
+    }catch{if(alive.current)setError('That meal could not be read. Try again, or log it by hand.');}
+    finally{locked.current=false;if(alive.current)setBusy(false);}
+  };
+  const logItems=(items:RecognizedItem[])=>{
+    if(locked.current)return;
+    // Each recognised food becomes its own diary row, so a wrong one can be removed on its own.
+    for(const item of items)nutritionStore.getState().addEntry({name:item.name,servings:1,
+      servingLabel:`${Math.round(item.grams)} g`,referenceMacros:item.macros,
+      referenceMicros:item.source==='usda'?item.micros:undefined,source:'photo'});
+    const total=Math.round(items.reduce((sum,item)=>sum+item.macros.caloriesKcal,0));
+    confirmToast(`${items.length} ${items.length===1?'food':'foods'} added · ${total} kcal`);
+    locked.current=true;onClose();
   };
   const changePortion=(text:string)=>{
     setPortion(text); if(!reference||!text.trim()||!Number.isFinite(Number(text))||Number(text)<=0)return;
@@ -93,6 +123,7 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
         if(macroFields.some(([key])=>values[key].trim()&&(!Number.isFinite(Number(values[key]))||Number(values[key])<0||Number(values[key])>20000)))throw new Error('Macro amounts must be between 0 and 20000 g.');
         nutritionStore.getState().addEntry({name:name.trim()||'Quick add',servings:1,servingLabel:null,
           referenceMacros:Object.fromEntries(macroFields.map(([k])=>[k,Number(values[k]||0)])) as unknown as MacroTotals,source:'quick'});
+        confirmToast(`${name.trim()||'Quick add'} added · ${Math.round(Number(values.caloriesKcal))} kcal`);
         locked.current=true;onClose();return;
       }
       if(!name.trim()||!portion.trim()||!Number.isFinite(Number(portion))||Number(portion)<=0||Number(portion)>352)throw new Error('Enter a food name and portion greater than 0 oz (up to 352 oz).');
@@ -101,6 +132,7 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
       nutritionStore.getState().addEntry({name:name.trim(),servings:1,servingLabel:`${Number(portion)} oz`,
         referenceMacros:Object.fromEntries(macroFields.map(([k])=>[k,Number(values[k])])) as unknown as MacroTotals,
         source:action==='photo'?'photo':action==='barcode'?'barcode':'manual'});
+      confirmToast(`${name.trim()} added · ${Math.round(Number(values.caloriesKcal))} kcal`);
     }locked.current=true;onClose();}catch(e){setError((e as Error).message);}
   };
   // One Modal for the life of this screen. presentationStyle cannot be changed on a modal
@@ -108,8 +140,9 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
   const scanner=action==='photo'||action==='barcode'||action==='label';
   if(scanner&&!editing)return <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose} statusBarTranslucent>
     <CameraScanner mode={action==='photo'?'photo':action==='label'?'label':'barcode'} busy={busy} notice={error}
-      onBarcode={code=>{void scan(code);}} onCapture={base64=>{void capture(base64);}} onCaptureUri={uri=>{void readLabel(uri);}}
-      onManual={()=>{setError(null);setEditing(true);}} onClose={onClose} />
+      angles={angles.length} maxAngles={action==='photo'?MAX_ANGLES:1} onDone={()=>{void estimate();}}
+      onBarcode={code=>{void scan(code);}} onCapture={base64=>{capture(base64);}} onCaptureUri={uri=>{void readLabel(uri);}}
+      onManual={()=>{setError(null);setAngles([]);setEditing(true);}} onClose={onClose} />
   </Modal>;
   if(photoWeight!==null)return <WeightPhotoSheet weightLbs={photoWeight} onClose={()=>setPhotoWeight(null)}
     onDone={photos=>{
@@ -126,7 +159,17 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
       <Action secondary label="Back to the scanner" disabled={busy} onPress={()=>{setError(null);setEditing(false);}} />
     </>}
     {action==='weight'&&<Text className="mb-4">A photo alongside the number is what actually shows change — the scale moves with water and food. Photos stay on this device and are never uploaded.</Text>}
-    {editing&&(action==='quick'?<>
+    {(action==='photo'||action==='describe')&&vision.result&&<MealReview items={vision.result.items} note={vision.result.note} busy={busy}
+      onChange={vision.setItems}
+      onRefine={description=>{void (action==='describe'?vision.describe(description):estimate(description));}}
+      onConfirm={()=>logItems(vision.result!.items)} onCancel={onClose} />}
+    {action==='describe'&&!vision.result&&<>
+      <Text className="mb-4">Write it the way you would say it — portions, how it was cooked, anything a photo would not show. Each food comes back as its own row for you to check.</Text>
+      <Field label="What did you eat?" value={described} onChangeText={setDescribed} multiline maxLength={500}
+        placeholder="a bowl of oatmeal with a scoop of whey and a banana" />
+      <Action label={busy?'Reading…':'Work out the macros'} disabled={busy||!described.trim()} onPress={()=>{void describe();}} />
+    </>}
+    {!((action==='photo'||action==='describe')&&vision.result)&&action!=='describe'&&editing&&(action==='quick'?<>
       <Text className="mb-4">For when you know roughly what it cost you but not the breakdown. Leave a macro blank and it is recorded as zero for this entry.</Text>
       <Field label="Food name" value={name} onChangeText={setName} maxLength={150} placeholder="Quick add" />
       {macroFields.map(([key,label])=><Field key={key} label={key==='caloriesKcal'?label:`${label} · optional`} value={values[key]} onChangeText={text=>setValues(s=>({...s,[key]:text}))} keyboardType="decimal-pad" />)}
@@ -135,6 +178,9 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
       <Text className="mb-3">Macros for the entire portion above. Changing a manual macro keeps your edited value until you change the portion again.</Text>{macroFields.map(([key,label])=><Field key={key} label={label} value={values[key]} onChangeText={text=>setValues(s=>({...s,[key]:text}))} keyboardType="decimal-pad" />)}
     </>)}
     {error&&<Text accessibilityRole="alert" className="mb-4">{error}</Text>}
-    {editing&&<Action label={action==='weight'?'Save body weight':action==='quick'?'Add calories':'Confirm food log'} disabled={busy} onPress={save} />}<Action secondary label="Close quick log" onPress={onClose}/>
+    {!((action==='photo'||action==='describe')&&vision.result)&&<>
+      {editing&&action!=='describe'&&<Action label={action==='weight'?'Save body weight':action==='quick'?'Add calories':'Confirm food log'} disabled={busy} onPress={save} />}
+      <Action secondary label="Close quick log" onPress={onClose}/>
+    </>}
   </ScrollView></KeyboardAvoidingView></SafeAreaView></Modal>;
 }

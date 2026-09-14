@@ -78,6 +78,10 @@ export const en = {
   'fab.quick': 'Quick add calories',
   'fab.manual': 'Add a food by hand',
   'fab.weight': 'Log your weight',
+  'fab.cameraGroup': 'Camera logging',
+  'fab.manualGroup': 'Manually log food',
+  'fab.describe': 'Describe what you ate',
+  'fab.back': 'Back',
 
   'food.title': 'Find it once',
   'food.subtitle': 'Search, campus dining, your recipes and the foods you log most.',

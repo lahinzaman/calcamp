@@ -101,16 +101,59 @@ test('workout screen mounts an active session, estimates 1RM, and completes a se
   assert.ok(workoutStore.getState().sets[0].completedAtMs !== null);
 });
 
-test('vision hook exposes configuration failure, validates estimates, and accepts manual correction', async () => {
+const MEAL = { items: [{ name: 'White rice, cooked', grams: 200, confidence: .7, macros: { caloriesKcal: 260, proteinG: 5, carbsG: 56, fatG: 1 } }], note: null };
+test('vision hook reports a missing provider, resolves items against USDA, and bounds the angle count', async () => {
   let hook!: ReturnType<typeof useFoodVision>;
   function Probe() { hook = useFoodVision(); return null; }
   await act(async () => { rendered = create(<Probe />); });
   await act(async () => { await hook.analyze('YWJj'); });
   assert.equal(hook.error?.code, 'NOT_CONFIGURED');
   assert.equal(hook.manualOverrideRequired, true);
-  await act(async () => { hook.applyManualOverride({ portion_size_grams: 100, macros: { caloriesKcal: 200, proteinG: 20, carbsG: 20, fatG: 5 } }); });
-  assert.equal(hook.result?.source, 'manual');
-  assert.equal(hook.manualOverrideRequired, false);
+
+  let sent: unknown;
+  const analyzer = async (images: unknown[], note: unknown) => { sent = { count: images.length, note }; return MEAL; };
+  function Angles() { hook = useFoodVision({ analyzer }); return null; }
+  await act(async () => { rendered = create(<Angles />); });
+  await act(async () => { await hook.analyze(['YWJj', 'YWJj', 'YWJj'], '  half was left  '); });
+  assert.deepEqual(sent, { count: 3, note: 'half was left' }, 'every angle is sent and the note is trimmed');
+  const [item] = hook.result!.items;
+  // A name that resolves gets USDA figures; the model's own numbers are not used for it.
+  assert.equal(item.source, 'usda');
+  assert.ok(item.matchedName?.toLowerCase().includes('rice'));
+  assert.ok(Object.keys(item.micros).length > 0, 'a USDA row carries the micronutrients the panel tracks');
+  assert.equal(item.grams, 200);
+
+  // A fifth angle costs more and estimates no better, so it is refused before any request.
+  await act(async () => { await hook.analyze(['YWJj', 'YWJj', 'YWJj', 'YWJj', 'YWJj']); });
+  assert.equal(hook.error?.code, 'INVALID_IMAGE');
+});
+
+test('an unresolvable food keeps the model estimate and says so, and rows re-portion cleanly', () => {
+  const { resolveItem, reportion, totalMacros } = require('../vision/resolveItems') as typeof import('../vision/resolveItems');
+  const invented = resolveItem({ name: 'zzqq pudding', grams: 100, confidence: .4, macros: { caloriesKcal: 200, proteinG: 3, carbsG: 30, fatG: 7 } });
+  assert.equal(invented.source, 'estimated');
+  assert.deepEqual(invented.micros, {}, 'an unmatched row reports no micronutrients rather than zeros');
+  assert.equal(invented.macros.caloriesKcal, 200);
+
+  const rice = resolveItem({ name: 'white rice, cooked', grams: 100, confidence: .7, macros: { caloriesKcal: 150, proteinG: 3, carbsG: 32, fatG: 0 } });
+  assert.equal(rice.source, 'usda');
+  assert.notEqual(rice.macros.caloriesKcal, 150, 'USDA figures replace the estimate, not merely confirm it');
+
+  // A name can find a food that merely shares a word — "oatmeal" matches an oatmeal cookie, at
+  // six times the energy. Where the two disagree that wildly they are not the same food, and
+  // the row says estimated rather than logging a cookie as porridge.
+  const porridge = resolveItem({ name: 'oatmeal, cooked', grams: 234, confidence: .7, macros: { caloriesKcal: 166, proteinG: 6, carbsG: 28, fatG: 4 } });
+  assert.equal(porridge.source, 'estimated');
+  assert.equal(porridge.macros.caloriesKcal, 166);
+  // The database's own name for it resolves cleanly, which is what the model is asked to give.
+  assert.equal(resolveItem({ name: 'oats, cooked', grams: 234, confidence: .7, macros: { caloriesKcal: 166, proteinG: 6, carbsG: 28, fatG: 4 } }).source, 'usda');
+  // Dropping a preparation word to find a match is fine; dropping an identifying one is not.
+  assert.equal(resolveItem({ name: 'zzqq dressing', grams: 30, confidence: .5, macros: { caloriesKcal: 120, proteinG: 0, carbsG: 2, fatG: 13 } }).source, 'estimated');
+  const doubled = reportion(rice, 200);
+  assert.equal(doubled.grams, 200);
+  assert.ok(Math.abs(doubled.macros.caloriesKcal - rice.macros.caloriesKcal * 2) <= 1);
+  assert.equal(reportion(rice, 0).grams, 100, 'a nonsense weight leaves the row alone');
+  assert.equal(totalMacros([rice, invented]).caloriesKcal, rice.macros.caloriesKcal + 200);
 });
 
 test('vision ignores stale results after manual override and bounds stalled adapters', async () => {
@@ -122,7 +165,7 @@ test('vision ignores stale results after manual override and bounds stalled adap
   let pending!: Promise<unknown>;
   await act(async () => { pending = hook.analyze({ uri: 'file:///meal.jpg' }); });
   await act(async () => { hook.triggerManualOverride(); });
-  await act(async () => { resolve({ portion_size_grams: 100, macros: { caloriesKcal: 200, proteinG: 20, carbsG: 20, fatG: 5 } }); await pending; });
+  await act(async () => { resolve(MEAL); await pending; });
   assert.equal(hook.result, null);
   assert.equal(hook.manualOverrideRequired, true);
   await act(async () => { await hook.analyze('YWJj'); });
@@ -154,12 +197,14 @@ test('vision HTTP adapter sends authenticated base64 JSON using the server contr
     globalThis.fetch = async (url, options) => {
       assert.equal(String(url), 'https://api.example/api/vision');
       assert.equal(new Headers(options?.headers).get('authorization'), 'Bearer user-session');
-      assert.deepEqual(JSON.parse(String(options?.body)), { image: { base64: '/9j/4AECAwQ=', mimeType: 'image/jpeg' } });
-      return Response.json({ portion_size_grams: 100, macros: { caloriesKcal: 100, proteinG: 5, carbsG: 10, fatG: 4 } });
+      assert.deepEqual(JSON.parse(String(options?.body)),
+        { images: [{ base64: '/9j/4AECAwQ=', mimeType: 'image/jpeg' }, { base64: '/9j/4AECAwQ=', mimeType: 'image/jpeg' }], note: 'no dressing' });
+      return Response.json(MEAL);
     };
+    const image = { base64: '/9j/4AECAwQ=', mimeType: 'image/jpeg' } as const;
     const analyzer = createVisionProxyAnalyzer('https://api.example/api/vision', async () => 'user-session');
-    await analyzer({ base64: '/9j/4AECAwQ=', mimeType: 'image/jpeg' }, new AbortController().signal);
-    await assert.rejects(createVisionProxyAnalyzer('https://api.example/api/vision', async () => null)({ base64: '/9j/4AECAwQ=', mimeType: 'image/jpeg' }, new AbortController().signal), /Sign in/);
+    await analyzer([image, image], 'no dressing', new AbortController().signal);
+    await assert.rejects(createVisionProxyAnalyzer('https://api.example/api/vision', async () => null)([image], null, new AbortController().signal), /Sign in/);
   } finally { globalThis.fetch = originalFetch; }
 });
 
@@ -204,8 +249,13 @@ test('Today shows the selected day and switches to another one without leaving t
   // Yesterday is the same screen on another date, not a separate history screen.
   const yesterday = new Date(Date.now() - 86_400_000);
   const label = yesterday.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-  await act(async () => { rendered!.root.findAll(node => typeof node.props.accessibilityLabel === 'string'
-    && node.props.accessibilityLabel.startsWith(label))[0].props.onPress(); });
+  // The strip runs Monday to Sunday, so on a Monday yesterday belongs to the week before and
+  // the strip has to be stepped back first. Without this the test only passed six days in seven.
+  const press = (match: string) => rendered!.root.findAll(node => typeof node.props.accessibilityLabel === 'string'
+    && node.props.accessibilityLabel.startsWith(match))[0];
+  if (new Date().getDay() === 1) await act(async () => { press('Previous week').props.onPress(); });
+  assert.ok(press(label), `${label} is not on the day strip`);
+  await act(async () => { press(label).props.onPress(); });
   assert.ok(textContent().includes('No foods were recorded on this day.'));
   assert.ok(!textContent().includes('cups'), 'water is only for today');
 });

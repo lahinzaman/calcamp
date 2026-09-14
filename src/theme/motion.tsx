@@ -44,17 +44,21 @@ export function useCountUp(value: number, duration = 650) {
   useEffect(() => {
     const start = from.current; const delta = value - start;
     const raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : null;
-    if (reduced || !raf || !Number.isFinite(delta) || Math.abs(delta) < .5) { from.current = value; setShown(value); return; }
+    if (reduced || !raf || !Number.isFinite(delta) || Math.abs(delta) < .5) { from.current = value; setShown(Math.round(value)); return; }
     const began = Date.now();
     const step = () => {
       const t = Math.min(1, (Date.now() - began) / duration);
       const eased = 1 - (1 - t) ** 3;
       const next = start + delta * eased;
-      from.current = next; setShown(next);
+      from.current = next; setShown(Math.round(next));
       if (t < 1) frame.current = raf(step);
     };
     frame.current = raf(step);
-    return () => { if (frame.current !== null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame.current); from.current = value; };
+    // Only stop the frame. This used to also set from.current to this effect's target, which
+    // is a claim the animation finished. Interrupt it — by choosing another day mid-count — and
+    // the next run started from a number that was never on screen, so the figure leapt up to the
+    // previous day's total before counting down to the real one.
+    return () => { if (frame.current !== null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame.current); };
   }, [value, duration, reduced]);
   return shown;
 }

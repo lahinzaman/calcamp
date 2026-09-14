@@ -45,6 +45,20 @@ existing Express app does not start a server; mount it at `/api/nutrislice`.
 ## Food vision
 
 The server also mounts authenticated `POST /api/vision` and loads `backend/.env`.
-Copy `backend/.env.example` and configure a LogMeal APIUser token for each app
-account. See [Phase 3 setup](../docs-phase-3.md) for the JSON contract, Supabase
-authentication, CORS, provider limitations, and frontend configuration.
+Copy `backend/.env.example` and set one `OPENAI_API_KEY`. It serves every signed-in
+user: nothing is provisioned per account, and no per-user token mapping is kept.
+
+The route takes one to four base64 photographs of the same meal plus an optional
+free-text `note`, and answers with the foods it recognised:
+
+```json
+{ "images": [{ "base64": "…", "mimeType": "image/jpeg" }], "note": "half the rice was left" }
+{ "items": [{ "name": "White rice, cooked", "grams": 200, "confidence": 0.7,
+              "macros": { "caloriesKcal": 260, "proteinG": 5, "carbsG": 56, "fatG": 1 } }],
+  "note": "The sauce under the rice could not be identified." }
+```
+
+Macros describe the whole portion. They are the model's own estimate: the client
+replaces them with USDA figures wherever the name resolves to a bundled food, and
+labels the row as estimated where it does not. A response with no usable row is a
+failed recognition (502), never a meal of zero calories.

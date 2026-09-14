@@ -46,6 +46,7 @@
     "express": "^5.2.1",
     "express-rate-limit": "8.7.0",
     "nativewind": "^4.2.6",
+    "openai": "^7.15.0",
     "patch-package": "8.0.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",

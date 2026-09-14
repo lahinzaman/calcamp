@@ -14,7 +14,7 @@ Phase 1 adds the Supabase schema, typed Zustand nutrition/workout stores, the
 Rutgers Nutrislice client, and an Express fallback proxy. Phase 2 adds adherent-day
 EMA/TDEE estimation, campus menu logging with editable portions, a typed food
 vision adapter hook, and workout logging with Brzycki 1RM and rest countdowns.
-Phase 3 wires authenticated Supabase writes, a secured LogMeal proxy, HealthKit /
+Phase 3 wires authenticated Supabase writes, a secured food-vision proxy, HealthKit /
 Health Connect adapters, and Mapbox walking-loop generation. See [Phase 3 setup](docs-phase-3.md)
 for credentials, authentication prerequisites, persistence semantics, and device
 build requirements. Authentication UI, durable offline queues, MMKV persistence,

@@ -9,10 +9,16 @@ persistence, native builds, validation, and current limitations.
   estimation. Uses only adherent rows with weight and intake; needs 14 paired
   observations. Calendar gaps affect EMA decay and regression. Returns coverage
   and insufficient/invalid states; does not automatically change intake targets.
-- `vision/useFoodVision.ts`: base64/camera URI analysis through the authenticated
-  `/api/vision` proxy or an injected analyzer. Validates portion and total macros,
-  handles cancellation/timeouts, and exposes manual overrides. The server uses
-  LogMeal's serving estimates; camera capture and barcode UI remain future work.
+- `vision/useFoodVision.ts`: one to four angles of a meal, plus an optional
+  description, analysed through the authenticated `/api/vision` proxy or an injected
+  analyzer. Validates every returned food, handles cancellation/timeouts, and hands
+  back editable rows.
+- `vision/resolveItems.ts`: matches each recognised name against the bundled USDA
+  database, so the numbers logged are measured rather than guessed wherever a food
+  resolves. An unresolved row keeps the model's estimate and reports no
+  micronutrients — unknown, not zero.
+- `vision/MealReview.tsx`: the rows before they are logged. Re-portion, remove, or
+  describe what the photos could not show and re-estimate against the same angles.
 - `workout/ActiveWorkoutScreen.tsx`: exercise variations, kg/reps/RPE logging,
   previous-set comparisons, Brzycki estimates, rest countdown, and retryable cloud
   saves. Estimates are omitted outside loaded sets of 1–12 reps. Previous sets

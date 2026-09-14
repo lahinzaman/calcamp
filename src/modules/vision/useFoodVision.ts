@@ -1,42 +1,52 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { MacroTotals } from '../../types/nutrition';
+import { resolveItems, type RecognizedItem } from './resolveItems';
 
-export type FoodVisionInput =
+export type FoodVisionImage =
   | { base64: string; mimeType: 'image/jpeg' | 'image/png' | 'image/webp' }
   | { uri: string; mimeType?: 'image/jpeg' | 'image/png' | 'image/webp' };
+export type FoodVisionInput = FoodVisionImage;
+
+/** The most angles worth sending: past this the cost rises and the estimate stops improving. */
+export const MAX_ANGLES = 4;
 
 export interface FoodVisionEstimate {
-  portion_size_grams: number;
-  macros: MacroTotals;
-  source: 'estimated' | 'manual';
+  items: RecognizedItem[];
+  /** What the model could not settle. Shown as-is; never folded into a row. */
+  note: string | null;
 }
 
-export type FoodVisionAnalyzer = (image: FoodVisionInput, signal: AbortSignal) => Promise<unknown>;
+export type FoodVisionAnalyzer = (images: FoodVisionImage[], note: string | null, signal: AbortSignal) => Promise<unknown>;
 export type FoodVisionErrorCode = 'NOT_CONFIGURED' | 'INVALID_IMAGE' | 'REQUEST_FAILED' | 'INVALID_RESPONSE' | 'TIMEOUT';
 export class FoodVisionError extends Error {
   constructor(public readonly code: FoodVisionErrorCode, message: string) { super(message); this.name = 'FoodVisionError'; }
 }
 
-/** Provider adapters must return total macros for this portion, not per-100g values. */
-export function parseVisionEstimate(value: unknown, source: FoodVisionEstimate['source'] = 'estimated'): FoodVisionEstimate {
-  const candidate = value as Partial<FoodVisionEstimate> | null;
-  const macros = candidate?.macros;
-  if (!candidate || typeof candidate.portion_size_grams !== 'number'
-    || !Number.isFinite(candidate.portion_size_grams) || candidate.portion_size_grams <= 0
-    || !macros || !['caloriesKcal', 'proteinG', 'carbsG', 'fatG'].every((key) => {
-      const amount = macros[key as keyof MacroTotals];
-      return typeof amount === 'number' && Number.isFinite(amount) && amount >= 0;
-    })) throw new FoodVisionError('INVALID_RESPONSE', 'The estimate needs a portion weight and all four macro values.');
-  return {
-    portion_size_grams: candidate.portion_size_grams,
-    macros: { caloriesKcal: macros.caloriesKcal, proteinG: macros.proteinG, carbsG: macros.carbsG, fatG: macros.fatG },
-    source,
-  };
+const macroValue = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value >= 0;
+
+/** Provider adapters must return whole-portion macros for each item, not per-100g values. */
+export function parseVisionEstimate(value: unknown): FoodVisionEstimate {
+  const payload = value as { items?: unknown; note?: unknown } | null;
+  if (!payload || !Array.isArray(payload.items) || !payload.items.length) {
+    throw new FoodVisionError('INVALID_RESPONSE', 'The estimate needs at least one recognised food.');
+  }
+  const parsed = payload.items.map((entry) => {
+    const item = entry as { name?: unknown; grams?: unknown; confidence?: unknown; macros?: Partial<MacroTotals> } | null;
+    const macros = item?.macros;
+    if (!item || typeof item.name !== 'string' || !item.name.trim()
+      || typeof item.grams !== 'number' || !Number.isFinite(item.grams) || item.grams <= 0
+      || !macros || !(['caloriesKcal', 'proteinG', 'carbsG', 'fatG'] as const).every(key => macroValue(macros[key]))) {
+      throw new FoodVisionError('INVALID_RESPONSE', 'Every food needs a name, a weight and all four macro values.');
+    }
+    const confidence = typeof item.confidence === 'number' && item.confidence >= 0 && item.confidence <= 1 ? item.confidence : 0;
+    return { name: item.name.trim(), grams: item.grams, confidence, macros: macros as MacroTotals };
+  });
+  return { items: resolveItems(parsed), note: typeof payload.note === 'string' && payload.note.trim() ? payload.note.trim() : null };
 }
 
-function normalizeImage(input: FoodVisionInput | string): FoodVisionInput {
-  let image: FoodVisionInput;
+function normalizeImage(input: FoodVisionImage | string): FoodVisionImage {
+  let image: FoodVisionImage;
   if (typeof input !== 'string') image = input;
   else if (/^(file|content|blob|https?):/.test(input)) image = { uri: input };
   else {
@@ -54,13 +64,33 @@ function normalizeImage(input: FoodVisionInput | string): FoodVisionInput {
   return image;
 }
 
-/** Authenticated JSON/base64 adapter for /api/vision. Provider secrets stay server-side. */
+async function toBase64(image: FoodVisionImage, signal: AbortSignal): Promise<FoodVisionImage> {
+  if ('base64' in image) return image;
+  const response = await fetch(image.uri, { signal });
+  if (!response.ok) throw new FoodVisionError('INVALID_IMAGE', 'Unable to read this image.');
+  const blob = await response.blob();
+  if (blob.size > 6_000_000) throw new FoodVisionError('INVALID_IMAGE', 'Use an image smaller than 6 MB.');
+  const dataUri = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    const abort = () => { reader.abort(); reject(new Error('Cancelled')); };
+    if (signal.aborted) { reject(new Error('Cancelled')); return; }
+    signal.addEventListener('abort', abort, { once: true });
+    reader.onloadend = () => signal.removeEventListener('abort', abort);
+    reader.onerror = () => reject(new Error('Unable to read image bytes.'));
+    reader.onload = () => resolve(String(reader.result));
+    reader.readAsDataURL(blob);
+  });
+  return normalizeImage({ base64: dataUri.slice(dataUri.indexOf(',') + 1),
+    mimeType: image.mimeType ?? (blob.type as 'image/jpeg') });
+}
+
+/** Authenticated JSON/base64 adapter for /api/vision. The provider key stays server-side. */
 export function createVisionProxyAnalyzer(endpoint: string, accessToken?: () => Promise<string | null>): FoodVisionAnalyzer {
   const url = new URL(endpoint);
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && __DEV__)) {
     throw new FoodVisionError('NOT_CONFIGURED', 'Configure an HTTPS food-vision endpoint.');
   }
-  return async (input, signal) => {
+  return async (images, note, signal) => {
     const token = accessToken ? await accessToken() : await (async () => {
       const { getSupabase } = await import('../../api/supabase');
       const { data, error } = await getSupabase().auth.getSession();
@@ -68,27 +98,11 @@ export function createVisionProxyAnalyzer(endpoint: string, accessToken?: () => 
       return data.session?.access_token ?? null;
     })();
     if (!token) throw new FoodVisionError('NOT_CONFIGURED', 'Sign in before recognizing food.');
-    let image = input;
-    if ('uri' in image) {
-      const response = await fetch(image.uri, { signal });
-      if (!response.ok) throw new FoodVisionError('INVALID_IMAGE', 'Unable to read this image.');
-      const blob = await response.blob();
-      if (blob.size > 6_000_000) throw new FoodVisionError('INVALID_IMAGE', 'Use an image smaller than 6 MB.');
-      const dataUri = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        const abort = () => { reader.abort(); reject(new Error('Cancelled')); };
-        if (signal.aborted) { reject(new Error('Cancelled')); return; }
-        signal.addEventListener('abort', abort, { once: true });
-        reader.onloadend = () => signal.removeEventListener('abort', abort);
-        reader.onerror = () => reject(new Error('Unable to read image bytes.'));
-        reader.onload = () => resolve(String(reader.result));
-        reader.readAsDataURL(blob);
-      });
-      image = normalizeImage({ base64: dataUri.slice(dataUri.indexOf(',') + 1),
-        mimeType: image.mimeType ?? (blob.type as 'image/jpeg') });
-    }
+    const encoded = [];
+    for (const image of images) encoded.push(await toBase64(image, signal));
     const response = await fetch(url.toString(), { method: 'POST',
-      body: JSON.stringify({ image }), headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, signal });
+      body: JSON.stringify({ images: encoded, note }),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, signal });
     if (!response.ok) throw new FoodVisionError('REQUEST_FAILED', 'Food recognition is unavailable. Enter your meal manually.');
     return response.json();
   };
@@ -103,7 +117,8 @@ export function useFoodVision(options: { analyzer?: FoodVisionAnalyzer; endpoint
   const cancel = useCallback(() => { request.current.id++; request.current.controller?.abort(); }, []);
   useEffect(() => cancel, [cancel]);
 
-  const analyze = useCallback(async (input: FoodVisionInput | string): Promise<FoodVisionEstimate | null> => {
+  /** `note` is the optional description: the facts a photo cannot carry at any angle. */
+  const analyze = useCallback(async (input: FoodVisionImage | string | (FoodVisionImage | string)[] = [], note?: string | null): Promise<FoodVisionEstimate | null> => {
     cancel();
     const id = request.current.id;
     const controller = new AbortController();
@@ -112,8 +127,13 @@ export function useFoodVision(options: { analyzer?: FoodVisionAnalyzer; endpoint
     let timer: ReturnType<typeof setTimeout> | undefined;
     let onAbort: (() => void) | undefined;
     try {
-      const image = normalizeImage(input);
-      const timeoutMs = options.timeoutMs ?? 20_000;
+      const list = (Array.isArray(input) ? input : [input]).map(normalizeImage);
+      const described = typeof note === 'string' && !!note.trim();
+      if (list.length > MAX_ANGLES) throw new FoodVisionError('INVALID_IMAGE', `Send at most ${MAX_ANGLES} photos.`);
+      // A meal described in words is a complete request; a photograph is one way of describing one.
+      if (!list.length && !described) throw new FoodVisionError('INVALID_IMAGE', 'Take a photo or describe the meal.');
+      // More angles is more upload and more to read, so the deadline scales with them.
+      const timeoutMs = options.timeoutMs ?? Math.min(60_000, 25_000 + list.length * 8_000);
       if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 60_000) throw new FoodVisionError('NOT_CONFIGURED', 'Invalid vision timeout.');
       const analyzer = options.analyzer ?? ((options.endpoint ?? process.env.EXPO_PUBLIC_VISION_PROXY_URL) ? createVisionProxyAnalyzer((options.endpoint ?? process.env.EXPO_PUBLIC_VISION_PROXY_URL)!, options.accessToken) : null);
       if (!analyzer) throw new FoodVisionError('NOT_CONFIGURED', 'Connect a food recognition provider or enter your meal manually.');
@@ -125,7 +145,8 @@ export function useFoodVision(options: { analyzer?: FoodVisionAnalyzer; endpoint
           controller.abort();
         }, timeoutMs);
       });
-      const value = await Promise.race([analyzer(image, controller.signal), interrupted]);
+      const trimmed = typeof note === 'string' && note.trim() ? note.trim().slice(0, 500) : null;
+      const value = await Promise.race([analyzer(list, trimmed, controller.signal), interrupted]);
       const estimate = parseVisionEstimate(value);
       if (request.current.id !== id) return null;
       setResult(estimate); setStatus('success');
@@ -142,18 +163,20 @@ export function useFoodVision(options: { analyzer?: FoodVisionAnalyzer; endpoint
     }
   }, [cancel, options.analyzer, options.endpoint, options.timeoutMs, options.accessToken]);
 
+  /** A meal in the person's own words, with no photograph at all. */
+  const describe = useCallback((text: string) => analyze([], text), [analyze]);
+
+  /** Replaces the working set of rows — used when the user edits, drops or re-portions one. */
+  const setItems = useCallback((items: RecognizedItem[]) => {
+    setResult(current => current ? { ...current, items } : { items, note: null });
+  }, []);
   const triggerManualOverride = useCallback(() => {
     cancel(); setStatus('idle'); setError(null); setManualOverrideRequired(true);
-  }, [cancel]);
-  const applyManualOverride = useCallback((value: Omit<FoodVisionEstimate, 'source'>) => {
-    const estimate = parseVisionEstimate(value, 'manual');
-    cancel(); setResult(estimate); setStatus('success'); setError(null); setManualOverrideRequired(false);
-    return estimate;
   }, [cancel]);
   const reset = useCallback(() => {
     cancel(); setResult(null); setError(null); setStatus('idle'); setManualOverrideRequired(false);
   }, [cancel]);
 
-  return { analyze, result, status, isLoading: status === 'loading', error, manualOverrideRequired,
-    triggerManualOverride, applyManualOverride, reset };
+  return { analyze, describe, result, status, isLoading: status === 'loading', error, manualOverrideRequired,
+    setItems, triggerManualOverride, reset };
 }

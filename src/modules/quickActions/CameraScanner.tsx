@@ -46,11 +46,16 @@ function Reticle({ scanning }: { scanning: boolean }) {
   </Animated.View>;
 }
 
-export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, onClose, onManual, notice }: {
+export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, onClose, onManual, notice,
+  angles = 0, maxAngles = 1, onDone }: {
   mode: ScannerMode; busy: boolean; notice?: string | null;
   onBarcode: (code: string) => void; onCapture: (base64: string) => void; onClose: () => void; onManual: () => void;
   /** Label reading works from a file, not base64: text recognition takes a URI. */
   onCaptureUri?: (uri: string) => void;
+  /** Angles already taken of this meal, and the cap. Above one, the shutter keeps collecting. */
+  angles?: number; maxAngles?: number;
+  /** Finish collecting and estimate from what has been taken so far. */
+  onDone?: () => void;
 }) {
   const [permission, requestPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
@@ -100,6 +105,9 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, 
     finally { locked.current = false; }
   };
 
+  // Extra angles mostly help portion size: a side view shows depth a top-down shot cannot.
+  const collecting = mode === 'photo' && maxAngles > 1;
+  const full = collecting && angles >= maxAngles;
   const stalledMessage = webCameraProblem()
     ?? 'The preview has not started. Close and reopen the scanner, or enter this item by hand.';
 
@@ -138,6 +146,7 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, 
         <View style={styles.titlePill}>
           <Text style={styles.chromeText}>{mode === 'barcode' ? (busy ? translate('camera.lookingUp') : translate('camera.pointAtBarcode'))
             : mode === 'label' ? (busy ? translate('camera.readingLabel') : translate('camera.fillFrameLabel'))
+            : collecting ? (angles === 0 ? translate('camera.fillFramePlate') : full ? `${angles} angles — that is plenty` : `${angles} taken · add a side angle, or use these`)
             : translate('camera.fillFramePlate')}</Text>
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel={torch ? 'Turn off torch' : 'Turn on torch'}
@@ -148,9 +157,18 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, 
 
       <View style={styles.bottomBar}>
         {(notice || error || stalled) && <View style={styles.noticePill}><Text style={styles.chromeText}>{error ?? notice ?? stalledMessage}</Text></View>}
-        {mode !== 'barcode' && <Pressable accessibilityRole="button" accessibilityLabel={mode === 'label' ? translate('camera.photographLabel') : translate('camera.takePhoto')} disabled={!ready || busy}
-          onPress={() => { void capture(); }} style={[styles.shutter, (!ready || busy) && { opacity: .5 }]} weight="firm">
+        {collecting && angles > 0 && <View style={styles.angleRow}>
+          {Array.from({ length: maxAngles }, (_, index) => <View key={index} style={[styles.angleDot, index < angles && styles.angleDotFilled]} />)}
+        </View>}
+        {mode !== 'barcode' && <Pressable accessibilityRole="button"
+          accessibilityLabel={mode === 'label' ? translate('camera.photographLabel') : angles > 0 ? 'Take another angle' : translate('camera.takePhoto')}
+          disabled={!ready || busy || full}
+          onPress={() => { void capture(); }} style={[styles.shutter, (!ready || busy || full) && { opacity: .5 }]} weight="firm">
           <View style={styles.shutterInner} />
+        </Pressable>}
+        {collecting && angles > 0 && <Pressable accessibilityRole="button" accessibilityLabel={`Estimate from ${angles} ${angles === 1 ? 'photo' : 'photos'}`}
+          disabled={busy} onPress={onDone} style={[styles.donePill, busy && { opacity: .5 }]} weight="firm">
+          <Text style={styles.doneText}>{busy ? 'Estimating…' : `Use ${angles} ${angles === 1 ? 'photo' : 'photos'}`}</Text>
         </Pressable>}
         <Pressable accessibilityRole="button" accessibilityLabel={mode === 'barcode' ? translate('camera.typeBarcode') : translate('camera.enterManually')}
           onPress={onManual} style={styles.manualPill} weight="firm">
@@ -171,6 +189,11 @@ const styles = StyleSheet.create({
   titlePill: { flex: 1, alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: 'rgba(0,0,0,.55)' },
   noticePill: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999, backgroundColor: 'rgba(0,0,0,.65)' },
   manualPill: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 999, backgroundColor: 'rgba(255,255,255,.16)' },
+  angleRow: { flexDirection: 'row', gap: 8 },
+  angleDot: { height: 9, width: 9, borderRadius: 5, backgroundColor: 'rgba(255,255,255,.3)' },
+  angleDotFilled: { backgroundColor: '#fff' },
+  donePill: { paddingHorizontal: 24, paddingVertical: 13, borderRadius: 999, backgroundColor: '#fff' },
+  doneText: { color: '#000', fontFamily: 'GoogleSansBold', fontSize: 15, textAlign: 'center' },
   chromeText: { color: '#fff', fontFamily: 'GoogleSansMedium', fontSize: 15, textAlign: 'center' },
   shutter: { height: 78, width: 78, borderRadius: 39, borderWidth: 4, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   shutterInner: { height: 58, width: 58, borderRadius: 29, backgroundColor: '#fff' },

@@ -4,7 +4,6 @@ import { once } from 'node:events';
 import express from 'express';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAccountRouter } from '../account';
-import { purgeLogMealHistory } from '../logmeal-account';
 test('account route derives owner from verified auth, requires confirmation, and stops on purge failure', async () => {
   const calls: string[] = []; let providerFails = false; let deleted = false;
   const client = { auth: { getUser: async (token: string) => ({ data: { user: token === 'valid' ? { id: 'alice' } : null }, error: null }),
@@ -27,15 +26,4 @@ test('account route derives owner from verified auth, requires confirmation, and
     assert.deepEqual(await (await remove({ confirmation: 'DELETE' }, 'lost-ack')).json(), { deleted: true });
     assert.equal(calls.length, 4, 'lost acknowledgement never repeats provider deletion');
   } finally { server.close(); await once(server, 'close'); }
-});
-test('LogMeal purge deletes intake artifacts, accepts an already-deleted intake, and verifies empty history', async () => {
-  const paths: string[] = []; let lists = 0;
-  const fetcher = (async (url, init) => {
-    paths.push(String(url));
-    if (init?.method === 'DELETE') return new Response(null, { status: 404 });
-    return new Response(JSON.stringify({ intakes_list: lists++ === 0 ? [{ image_id: 12 }] : [] }));
-  }) as typeof fetch;
-  await purgeLogMealHistory('alice', fetcher, 'private-provider-token');
-  assert.equal(paths.length, 3); assert.equal(paths[1], 'https://api.logmeal.com/v2/intake/12');
-  await assert.rejects(purgeLogMealHistory('alice', (async () => new Response('{}')) as typeof fetch, 'token'), /history/);
 });

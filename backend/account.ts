@@ -2,7 +2,6 @@ import { Router, json } from 'express';
 import cors from 'cors';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { structuredLimit } from './http';
-import { logMealTokenForUser, purgeLogMealHistory } from './logmeal-account';
 export function createAccountRouter(options: { client?: () => SupabaseClient; purgeProvider?: (owner: string) => Promise<void> } = {}) {
   const router = Router();
   const client = options.client ?? (() => {
@@ -28,12 +27,9 @@ export function createAccountRouter(options: { client?: () => SupabaseClient; pu
         res.status(401).json({ error: 'Sign in again to verify your account. If an earlier deletion completed, this account can no longer sign in.' }); return; }
       const owner = data.user.id; // Never accept a user ID from the request body.
       const mark = await admin.from('users').update({ deletion_requested_at: new Date().toISOString() }).eq('id', owner); if (mark.error) throw mark.error;
+      // The recognition provider keeps no per-user history to purge: images are sent once and
+      // never stored. The hook stays for a provider that does.
       if (options.purgeProvider) await options.purgeProvider(owner);
-      else if (logMealTokenForUser(owner)) {
-        // Vision requests have a 20-second upstream deadline. Let already admitted work settle.
-        await new Promise(resolve => setTimeout(resolve, 21000));
-        await purgeLogMealHistory(owner);
-      }
       // Revoke refresh sessions before hard-deleting auth identity; FK cascades remove all app rows.
       const signOut = await admin.auth.admin.signOut(token, 'global'); if (signOut.error) throw signOut.error;
       const deleted = await admin.auth.admin.deleteUser(owner, false); if (deleted.error) throw deleted.error;

@@ -8,6 +8,7 @@ import type { MacroTotals } from '../../types/nutrition';
 import type { DailyMenuItem } from '../../types/nutrislice';
 import type { MealSlot } from '../../types/foodEntry';
 import { nutritionStore } from '../../store/nutritionStore';
+import { confirmToast } from '../../components/Toast';
 import { servingLabel } from './serving';
 import { foodLogAmounts } from './logFood';
 
@@ -28,6 +29,7 @@ export function FoodLogSheet({ item, onClose, onLogged, meal }: {
       const single = foodLogAmounts(item, 1, macros);
       nutritionStore.getState().addEntry({ name: item.name, meal, servings: Number(servings), servingLabel: servingLabel(item.serving),
         referenceMacros: single.macros, referenceMicros: single.micros, source: 'dining' });
+      confirmToast(`${item.name} added · ${Math.round(macros.caloriesKcal * Number(servings))} kcal`);
       onLogged(item.name);
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Check your portion and macros.'); }
   };

@@ -3,6 +3,7 @@ import { Text } from '../theme/primitives';
 import { Pressable } from '../theme/Pressable';
 import { Pop, ProgressBar, Reveal } from '../theme/motion';
 import { haptic } from '../theme/haptics';
+import { confirmToast } from './Toast';
 import { nutritionStore, useNutritionStore } from '../store/nutritionStore';
 const CUP_OZ = 8;
 const CUP_G = 236.588;
@@ -15,6 +16,7 @@ export function WaterTracker() {
   const add = () => {
     nutritionStore.getState().addEntry({ name: NAME, servings: 1, servingLabel: `${CUP_OZ} oz`, source: 'quick',
       referenceMacros: { caloriesKcal: 0, proteinG: 0, carbsG: 0, fatG: 0 }, referenceMicros: { water_g: CUP_G } });
+    confirmToast(`Water logged · ${cups + 1} ${cups + 1 === 1 ? 'cup' : 'cups'} today`);
     haptic('light');
   };
   const removeOne = () => {

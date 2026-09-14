@@ -90,12 +90,12 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
   const remove = useCallback((id: string) => safelyEdit(() => workoutStore.getState().removeSet(id)), []);
   const [program, setProgram] = useState(0);
   const owner = useAuthStore(s => s.session?.user.id);
-  const [builder,setBuilder] = useState(false); const [routines,setRoutines] = useState<WorkoutRoutine[]>([]);
+  const [builder,setBuilder] = useState<WorkoutRoutine|'new'|null>(null); const [routines,setRoutines] = useState<WorkoutRoutine[]>([]);
   const experience = useMemo(() => readExperience(owner ?? 'anonymous'), [owner]);
   const [lifts,setLifts] = useState<LiftHistory>({}); const [volumeLog,setVolumeLog] = useState<SessionVolumePoint[]>([]); const [records,setRecords] = useState<PersonalRecord[]>([]);
   const [routineError,setRoutineError] = useState<string|null>(null);
   useEffect(() => {
-    let active = true; setRoutines([]); setProgram(0); setBuilder(false);
+    let active = true; setRoutines([]); setProgram(0); setBuilder(null);
     void (async () => {
       if (!owner) return;
       const {syncEngine} = await import('../sync/runtime');
@@ -115,7 +115,11 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
   const saveRoutine = async (routine: WorkoutRoutine) => {
     const { syncEngine } = await import('../sync/runtime');
     if (!owner || syncEngine.owner !== owner) throw new Error('Sign in before saving a routine.');
-    const next = [...(syncEngine.data.routines ?? []),routine];
+    // An edit keeps the routine's id, so it replaces in place. Appending would leave the old
+    // version behind and the picker would show the same routine twice.
+    const saved = syncEngine.data.routines ?? [];
+    const next = saved.some(entry => entry.id === routine.id)
+      ? saved.map(entry => entry.id === routine.id ? routine : entry) : [...saved,routine];
     syncEngine.queue({kind:'routine',data:routine},`routine:${routine.id}`,{routines:next}); setRoutines(next); setRoutineError(null);
     void syncEngine.drain();
   };
@@ -170,14 +174,15 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
         {!plans.length ? <>
           <Text className="text-2xl font-bold text-ink">Build your first routine</Text>
           <Text className="mt-3 leading-6 text-ink">CalCamp does not ship a template, because the split that works is the one you will actually run. Pick your exercises, set your own sets and rest, and we will check the weekly volume as you go.</Text>
-          <Action label={t('train.createRoutine')} onPress={() => setBuilder(true)} />
+          <Action label={t('train.createRoutine')} onPress={() => setBuilder('new')} />
         </> : <>
         <Text className="text-xs font-bold uppercase tracking-widest text-ink">Ready when you are</Text>
         <Text className="mt-4 text-2xl font-bold text-ink">{plan.name}</Text>
         <Text className="mt-3 leading-6 text-ink">{plan.focus}. Sets, rest and rep ranges come from the routine — change them any time.</Text>
         <View className="mt-4 flex-row flex-wrap">{plans.map((plan, index) => <Choice key={plan.name} label={plan.name} selected={program === index} onPress={() => setProgram(index)} />)}</View>
         <Pressable accessibilityRole="button" onPress={() => safelyEdit(start)} className="mt-6 items-center rounded-2xl bg-accent p-4"><Text className="font-bold text-ink">{t('train.startSession')}</Text></Pressable>
-        <Action secondary label={t('train.createAnother')} onPress={() => setBuilder(true)} />
+        <Action secondary label={`Edit ${plan.name}`} onPress={() => setBuilder(plan.routine)} />
+        <Action secondary label={t('train.createAnother')} onPress={() => setBuilder('new')} />
         </>}
         <TrainingTips routines={routines} experience={experience} lifts={lifts} volumeLog={volumeLog} />
         <Action secondary label={t('train.history')} onPress={() => router.push('/workouts')} />
@@ -237,7 +242,8 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
           onCancel={() => safelyEdit(() => { workoutStore.getState().cancelSession(); setFinished('Session discarded. Nothing was recorded.'); })} />
       </> : null}
     />
-    {builder && <RoutineBuilder onClose={() => setBuilder(false)} onSave={saveRoutine} />}
+    {builder && <RoutineBuilder existing={builder === 'new' ? undefined : builder}
+      onClose={() => setBuilder(null)} onSave={saveRoutine} />}
     {ordering && <ExerciseOrder sequence={sequence} onClose={() => setOrdering(false)} />}
   </SafeAreaView>;
 }

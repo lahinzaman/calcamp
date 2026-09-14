@@ -18,6 +18,7 @@ import { ActivityIndicator, View, useColorScheme } from 'react-native';
 import { Text } from '../theme/primitives';
 import { TrackingProvider } from '@/components/providers/TrackingProvider';
 import { Action } from '@/components/FormControls';
+import { Toast } from '@/components/Toast';
 import { authStore, useAuthStore } from '@/store/authStore';
 import { signOutWithDeviceCleanup } from '../modules/notifications/logout';
 void SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -44,7 +45,7 @@ function RootLayout() {
   useEffect(() => { if (loaded || fontError) void SplashScreen.hideAsync(); }, [loaded, fontError]);
   const base = mode === 'light' ? DefaultTheme : DarkTheme;
   const theme = { ...base, colors: { ...base.colors, background: palette.background, card: palette.surface, text: palette.ink, primary: palette.ink, border: palette.border }, fonts: Object.fromEntries(Object.entries(base.fonts).map(([key, font]) => [key, { ...font, fontFamily: key === 'regular' ? 'GoogleSans' : 'GoogleSansBold' }])) as typeof base.fonts };
-  return <ThemeRoot><HydrateTheme /><StatusBar style={mode === 'light' ? 'dark' : 'light'} />{(loaded || fontError) && <ThemeProvider value={theme}><TrackingProvider><NotificationLifecycle /><DayRollover /><AuthenticatedRoutes /></TrackingProvider></ThemeProvider>}</ThemeRoot>;
+  return <ThemeRoot><HydrateTheme /><StatusBar style={mode === 'light' ? 'dark' : 'light'} />{(loaded || fontError) && <ThemeProvider value={theme}><TrackingProvider><NotificationLifecycle /><DayRollover /><AuthenticatedRoutes /><Toast /></TrackingProvider></ThemeProvider>}</ThemeRoot>;
 }
 
 export default wrapWithTelemetry(RootLayout);

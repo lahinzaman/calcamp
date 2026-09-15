@@ -15,8 +15,21 @@ export function createApp(options: { pingDatabase?: () => Promise<boolean> } = {
   config({ path: resolve(process.cwd(), 'backend/.env'), quiet: true });
   const app = express();
   app.disable('x-powered-by');
-  // Set to the exact trusted reverse-proxy subnet in deployment, never unrestricted true.
-  if (process.env.TRUST_PROXY) app.set('trust proxy', process.env.TRUST_PROXY.split(','));
+  // Render terminates TLS at a reverse proxy and puts the caller's address in X-Forwarded-For.
+  // With no trust setting Express reports the proxy's own address instead, express-rate-limit
+  // refuses to key a limit on it — ERR_ERL_UNEXPECTED_X_FORWARDED_FOR — and the rejection takes
+  // the process down with it. Must be set before any limiter runs.
+  //
+  // 1 trusts exactly one hop, so the address comes from the last entry, which the proxy writes
+  // itself. Never `true`: that reads the first entry, which is whatever the caller sent, and a
+  // per-IP limit keyed on a value the caller chooses is not a limit at all. TRUST_PROXY still
+  // overrides with an exact subnet list, a different hop count, or `false` where there is no proxy.
+  const trusted = process.env.TRUST_PROXY?.trim();
+  app.set('trust proxy',
+    !trusted ? 1
+      : /^\d+$/.test(trusted) ? Number(trusted)
+        : /^(false|off|none)$/i.test(trusted) ? false
+          : trusted.split(',').map(entry => entry.trim()).filter(Boolean));
   app.use(requestTelemetry);
   const cached = createCachedLoader();
   const ping = options.pingDatabase ?? (async () => {

@@ -2,6 +2,7 @@ import { Router, json, type ErrorRequestHandler } from 'express';
 import cors from 'cors';
 import OpenAI from 'openai';
 import { structuredLimit as rateLimit } from './http';
+import { describeProviderFailure, logProviderFailure } from './provider-error';
 import { verifyBearer } from './supabase-auth';
 import { fetchPublicHtml, UnsafeUrl, type SafeFetchOptions } from './safe-fetch';
 
@@ -189,10 +190,12 @@ export function createRecipeProxyRouter(options: RecipeProxyOptions = {}) {
         text: { format: { type: 'json_schema', name: 'recipe', schema: SCHEMA, strict: true } },
       }, { signal: controller.signal });
       res.json(normalizeRecipe(JSON.parse(response.output_text)));
-    } catch {
-      if (!res.destroyed) res.status(controller.signal.aborted ? 504 : 502).json({ error: {
-        code: controller.signal.aborted ? 'TIMEOUT' : 'IMPORT_FAILED', message: 'No recipe could be read from that page. Build it by hand instead.',
-      } });
+    } catch (cause) {
+      // Swallowing this is how a 502 became unreadable in production: the log said nothing about
+      // whether the key was rejected, the model was wrong, or the provider was simply down.
+      const failure = describeProviderFailure(cause, controller.signal.aborted);
+      logProviderFailure('recipe', model, cause, failure);
+      if (!res.destroyed) res.status(failure.status).json({ error: { code: failure.code, message: failure.message } });
     } finally { clearTimeout(timer); res.off('close', disconnect); }
   });
   const errors: ErrorRequestHandler = (error, _req, res, _next) => {

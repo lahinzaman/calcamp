@@ -2,6 +2,7 @@ import { Router, json, type ErrorRequestHandler } from 'express';
 import cors from 'cors';
 import OpenAI from 'openai';
 import { structuredLimit as rateLimit } from './http';
+import { describeProviderFailure, logProviderFailure } from './provider-error';
 import { verifyBearer } from './supabase-auth';
 
 /** One recognised food. Macros are the model's own estimate for `grams`, replaced client-side
@@ -182,10 +183,12 @@ export function createVisionProxyRouter(options: VisionProxyOptions = {}) {
         text: { format: { type: 'json_schema', name: 'meal', schema: SCHEMA, strict: true } },
       }, { signal: controller.signal });
       res.json(normalizeVision(JSON.parse(response.output_text)));
-    } catch {
-      if (!res.destroyed) res.status(controller.signal.aborted ? 504 : 502).json({ error: {
-        code: controller.signal.aborted ? 'TIMEOUT' : 'RECOGNITION_FAILED', message: 'No estimate is available. Enter this meal manually.',
-      } });
+    } catch (cause) {
+      // Swallowing this is how a 502 became unreadable in production: the log said nothing about
+      // whether the key was rejected, the model was wrong, or the provider was simply down.
+      const failure = describeProviderFailure(cause, controller.signal.aborted);
+      logProviderFailure('vision', model, cause, failure);
+      if (!res.destroyed) res.status(failure.status).json({ error: { code: failure.code, message: failure.message } });
     } finally { clearTimeout(timer); res.off('close', disconnect); }
   });
   const errors: ErrorRequestHandler = (error, _req, res, _next) => {

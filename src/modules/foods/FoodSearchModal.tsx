@@ -13,6 +13,7 @@ import { nutritionStore } from '../../store/nutritionStore';
 import { useAuthStore } from '../../store/authStore';
 import { searchFoods, type SearchResult } from '../../api/foodSearch';
 import { QUALITY_LABELS, UsdaRateLimited, searchUsdaFoods } from '../../api/usda';
+import { searchBrandedFoods } from '../../api/brandedFoods';
 import { searchBundledFoods, toSearchResult } from '../../data/usdaFoods';
 import { MEAL_LABELS, MEAL_SLOTS, mealForHour, scaleMacros, type MealSlot } from '../../types/foodEntry';
 import { orderFoods, readSavedFoods, rememberFood, toggleFavorite, forgetFood, type SavedFood } from './savedFoods';
@@ -45,6 +46,18 @@ type Candidate = { name: string; servingLabel: string | null; macros: SearchResu
  * campus dining, your own recipes and saved foods, and the drinks catalogue. The + sheet and
  * the Food tab render the same component so they can never drift apart.
  */
+/**
+ * Chips on one scrolling line instead of wrapping onto four. Wrapped, the tabs and the drink
+ * categories together pinned six rows above the list and left it a strip at the bottom of the
+ * screen — scrollable, but with almost nothing to scroll in.
+ */
+function ChipRow({ children }: { children: React.ReactNode }) {
+  return <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled"
+    contentContainerStyle={{ paddingRight: 12 }} style={{ flexGrow: 0 }}>
+    <View className="flex-row">{children}</View>
+  </ScrollView>;
+}
+
 export function FoodLibrary({ meal, onDone, footer, header }: {
   meal?: MealSlot; onDone: () => void; footer?: React.ReactNode;
   /** Rendered above the tabs, inside the fixed chrome. */
@@ -81,6 +94,10 @@ export function FoodLibrary({ meal, onDone, footer, header }: {
     queryFn: ({ signal }) => searchUsdaFoods(query, signal), retry: false, staleTime: 300_000 });
   const results = useQuery({ enabled, queryKey: ['food-search', query],
     queryFn: ({ signal }) => searchFoods(query, signal), retry: false, staleTime: 300000 });
+  // Restaurant food is what a campus actually eats, and USDA has none of it. This runs beside
+  // the other two rather than after them; a brand that is down must not hold up the rest.
+  const brands = useQuery({ enabled, queryKey: ['branded-search', query],
+    queryFn: ({ signal }) => searchBrandedFoods(query, signal), retry: false, staleTime: 300_000 });
   const dining = useDiningMenu();
   const list = useMemo(() => orderFoods(saved, tab === 'recent' || tab === 'frequent' || tab === 'favorite' ? tab : 'recent'), [saved, tab]);
   // The drinks catalogue is bundled, so it answers instantly and works with no connection.
@@ -109,7 +126,15 @@ export function FoodLibrary({ meal, onDone, footer, header }: {
         out.push({ kind: 'note', id: 'note-drinks', small: true,
           text: 'Drink energy is calculated from ABV and published carbohydrate, not read off a label.' });
       }
-      if (results.isLoading || usda.isLoading) out.push({ kind: 'loading', id: 'loading' });
+      if (brands.data?.length) {
+        out.push({ kind: 'heading', id: 'head-brands', text: t('food.brandsHeading') });
+        for (const result of brands.data) food(result.key, result.name,
+          // The brand leads the subtitle: which chain it is decides whether the row is the
+          // right food far more often than the calories do.
+          `${result.brand} · ${Math.round(result.macros.caloriesKcal)} kcal per ${result.servingLabel}`,
+          { name: `${result.brand} ${result.name}`, servingLabel: result.servingLabel, macros: result.macros, micros: result.micros, source: 'custom' });
+      }
+      if (results.isLoading || usda.isLoading || brands.isLoading) out.push({ kind: 'loading', id: 'loading' });
       if (usda.error instanceof UsdaRateLimited) out.push({ kind: 'note', id: 'note-rate', small: true, text: usda.error.message });
       if (bundled.length) {
         out.push({ kind: 'heading', id: 'head-usda', text: t('food.usdaHeading') });
@@ -124,7 +149,7 @@ export function FoodLibrary({ meal, onDone, footer, header }: {
           { name: result.name, servingLabel: result.servingLabel, macros: result.macros, micros: result.micros, source: 'custom' });
       }
       if (results.isError && !bundled.length && !branded.length) out.push({ kind: 'note', id: 'note-unavailable', alert: true, text: t('food.unavailable') });
-      if (results.data?.length === 0 && !bundled.length && !branded.length && !drinkMatches.length) {
+      if (results.data?.length === 0 && !bundled.length && !branded.length && !drinkMatches.length && !brands.data?.length) {
         out.push({ kind: 'note', id: 'note-empty', text: t('food.noResults', { query: localQuery }) });
       }
       if (results.data?.length) {
@@ -172,7 +197,7 @@ export function FoodLibrary({ meal, onDone, footer, header }: {
     }
     return out;
   }, [tab, t, drinkMatches, results.isLoading, results.isError, results.data, usda.isLoading, usda.error,
-      bundled, branded, localQuery, recipes, category, list, owner, importError,
+      bundled, branded, brands.data, brands.isLoading, localQuery, recipes, category, list, owner, importError,
       dining.isPending, dining.isError, dining.emptyReason, dining.groups]);
 
   /** Reads the page server-side, resolves it against USDA, and opens the builder on the draft. */
@@ -198,8 +223,7 @@ export function FoodLibrary({ meal, onDone, footer, header }: {
     {/* Tabs and the search field stay put. Scrolling a long result list used to carry them off
         the top of the screen, leaving no way back to either without scrolling all the way up. */}
     <View className="px-1">
-      {header}
-      <View className="mb-3 flex-row flex-wrap">{TABS.map(([value, messageKey]) => <Choice key={value} label={t(messageKey)} selected={tab === value} onPress={() => setTab(value)} />)}</View>
+      <ChipRow>{TABS.map(([value, messageKey]) => <Choice key={value} label={t(messageKey)} selected={tab === value} onPress={() => setTab(value)} />)}</ChipRow>
       {tab === 'search' && <Field label={t('food.searchLabel')} value={term} onChangeText={setTerm} autoCorrect={false}
         placeholder="Greek yogurt, chicken breast, Tito's, Bud Light…" />}
       {tab === 'recipe' && <>
@@ -210,19 +234,22 @@ export function FoodLibrary({ meal, onDone, footer, header }: {
           disabled={importing || !recipeUrl.trim()} onPress={() => { void runImport(); }} />
       </>}
       {tab === 'dining' && <>
-        <View className="mb-3 flex-row flex-wrap">{DINING_HALL_SLUGS.map(value => <Choice key={value} label={DINING_HALLS[value]}
-          selected={dining.hall === value} onPress={() => dining.setHall(value)} />)}</View>
-        <View className="mb-3 flex-row flex-wrap">{MEAL_TYPES.map(value => <Choice key={value} label={MEAL_TYPE_LABELS[value]}
-          selected={dining.period === value} onPress={() => dining.setPeriod(value)} />)}</View>
+        <ChipRow>{DINING_HALL_SLUGS.map(value => <Choice key={value} label={DINING_HALLS[value]}
+          selected={dining.hall === value} onPress={() => dining.setHall(value)} />)}</ChipRow>
+        <ChipRow>{MEAL_TYPES.map(value => <Choice key={value} label={MEAL_TYPE_LABELS[value]}
+          selected={dining.period === value} onPress={() => dining.setPeriod(value)} />)}</ChipRow>
         <Field label="Search today's menu" value={dining.query} onChangeText={dining.setQuery} autoCorrect={false}
           placeholder="grilled chicken, rice, tofu…" />
       </>}
-      {tab === 'drinks' && <View className="mb-3 flex-row flex-wrap">{DRINK_CATEGORIES.map(([value, label]) => <Choice key={value} label={label}
-        selected={category === value} onPress={() => setCategory(value)} />)}</View>}
+      {tab === 'drinks' && <ChipRow>{DRINK_CATEGORIES.map(([value, label]) => <Choice key={value} label={label}
+        selected={category === value} onPress={() => setCategory(value)} />)}</ChipRow>}
     </View>
     {/* flex-1 is load-bearing: a FlashList needs a bounded height. Sized to its content it
         overflowed the column instead of scrolling, which only showed on the longest tabs. */}
+    {/* The title is not a control, so it scrolls away with the rows and gives the list back the
+        height it was taking. Only the tabs and the field that filters them stay put. */}
     <FlashList ref={listRef} data={items} keyExtractor={item => item.id} style={{ flex: 1 }}
+      ListHeaderComponent={header ? <View className="px-1">{header}</View> : null}
       keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
       contentContainerStyle={{ paddingBottom: 24 }}
       renderItem={({ item }) => <LibraryRow item={item} onChoose={setChosen} onPickMenuItem={dining.setSelected} />}

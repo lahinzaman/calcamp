@@ -194,6 +194,44 @@ test('fresh Supabase schema: permissions, nutrition constraints, and workout int
       await fails("update public.users set training_days = '{}'");
       await fails('update public.users set is_advanced_track = false');
     });
+    await t.test('branded foods are a shared published catalogue, readable but not editable', async () => {
+      await db.exec('reset role');
+      await db.exec(`insert into public.branded_foods (brand_name, item_name, serving_size_grams, calories, protein, carbs, fat)
+        values ('Chipotle', 'Chicken burrito bowl', 510, 625, 45, 63, 21.5),
+               ('Chipotle', 'Chips', 113, 540, 7, 73, 25),
+               ('Shah''s Halal Food', 'Chicken over rice', null, 1020, 58, 118, 34)`);
+      await signIn(alice);
+
+      // Everyone signed in reads the same catalogue; nobody signed in may change it.
+      const rows = await db.query<{ count: string }>('select count(*) as count from public.branded_foods');
+      assert.equal(Number(rows.rows[0].count), 3);
+      // Writing is not merely policy-denied: the grant itself is absent, so it is a privilege error.
+      await fails("insert into public.branded_foods (brand_name, item_name, calories, protein, carbs, fat) values ('Mine', 'X', 1, 1, 1, 1)", '42501');
+      await fails("update public.branded_foods set calories = 0", '42501');
+      await fails('delete from public.branded_foods', '42501');
+
+      // A portion nobody published stays null rather than becoming a zero-gram serving.
+      const halal = await db.query<{ serving_size_grams: string | null }>(
+        "select serving_size_grams from public.branded_foods where brand_name = 'Shah''s Halal Food'");
+      assert.equal(halal.rows[0].serving_size_grams, null);
+
+      // The brand is weighted above the item, and the word being typed matches as a prefix.
+      await db.exec('reset role');
+      const hits = await db.query<{ item_name: string }>(
+        `select item_name from public.branded_foods where search @@ to_tsquery('simple', $1) order by item_name`, ['chipo:*']);
+      assert.deepEqual(hits.rows.map(row => row.item_name), ['Chicken burrito bowl', 'Chips']);
+      const across = await db.query<{ item_name: string }>(
+        `select item_name from public.branded_foods where search @@ to_tsquery('simple', $1)`, ['chicken & ri:*']);
+      assert.deepEqual(across.rows.map(row => row.item_name), ['Chicken over rice']);
+
+      // Published figures cannot be negative, and the same item cannot be listed twice.
+      await db.exec('set role service_role');
+      await assert.rejects(db.query("insert into public.branded_foods (brand_name, item_name, calories, protein, carbs, fat) values ('A', 'B', -1, 0, 0, 0)"));
+      await assert.rejects(db.query("insert into public.branded_foods (brand_name, item_name, calories, protein, carbs, fat) values ('Chipotle', 'Chips', 1, 1, 1, 1)"));
+      await assert.rejects(db.query("insert into public.branded_foods (brand_name, item_name, serving_size_grams, calories, protein, carbs, fat) values ('A', 'B', 0, 1, 1, 1, 1)"));
+      await db.exec('reset role');
+    });
+
     await t.test('Phase 5 atomic nutrition deltas deduplicate retries and isolate receipts', async () => {
       const id = '50000000-0000-4000-8000-000000000001';
       const id2 = '50000000-0000-4000-8000-000000000002';

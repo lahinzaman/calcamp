@@ -107,6 +107,7 @@ export const en = {
   'food.nutrients': 'nutrients',
   'food.brandedHeading': 'BRANDED & PACKAGED · USDA',
   'food.drinksHeading': 'DRINKS',
+  'food.brandsHeading': 'RESTAURANTS & FAST FOOD',
   'food.createRecipe': 'Create a recipe',
   'food.noRecipes': 'No recipes yet. Build one from foods you have already logged and it becomes a single tap.',
   'food.noFavourites': 'No favourites yet. Star a food after logging it and it lands here.',

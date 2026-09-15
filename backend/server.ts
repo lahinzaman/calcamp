@@ -3,7 +3,7 @@ import { config } from 'dotenv';
 import { resolve } from 'node:path';
 import { createVisionProxyRouter } from './vision-proxy';
 import { createRecipeProxyRouter } from './recipe-proxy';
-import { createBrandedSearchRouter } from './nutritionix';
+import { createBrandedSearchRouter } from './fatsecret';
 import express from 'express';
 import { createClient } from '@supabase/supabase-js';
 import { apiErrors, requestTelemetry, structuredLimit } from './http';

@@ -88,20 +88,28 @@ It reuses `OPENAI_API_KEY`; no extra configuration.
 
 ## Branded fast food search
 
-`GET /api/search-branded?query=chipotle` proxies Nutritionix instant search, behind the same
-session check and rate limits as every other route that spends a third-party quota.
+`GET /api/search-branded?query=chipotle` searches FatSecret, behind the same session check and
+rate limits as every other route that spends a third-party quota.
 
 ```json
-{ "items": [{ "key": "nutritionix:abc123", "brandName": "Chipotle", "itemName": "Chicken Burrito Bowl",
-              "servingQty": 1, "servingUnit": "bowl", "servingWeightGrams": 510,
-              "caloriesKcal": 625, "macros": null, "needsNutrients": true,
-              "nixItemId": "abc123", "photoUrl": "https://…" }] }
+{ "items": [{ "key": "fatsecret:1", "brandName": "Chipotle", "itemName": "Chicken Burrito Bowl",
+              "servingLabel": "1 serving",
+              "macros": { "caloriesKcal": 625, "proteinG": 45, "carbsG": 63, "fatG": 21.5 },
+              "foodId": "1" }] }
 ```
 
-**`macros` is null on purpose.** Nutritionix instant search publishes `nf_calories` and nothing
-else — no protein, carbohydrate or fat. `needsNutrients` says so, and `nixItemId` is what a
-second call to `/v2/search/item` needs to fill them in. A row arriving with zeros there would
-read as a burrito bowl containing no protein, so it does not.
+Macros are parsed out of FatSecret's `food_description` — `"Per 1 serving - Calories: 300kcal |
+Fat: 13.00g | Carbs: 32.00g | Protein: 15.00g"` — by label rather than by position, so a
+reordered or extended description still reads correctly. They belong to `servingLabel`, which is
+`100g` for anything measured that way: reading those as per-portion is a silent threefold error.
+A description missing any of the four is unusable and the row is dropped.
 
-Needs `NUTRITIONIX_APP_ID` and `NUTRITIONIX_API_KEY`. Without them the route answers 503
+Only branded rows are returned. A generic food is what the bundled USDA data already covers, and
+listing it here would repeat it under a heading it does not belong to.
+
+The OAuth token is fetched once and held in memory until a minute before it expires; concurrent
+searches share a single refresh. A token FatSecret rejects triggers exactly one forced refresh
+and retry, which separates a revoked token from a credential that is simply wrong.
+
+Needs `FATSECRET_CLIENT_ID` and `FATSECRET_CLIENT_SECRET`. Without them the route answers 503
 `NOT_CONFIGURED` rather than failing at the call.

@@ -14,6 +14,7 @@ import { useAuthStore } from '../../store/authStore';
 import { searchFoods, type SearchResult } from '../../api/foodSearch';
 import { QUALITY_LABELS, UsdaRateLimited, searchUsdaFoods } from '../../api/usda';
 import { searchBrandedFoods } from '../../api/brandedFoods';
+import { searchBrandedApi } from '../../api/brandedSearch';
 import { searchBundledFoods, toSearchResult } from '../../data/usdaFoods';
 import { MEAL_LABELS, MEAL_SLOTS, mealForHour, scaleMacros, type MealSlot } from '../../types/foodEntry';
 import { orderFoods, readSavedFoods, rememberFood, toggleFavorite, forgetFood, type SavedFood } from './savedFoods';
@@ -98,6 +99,16 @@ export function FoodLibrary({ meal, onDone, footer, header }: {
   // the other two rather than after them; a brand that is down must not hold up the rest.
   const brands = useQuery({ enabled, queryKey: ['branded-search', query],
     queryFn: ({ signal }) => searchBrandedFoods(query, signal), retry: false, staleTime: 300_000 });
+  // The same section is fed from two places: the table this app owns, and FatSecret behind the
+  // backend. They run side by side because one being down must not empty the other's rows.
+  const restaurants = useQuery({ enabled, queryKey: ['branded-api', query],
+    queryFn: ({ signal }) => searchBrandedApi(query, signal), retry: false, staleTime: 300_000 });
+  const brandRows = useMemo(() => {
+    const own = brands.data ?? [];
+    const seen = new Set(own.map(food => `${food.brand ?? ''}|${food.name}`.toLowerCase()));
+    // Our own catalogue wins a tie: it was curated, and it carries a gram weight.
+    return [...own, ...(restaurants.data ?? []).filter(food => !seen.has(`${food.brand ?? ''}|${food.name}`.toLowerCase()))];
+  }, [brands.data, restaurants.data]);
   const dining = useDiningMenu();
   const list = useMemo(() => orderFoods(saved, tab === 'recent' || tab === 'frequent' || tab === 'favorite' ? tab : 'recent'), [saved, tab]);
   // The drinks catalogue is bundled, so it answers instantly and works with no connection.
@@ -126,15 +137,15 @@ export function FoodLibrary({ meal, onDone, footer, header }: {
         out.push({ kind: 'note', id: 'note-drinks', small: true,
           text: 'Drink energy is calculated from ABV and published carbohydrate, not read off a label.' });
       }
-      if (brands.data?.length) {
+      if (brandRows.length) {
         out.push({ kind: 'heading', id: 'head-brands', text: t('food.brandsHeading') });
-        for (const result of brands.data) food(result.key, result.name,
+        for (const result of brandRows) food(result.key, result.name,
           // The brand leads the subtitle: which chain it is decides whether the row is the
           // right food far more often than the calories do.
           `${result.brand} · ${Math.round(result.macros.caloriesKcal)} kcal per ${result.servingLabel}`,
           { name: `${result.brand} ${result.name}`, servingLabel: result.servingLabel, macros: result.macros, micros: result.micros, source: 'custom' });
       }
-      if (results.isLoading || usda.isLoading || brands.isLoading) out.push({ kind: 'loading', id: 'loading' });
+      if (results.isLoading || usda.isLoading || brands.isLoading || restaurants.isLoading) out.push({ kind: 'loading', id: 'loading' });
       if (usda.error instanceof UsdaRateLimited) out.push({ kind: 'note', id: 'note-rate', small: true, text: usda.error.message });
       if (bundled.length) {
         out.push({ kind: 'heading', id: 'head-usda', text: t('food.usdaHeading') });
@@ -149,7 +160,7 @@ export function FoodLibrary({ meal, onDone, footer, header }: {
           { name: result.name, servingLabel: result.servingLabel, macros: result.macros, micros: result.micros, source: 'custom' });
       }
       if (results.isError && !bundled.length && !branded.length) out.push({ kind: 'note', id: 'note-unavailable', alert: true, text: t('food.unavailable') });
-      if (results.data?.length === 0 && !bundled.length && !branded.length && !drinkMatches.length && !brands.data?.length) {
+      if (results.data?.length === 0 && !bundled.length && !branded.length && !drinkMatches.length && !brandRows.length) {
         out.push({ kind: 'note', id: 'note-empty', text: t('food.noResults', { query: localQuery }) });
       }
       if (results.data?.length) {
@@ -197,7 +208,7 @@ export function FoodLibrary({ meal, onDone, footer, header }: {
     }
     return out;
   }, [tab, t, drinkMatches, results.isLoading, results.isError, results.data, usda.isLoading, usda.error,
-      bundled, branded, brands.data, brands.isLoading, localQuery, recipes, category, list, owner, importError,
+      bundled, branded, brandRows, brands.isLoading, restaurants.isLoading, localQuery, recipes, category, list, owner, importError,
       dining.isPending, dining.isError, dining.emptyReason, dining.groups]);
 
   /** Reads the page server-side, resolves it against USDA, and opens the builder on the draft. */

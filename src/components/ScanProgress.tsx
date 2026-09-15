@@ -12,9 +12,13 @@ const SIZE = 132;
 const STROKE = 10;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-/** How fast the reading closes the gap to the next real milestone, per tick. */
+/** How fast the reading closes the gap to where it is drifting, per tick. */
 const CREEP = 0.05;
 const TICK_MS = 120;
+/** How far past a reached milestone the reading may drift, as a share of what is left. */
+const LOOKAHEAD = 0.45;
+/** Never drift to completion: only finishing the work is allowed to say 100%. */
+const CAP = 0.97;
 
 /**
  * A reading that only ever moves when the work does. `reach` is called at points that have
@@ -33,7 +37,7 @@ export function useScanProgress() {
   useEffect(() => stop, [stop]);
 
   const begin = useCallback(() => {
-    current.current = 0; ceiling.current = 0.08; setValue(0);
+    current.current = 0; ceiling.current = 0.1; setValue(0);
     stop();
     timer.current = setInterval(() => {
       const gap = ceiling.current - current.current;
@@ -43,10 +47,16 @@ export function useScanProgress() {
     }, TICK_MS);
   }, [stop]);
 
-  /** A milestone the work actually reached. Never moves the reading backwards. */
+  /**
+   * A milestone the work actually reached: the reading goes to it, because it is true. It then
+   * drifts partway toward whatever comes next, so a long wait still moves and a short one does
+   * not stall. Showing a fraction of a milestone instead — which is what this used to do — left
+   * a fast scan sitting near half and then jumping to done.
+   */
   const reach = useCallback((next: number) => {
-    ceiling.current = Math.max(ceiling.current, Math.min(next, 0.97));
-    if (current.current < ceiling.current) { current.current = Math.max(current.current, ceiling.current * 0.55); setValue(current.current); }
+    const milestone = Math.min(Math.max(next, 0), CAP);
+    if (milestone > current.current) { current.current = milestone; setValue(milestone); }
+    ceiling.current = Math.max(ceiling.current, Math.min(CAP, milestone + (1 - milestone) * LOOKAHEAD));
   }, []);
 
   const done = useCallback(() => { stop(); current.current = 1; ceiling.current = 1; setValue(1); }, [stop]);
@@ -55,8 +65,12 @@ export function useScanProgress() {
   return { value, begin, reach, done, reset };
 }
 
-export function ScanProgress({ value, label }: { value: number; label: string }) {
+/** `onDark` draws the ring over a live camera preview, where the theme's ink would vanish. */
+export function ScanProgress({ value, label, onDark = false }: { value: number; label: string; onDark?: boolean }) {
   const mode = useThemeStore(s => s.mode); const palette = palettes[mode];
+  const track = onDark ? 'rgba(255,255,255,.25)' : palette.raised;
+  const sweep = onDark ? '#fff' : palette.protein;
+  const ink = onDark ? { color: '#fff' } : undefined;
   const clamped = Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
   const progress = useSharedValue(0);
   useEffect(() => { progress.value = withTiming(clamped, { duration: TIMING.base, reduceMotion: ReduceMotion.System }); }, [clamped, progress]);
@@ -67,15 +81,15 @@ export function ScanProgress({ value, label }: { value: number; label: string })
     <View>
       <Svg width={SIZE} height={SIZE}>
         <G rotation={-90} originX={SIZE / 2} originY={SIZE / 2}>
-          <Circle cx={SIZE / 2} cy={SIZE / 2} r={RADIUS} stroke={palette.raised} strokeWidth={STROKE} fill="none" />
-          <AnimatedCircle cx={SIZE / 2} cy={SIZE / 2} r={RADIUS} stroke={palette.protein} strokeWidth={STROKE}
+          <Circle cx={SIZE / 2} cy={SIZE / 2} r={RADIUS} stroke={track} strokeWidth={STROKE} fill="none" />
+          <AnimatedCircle cx={SIZE / 2} cy={SIZE / 2} r={RADIUS} stroke={sweep} strokeWidth={STROKE}
             fill="none" strokeLinecap="round" strokeDasharray={CIRCUMFERENCE} animatedProps={animated} />
         </G>
       </Svg>
       <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, alignItems: 'center', justifyContent: 'center' }} pointerEvents="none">
-        <Text className="text-3xl font-bold" style={{ fontVariant: ['tabular-nums'] }}>{percent}%</Text>
+        <Text className="text-3xl font-bold" style={[{ fontVariant: ['tabular-nums'] }, ink]}>{percent}%</Text>
       </View>
     </View>
-    <Text className="mt-3 text-center text-sm">{label}</Text>
+    <Text className="mt-3 text-center text-sm" style={ink}>{label}</Text>
   </View>;
 }

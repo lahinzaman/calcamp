@@ -149,6 +149,12 @@ test('an unresolvable food keeps the model estimate and says so, and rows re-por
   assert.equal(resolveItem({ name: 'oats, cooked', grams: 234, confidence: .7, macros: { caloriesKcal: 166, proteinG: 6, carbsG: 28, fatG: 4 } }).source, 'usda');
   // Dropping a preparation word to find a match is fine; dropping an identifying one is not.
   assert.equal(resolveItem({ name: 'zzqq dressing', grams: 30, confidence: .5, macros: { caloriesKcal: 120, proteinG: 0, carbsG: 2, fatG: 13 } }).source, 'estimated');
+
+  // Only a window holding every identity word is searched, so the filler a description arrives
+  // wrapped in no longer buries the food inside it.
+  const spoken = resolveItem({ name: 'a bowl of chicken breast', grams: 140, confidence: .7, macros: { caloriesKcal: 231, proteinG: 43, carbsG: 0, fatG: 5 } });
+  assert.equal(spoken.source, 'usda');
+  assert.match(spoken.matchedName!.toLowerCase(), /chicken/);
   const doubled = reportion(rice, 200);
   assert.equal(doubled.grams, 200);
   assert.ok(Math.abs(doubled.macros.caloriesKcal - rice.macros.caloriesKcal * 2) <= 1);

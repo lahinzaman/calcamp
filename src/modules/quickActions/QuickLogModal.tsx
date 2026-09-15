@@ -148,11 +148,22 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
   // One Modal for the life of this screen. presentationStyle cannot be changed on a modal
   // that is already presented, and swapping between two of them races iOS's dismissal.
   const scanner=action==='photo'||action==='barcode'||action==='label';
+  const progressValue=action==='photo'||action==='describe'?vision.progress:scan.value;
+  const progressLabel=action==='barcode'?'Looking up that barcode…':action==='label'?'Reading that label…'
+    :action==='describe'?'Working out what that was…':'Working out what is on the plate…';
+  // The scan happens while the camera is still on screen, so the ring has to live over it.
+  // Rendering it only in the body below meant it was never once visible for a camera scan:
+  // this branch returns first, and by the time it stops returning the work has finished.
   if(scanner&&!editing)return <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose} statusBarTranslucent>
-    <CameraScanner mode={action==='photo'?'photo':action==='label'?'label':'barcode'} busy={busy} notice={error}
-      angles={angles.length} maxAngles={action==='photo'?MAX_ANGLES:1} onDone={()=>{void estimate();}}
-      onBarcode={code=>{void lookUp(code);}} onCapture={base64=>{capture(base64);}} onCaptureUri={uri=>{void readLabel(uri);}}
-      onManual={()=>{setError(null);setAngles([]);setEditing(true);}} onClose={onClose} />
+    <View style={{flex:1}}>
+      <CameraScanner mode={action==='photo'?'photo':action==='label'?'label':'barcode'} busy={busy} notice={error}
+        angles={angles.length} maxAngles={action==='photo'?MAX_ANGLES:1} onDone={()=>{void estimate();}}
+        onBarcode={code=>{void lookUp(code);}} onCapture={base64=>{capture(base64);}} onCaptureUri={uri=>{void readLabel(uri);}}
+        onManual={()=>{setError(null);setAngles([]);setEditing(true);}} onClose={onClose} />
+      {busy&&<View accessibilityViewIsModal style={{position:'absolute',top:0,right:0,bottom:0,left:0,alignItems:'center',justifyContent:'center',backgroundColor:'rgba(0,0,0,.6)'}}>
+        <ScanProgress value={progressValue} label={progressLabel} onDark />
+      </View>}
+    </View>
   </Modal>;
   if(photoWeight!==null)return <WeightPhotoSheet weightLbs={photoWeight} onClose={()=>setPhotoWeight(null)}
     onDone={photos=>{
@@ -173,8 +184,7 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
       onChange={vision.setItems}
       onRefine={description=>{void (action==='describe'?vision.describe(description):estimate(description));}}
       onConfirm={()=>logItems(vision.result!.items)} onCancel={onClose} />}
-    {busy&&<ScanProgress value={action==='photo'||action==='describe'?vision.progress:scan.value}
-      label={action==='barcode'?'Looking up that barcode…':action==='label'?'Reading that label…':action==='describe'?'Working out what that was…':'Working out what is on the plate…'} />}
+    {busy&&<ScanProgress value={progressValue} label={progressLabel} />}
     {action==='describe'&&!vision.result&&<>
       <Text className="mb-4">Write it the way you would say it — portions, how it was cooked, anything a photo would not show. Each food comes back as its own row for you to check.</Text>
       <Field label="What did you eat?" value={described} onChangeText={setDescribed} multiline maxLength={500}

@@ -47,10 +47,18 @@ test('a recipe page becomes ingredients with whole-recipe gram weights', async t
 });
 
 test('the server will not fetch an address only the server can reach', async t => {
-  for (const address of ['127.0.0.1', '10.0.0.5', '192.168.1.1', '169.254.169.254', '172.16.0.1', '100.64.0.1', '::1', 'fc00::1', 'fe80::1', '::ffff:127.0.0.1']) {
+  for (const address of ['127.0.0.1', '10.0.0.5', '192.168.1.1', '169.254.169.254', '172.16.0.1', '100.64.0.1',
+    // The same addresses spelled the other ways IPv6 allows. Comparing the text rather than the
+    // bytes is how ::ffff:7f00:1 got through while ::ffff:127.0.0.1 was caught.
+    '::1', '0:0:0:0:0:0:0:1', '0000:0000:0000:0000:0000:0000:0000:0001', '::',
+    '::ffff:127.0.0.1', '::ffff:7f00:1', '::FFFF:169.254.169.254', '::ffff:a9fe:a9fe',
+    '64:ff9b::7f00:1', 'fc00::1', 'fd12:3456::1', 'fe80::1', 'ff02::1']) {
     assert.equal(isPrivateAddress(address), true, address);
   }
-  for (const address of ['93.184.216.34', '8.8.8.8', '2606:2800::1']) assert.equal(isPrivateAddress(address), false, address);
+  for (const host of ['[::ffff:7f00:1]', '[0:0:0:0:0:0:0:1]', '[fe80::1]']) {
+    await assert.rejects(assertPublicUrl(`http://${host}/`), UnsafeUrl, host);
+  }
+  for (const address of ['93.184.216.34', '8.8.8.8', '2606:2800:220:1:248:1893:25c8:1946', '2001:4860:4860::8888']) assert.equal(isPrivateAddress(address), false, address);
 
   await assert.rejects(assertPublicUrl('file:///etc/passwd'), UnsafeUrl);
   await assert.rejects(assertPublicUrl('http://localhost/admin'), UnsafeUrl);
@@ -58,7 +66,11 @@ test('the server will not fetch an address only the server can reach', async t =
   await assert.rejects(assertPublicUrl('http://169.254.169.254/latest/meta-data/'), UnsafeUrl);
   // A name that resolves into the private range is the same attack wearing a public hostname.
   await assert.rejects(assertPublicUrl('https://sneaky.example', (async () => [{ address: '10.1.2.3', family: 4 }]) as never), UnsafeUrl);
-  assert.equal((await assertPublicUrl('https://example.com/x', publicDns as never)).hostname, 'example.com');
+  const verified = await assertPublicUrl('https://example.com/x', publicDns as never);
+  assert.equal(verified.url.hostname, 'example.com');
+  // The checked addresses come back so the connection can be pinned to them rather than
+  // resolving the name a second time, which is the rebinding window.
+  assert.deepEqual(verified.addresses.map(entry => entry.address), ['93.184.216.34']);
 
   // A redirect is a second address, and gets checked like the first.
   await assert.rejects(fetchPublicHtml('https://example.com/a', {
@@ -115,4 +127,29 @@ test('structured recipe data survives the tag stripping that removes every other
   assert.ok(!text.includes('window.tracker') && !text.includes('color:red') && !text.includes('hidden'));
   assert.ok(text.includes('900 g beef'), 'entities decode and list items keep their words');
   assert.ok(!text.includes('<'));
+});
+
+test('an oversized page is stopped while it arrives, not trimmed after it lands', async () => {
+  let pulled = 0;
+  // A body with no end to it. Buffering first and slicing afterwards is how a page the caller
+  // chose could take the whole process down.
+  const endless = () => new Response(new ReadableStream({
+    pull(controller) { pulled += 1024; controller.enqueue(new TextEncoder().encode('x'.repeat(1024))); },
+  }), { headers: { 'content-type': 'text/html' } });
+  const text = await fetchPublicHtml('https://example.com/big', { resolver: publicDns as never, maxBytes: 4096, fetchImpl: async () => endless() });
+  assert.equal(text.length, 4096);
+  assert.ok(pulled < 32_000, `read ${pulled} bytes for a 4096 byte cap`);
+
+  // A declared size far past the cap is refused before any of it is read.
+  await assert.rejects(fetchPublicHtml('https://example.com/huge', { resolver: publicDns as never, maxBytes: 1000,
+    fetchImpl: async () => new Response('x', { headers: { 'content-type': 'text/html', 'content-length': '999999999' } }) }), UnsafeUrl);
+});
+
+test('a page that declares a broken character entity still imports', async () => {
+  // String.fromCodePoint throws above the Unicode range, which took the whole page down.
+  const text = htmlToText('<p>chilli &#99999999; powder &#8212; 2 tbsp &#x1F336; &#xD800;</p>');
+  assert.ok(text.includes('chilli') && text.includes('2 tbsp'));
+  assert.ok(text.includes('—'), 'a valid entity still decodes');
+  assert.ok(text.includes('🌶'), 'and so does a hex one');
+  assert.ok(text.includes('&#99999999;') && text.includes('&#xD800;'), 'an impossible one is left as written');
 });

@@ -46,13 +46,34 @@ const identityWords = (name: string) => {
  * to appear, so the full phrase usually misses and the query has to be narrowed a word at a
  * time — widest window first, so the most specific match that exists is the one found.
  */
+/** Bounded so one long import cannot grow it without limit; repeated ingredients are common. */
+const lookups = new Map<string, BundledFood | null>();
+function lookup(query: string): BundledFood | null {
+  const cached = lookups.get(query);
+  if (cached !== undefined) return cached;
+  const [food] = searchBundledFoods(query, 1);
+  if (lookups.size > 500) lookups.clear();
+  lookups.set(query, food ?? null);
+  return food ?? null;
+}
+
 export function findBundled(name: string): { food: BundledFood; matched: string[] } | null {
   const words = wordsOf(name);
   if (!words.length) return null;
+  // Only a window holding every identity word can be accepted downstream, so the rest are not
+  // worth a search. Searching all of them meant a five-word ingredient scanned the whole 7,833
+  // catalogue fifteen times, all but one of those scans for a window that would be rejected.
+  const identity = new Set(identityWords(name));
+  const firstIdentity = words.findIndex(word => identity.has(word));
+  const lastIdentity = words.length - 1 - [...words].reverse().findIndex(word => identity.has(word));
+  const from = firstIdentity < 0 ? 0 : firstIdentity;
+  const to = firstIdentity < 0 ? words.length - 1 : lastIdentity;
+  // Widest window first, so the most specific match that exists is the one found.
   for (let size = words.length; size >= 1; size--) {
     for (let start = 0; start + size <= words.length; start++) {
+      if (start > from || start + size - 1 < to) continue;
       const window = words.slice(start, start + size);
-      const [food] = searchBundledFoods(window.join(' '), 1);
+      const food = lookup(window.join(' '));
       if (food) return { food, matched: window };
     }
   }

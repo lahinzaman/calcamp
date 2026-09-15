@@ -22,7 +22,7 @@ afterEach(async () => { await act(async () => view?.unmount()); view = undefined
 
 const tick = async (ms: number) => { await act(async () => { await new Promise(resolve => setTimeout(resolve, ms)); }); };
 
-test('the reading moves while waiting but never claims a milestone the work has not reached', async () => {
+test('a reached milestone is shown as reached, and only finishing shows 100%', async () => {
   await act(async () => { view = create(<Probe />); });
   assert.equal(hook.value, 0);
 
@@ -31,15 +31,18 @@ test('the reading moves while waiting but never claims a milestone the work has 
   const creeping = hook.value;
   // It moves, so a slow model does not look like a frozen app...
   assert.ok(creeping > 0, 'the reading advances while the request is in flight');
-  // ...but it stays under the first real milestone, because nothing has happened yet.
-  assert.ok(creeping < 0.08, `crept to ${creeping}, past the first milestone`);
+  // ...but stays low, because nothing has actually happened yet.
+  assert.ok(creeping < 0.1, `crept to ${creeping} before any milestone`);
 
-  // A milestone the work actually reached moves it, and it keeps creeping toward the next.
-  await act(async () => hook.reach(0.45));
-  const atMilestone = hook.value;
-  assert.ok(atMilestone > creeping, 'reaching a milestone advances the reading');
+  // A milestone reads as the milestone. Showing a fraction of it — which this used to do —
+  // left a fast scan sitting near half and then jumping to done.
+  await act(async () => hook.reach(0.8));
+  assert.ok(Math.abs(hook.value - 0.8) < 1e-9, `showed ${hook.value} on reaching 0.8`);
+
+  // Then it drifts on toward what comes next, so a wait after a milestone still moves.
   await tick(500);
-  assert.ok(hook.value > atMilestone && hook.value < 0.45 + 0.001, 'it eases toward the milestone without overshooting');
+  assert.ok(hook.value > 0.8, 'the reading keeps moving past a milestone while it waits');
+  assert.ok(hook.value < 0.97, 'but never drifts to completion on its own');
 
   // Nothing ever reads backwards, even if an earlier milestone arrives late.
   const before = hook.value;
@@ -50,6 +53,21 @@ test('the reading moves while waiting but never claims a milestone the work has 
   assert.equal(hook.value, 1);
   // And the ticking stops with it, rather than running on behind a finished scan.
   await tick(400);
+  assert.equal(hook.value, 1);
+});
+
+test('the milestone schedule climbs smoothly instead of stalling then snapping', async () => {
+  await act(async () => { view = create(<Probe />); });
+  await act(async () => hook.begin());
+  const seen: number[] = [];
+  // The real order a photo scan reports: encoded, sent, answered, parsed, matched, done.
+  for (const milestone of [0.12, 0.45, 0.8, 0.9, 0.94]) {
+    await act(async () => hook.reach(milestone));
+    seen.push(hook.value);
+  }
+  assert.deepEqual(seen.map(v => Math.round(v * 100)), [12, 45, 80, 90, 94]);
+  // The gap left for the final jump is small; it used to be a leap from about half.
+  await act(async () => hook.done());
   assert.equal(hook.value, 1);
 });
 

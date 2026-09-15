@@ -65,6 +65,21 @@ const SCHEMA = {
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', '#39': "'", frac12: '1/2', frac14: '1/4', frac34: '3/4' };
 
 /**
+ * A numeric entity, or null when it names nothing a string can hold. `&#99999999;` is outside
+ * Unicode and `String.fromCodePoint` throws on it, which took a whole recipe page down over one
+ * malformed character in a comment.
+ */
+function codePoint(name: string): string | null {
+  const decimal = /^#(\d{1,7})$/.exec(name);
+  const hex = /^#x([0-9a-f]{1,6})$/i.exec(name);
+  if (!decimal && !hex) return null;
+  const value = decimal ? Number(decimal[1]) : parseInt(hex![1], 16);
+  // Surrogates are not standalone characters; above 0x10FFFF is not a character at all.
+  if (!Number.isInteger(value) || value < 0 || value > 0x10ffff || (value >= 0xd800 && value <= 0xdfff)) return null;
+  return String.fromCodePoint(value);
+}
+
+/**
  * Tags out, words in. Structured recipe data (schema.org JSON-LD) is kept rather than stripped
  * with the other scripts: it is the same page saying the same thing without the prose around
  * it, and a model reading both gets the quantities right far more often.
@@ -81,7 +96,7 @@ export function htmlToText(html: string): string {
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<[^>]+>/g, ' ');
   const text = `${structured.join('\n')}\n${prose}`
-    .replace(/&(#?\w+);/g, (whole, name: string) => ENTITIES[name.toLowerCase()] ?? (/^#\d+$/.test(name) ? String.fromCodePoint(Number(name.slice(1))) : whole))
+    .replace(/&(#?\w+);/g, (whole, name: string) => ENTITIES[name.toLowerCase()] ?? codePoint(name) ?? whole)
     .replace(/[ \t\f\v ]+/g, ' ')
     .replace(/\n\s*\n\s*/g, '\n')
     .trim();

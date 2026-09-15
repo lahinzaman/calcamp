@@ -18,7 +18,7 @@ export function redactSecrets(value: string): string {
     .replace(/\bBearer\s+[A-Za-z0-9._~+/-]{8,}=*/gi, 'Bearer ***');
 }
 
-export function describeProviderFailure(error: unknown, aborted: boolean): ProviderFailure {
+export function describeProviderFailure(error: unknown, aborted: boolean, options: { notFoundCode?: string } = {}): ProviderFailure {
   if (aborted) return { status: 504, code: 'TIMEOUT', message: 'That took too long to answer. Try again, or enter it by hand.' };
   const failure = error as { status?: number; code?: string; type?: string; message?: string } | null;
   const status = typeof failure?.status === 'number' ? failure.status : 0;
@@ -30,7 +30,9 @@ export function describeProviderFailure(error: unknown, aborted: boolean): Provi
     return { status: 503, code: 'NOT_CONFIGURED', message: 'This feature is not configured correctly on the server yet.' };
   }
   if (status === 404 || code.includes('model_not_found') || code.includes('does not exist')) {
-    return { status: 503, code: 'MODEL_UNAVAILABLE', message: 'This feature is not configured correctly on the server yet.' };
+    // A 404 means we asked for something that is not there — a model, or an endpoint. Either
+    // way it is ours to fix, so the caller is told the same thing and the name says which.
+    return { status: 503, code: options.notFoundCode ?? 'MODEL_UNAVAILABLE', message: 'This feature is not configured correctly on the server yet.' };
   }
   if (status === 429 || code.includes('rate_limit') || code.includes('quota')) {
     return { status: 429, code: 'RATE_LIMITED', message: 'Too many requests right now. Try again shortly.' };

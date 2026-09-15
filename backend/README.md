@@ -85,3 +85,23 @@ The page is fetched **server-side**, so the address is treated as hostile: http(
 resolved and every answer checked against the private, loopback, link-local and carrier ranges,
 redirects followed by hand with each hop re-checked, three hops maximum, 2 MB and 15 seconds.
 It reuses `OPENAI_API_KEY`; no extra configuration.
+
+## Branded fast food search
+
+`GET /api/search-branded?query=chipotle` proxies Nutritionix instant search, behind the same
+session check and rate limits as every other route that spends a third-party quota.
+
+```json
+{ "items": [{ "key": "nutritionix:abc123", "brandName": "Chipotle", "itemName": "Chicken Burrito Bowl",
+              "servingQty": 1, "servingUnit": "bowl", "servingWeightGrams": 510,
+              "caloriesKcal": 625, "macros": null, "needsNutrients": true,
+              "nixItemId": "abc123", "photoUrl": "https://…" }] }
+```
+
+**`macros` is null on purpose.** Nutritionix instant search publishes `nf_calories` and nothing
+else — no protein, carbohydrate or fat. `needsNutrients` says so, and `nixItemId` is what a
+second call to `/v2/search/item` needs to fill them in. A row arriving with zeros there would
+read as a burrito bowl containing no protein, so it does not.
+
+Needs `NUTRITIONIX_APP_ID` and `NUTRITIONIX_API_KEY`. Without them the route answers 503
+`NOT_CONFIGURED` rather than failing at the call.

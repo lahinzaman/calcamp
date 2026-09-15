@@ -6,7 +6,9 @@ process.env.APP_VARIANT = variant;
 const { exp } = getConfig(process.cwd());
 const failures = [];
 const required = key => { if (!process.env[key]) failures.push(`Set ${key} in the ${variant} EAS environment.`); };
-for (const key of ['EXPO_PUBLIC_SUPABASE_URL', 'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN', 'EXPO_PUBLIC_BACKEND_URL', 'EXPO_PUBLIC_VISION_PROXY_URL']) required(key);
+
+for (const key of ['EXPO_PUBLIC_SUPABASE_URL', 'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'EXPO_PUBLIC_BACKEND_URL', 'EXPO_PUBLIC_VISION_PROXY_URL']) required(key);
+
 if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(exp.extra?.eas?.projectId ?? '')) failures.push('Link an EAS project and provide EAS_PROJECT_ID.');
 for (const key of ['EXPO_PUBLIC_SUPABASE_URL', 'EXPO_PUBLIC_BACKEND_URL', 'EXPO_PUBLIC_VISION_PROXY_URL']) {
   const value = process.env[key]; if (!value) continue;
@@ -14,7 +16,9 @@ for (const key of ['EXPO_PUBLIC_SUPABASE_URL', 'EXPO_PUBLIC_BACKEND_URL', 'EXPO_
   catch { failures.push(`${key} must be a valid ${variant === 'development' ? 'HTTP(S)' : 'HTTPS'} URL.`); }
 }
 const plugins = (exp.plugins ?? []).map(p => Array.isArray(p) ? p[0] : p);
-for (const name of ['react-native-health', 'react-native-health-connect', '@rnmapbox/maps', 'expo-build-properties', 'expo-location', 'expo-secure-store', 'expo-sqlite', 'expo-background-task', 'expo-notifications']) if (!plugins.includes(name)) failures.push(`Missing native plugin: ${name}`);
+
+for (const name of ['react-native-health', 'react-native-health-connect', 'expo-build-properties', 'expo-location', 'expo-secure-store', 'expo-sqlite', 'expo-background-task', 'expo-notifications']) if (!plugins.includes(name)) failures.push(`Missing native plugin: ${name}`);
+
 if (process.env.EXPO_PUBLIC_SENTRY_DSN?.trim()) {
   if (!/^https:\/\/[^@\s]+@[^\s]+\/\d+$/.test(process.env.EXPO_PUBLIC_SENTRY_DSN.trim())) failures.push('EXPO_PUBLIC_SENTRY_DSN must be a valid HTTPS Sentry DSN.');
   if (!plugins.includes('@sentry/react-native/expo')) failures.push('Missing Sentry upload plugin.');

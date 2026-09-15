@@ -92,7 +92,7 @@ export function ExercisePicker({ catalog = EXERCISE_CATALOG, selectedIds, onTogg
     </View>
     {matches.length === 0
       ? <View className="flex-1 items-center justify-center px-8"><Text className="text-center">Nothing matches that. Clear a filter or search for a shorter word.</Text></View>
-      : <FlashList ref={list} data={matches} keyExtractor={exercise => exercise.id} keyboardShouldPersistTaps="always" keyboardDismissMode="on-drag"
+      : <FlashList ref={list} data={matches} keyExtractor={exercise => exercise.id} style={{ flex: 1 }} keyboardShouldPersistTaps="always" keyboardDismissMode="on-drag"
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
           renderItem={({ item }) => <ExerciseRow exercise={item} chosen={selectedIds.includes(item.id)} onToggle={onToggle} />} />}
     <View className="gap-2 px-5 pb-4">{footer}</View>

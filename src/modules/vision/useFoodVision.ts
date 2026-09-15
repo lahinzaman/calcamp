@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { MacroTotals } from '../../types/nutrition';
 import { resolveItems, type RecognizedItem } from './resolveItems';
+import { useScanProgress } from '../../components/ScanProgress';
 
 export type FoodVisionImage =
   | { base64: string; mimeType: 'image/jpeg' | 'image/png' | 'image/webp' }
@@ -17,7 +18,9 @@ export interface FoodVisionEstimate {
   note: string | null;
 }
 
-export type FoodVisionAnalyzer = (images: FoodVisionImage[], note: string | null, signal: AbortSignal) => Promise<unknown>;
+/** `onStage` reports fractions of the work that have actually completed, for a progress ring.
+ *  It is optional, so an analyzer that does not report simply shows no intermediate movement. */
+export type FoodVisionAnalyzer = (images: FoodVisionImage[], note: string | null, signal: AbortSignal, onStage?: (fraction: number) => void) => Promise<unknown>;
 export type FoodVisionErrorCode = 'NOT_CONFIGURED' | 'INVALID_IMAGE' | 'REQUEST_FAILED' | 'INVALID_RESPONSE' | 'TIMEOUT';
 export class FoodVisionError extends Error {
   constructor(public readonly code: FoodVisionErrorCode, message: string) { super(message); this.name = 'FoodVisionError'; }
@@ -90,7 +93,7 @@ export function createVisionProxyAnalyzer(endpoint: string, accessToken?: () => 
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && __DEV__)) {
     throw new FoodVisionError('NOT_CONFIGURED', 'Configure an HTTPS food-vision endpoint.');
   }
-  return async (images, note, signal) => {
+  return async (images, note, signal, onStage) => {
     const token = accessToken ? await accessToken() : await (async () => {
       const { getSupabase } = await import('../../api/supabase');
       const { data, error } = await getSupabase().auth.getSession();
@@ -99,12 +102,17 @@ export function createVisionProxyAnalyzer(endpoint: string, accessToken?: () => 
     })();
     if (!token) throw new FoodVisionError('NOT_CONFIGURED', 'Sign in before recognizing food.');
     const encoded = [];
-    for (const image of images) encoded.push(await toBase64(image, signal));
+    // Encoding is the one part whose size is known up front, so it reports per photo.
+    for (const image of images) { encoded.push(await toBase64(image, signal)); onStage?.(0.12 + 0.28 * (encoded.length / images.length)); }
+    onStage?.(0.45);
     const response = await fetch(url.toString(), { method: 'POST',
       body: JSON.stringify({ images: encoded, note }),
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, signal });
+    onStage?.(0.8);
     if (!response.ok) throw new FoodVisionError('REQUEST_FAILED', 'Food recognition is unavailable. Enter your meal manually.');
-    return response.json();
+    const body = await response.json();
+    onStage?.(0.9);
+    return body;
   };
 }
 
@@ -113,6 +121,7 @@ export function useFoodVision(options: { analyzer?: FoodVisionAnalyzer; endpoint
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [error, setError] = useState<FoodVisionError | null>(null);
   const [manualOverrideRequired, setManualOverrideRequired] = useState(false);
+  const progress = useScanProgress();
   const request = useRef<{ id: number; controller: AbortController | null }>({ id: 0, controller: null });
   const cancel = useCallback(() => { request.current.id++; request.current.controller?.abort(); }, []);
   useEffect(() => cancel, [cancel]);
@@ -123,7 +132,7 @@ export function useFoodVision(options: { analyzer?: FoodVisionAnalyzer; endpoint
     const id = request.current.id;
     const controller = new AbortController();
     request.current.controller = controller;
-    setStatus('loading'); setError(null); setResult(null); setManualOverrideRequired(false);
+    setStatus('loading'); setError(null); setResult(null); setManualOverrideRequired(false); progress.begin();
     let timer: ReturnType<typeof setTimeout> | undefined;
     let onAbort: (() => void) | undefined;
     try {
@@ -146,22 +155,26 @@ export function useFoodVision(options: { analyzer?: FoodVisionAnalyzer; endpoint
         }, timeoutMs);
       });
       const trimmed = typeof note === 'string' && note.trim() ? note.trim().slice(0, 500) : null;
-      const value = await Promise.race([analyzer(list, trimmed, controller.signal), interrupted]);
+      const value = await Promise.race([analyzer(list, trimmed, controller.signal, progress.reach), interrupted]);
+      // Matching every food against the bundled USDA data is the last real step.
+      progress.reach(0.94);
       const estimate = parseVisionEstimate(value);
       if (request.current.id !== id) return null;
+      progress.done();
       setResult(estimate); setStatus('success');
       return estimate;
     } catch (cause) {
       if (request.current.id !== id) return null;
       const failure = cause instanceof FoodVisionError ? cause
         : new FoodVisionError('REQUEST_FAILED', 'Could not recognize this meal. Enter it manually.');
+      progress.reset();
       setError(failure); setStatus('error'); setManualOverrideRequired(true);
       return null;
     } finally {
       clearTimeout(timer);
       if (onAbort) controller.signal.removeEventListener('abort', onAbort);
     }
-  }, [cancel, options.analyzer, options.endpoint, options.timeoutMs, options.accessToken]);
+  }, [cancel, options.analyzer, options.endpoint, options.timeoutMs, options.accessToken, progress]);
 
   /** A meal in the person's own words, with no photograph at all. */
   const describe = useCallback((text: string) => analyze([], text), [analyze]);
@@ -174,9 +187,9 @@ export function useFoodVision(options: { analyzer?: FoodVisionAnalyzer; endpoint
     cancel(); setStatus('idle'); setError(null); setManualOverrideRequired(true);
   }, [cancel]);
   const reset = useCallback(() => {
-    cancel(); setResult(null); setError(null); setStatus('idle'); setManualOverrideRequired(false);
-  }, [cancel]);
+    cancel(); progress.reset(); setResult(null); setError(null); setStatus('idle'); setManualOverrideRequired(false);
+  }, [cancel, progress]);
 
   return { analyze, describe, result, status, isLoading: status === 'loading', error, manualOverrideRequired,
-    setItems, triggerManualOverride, reset };
+    progress: progress.value, setItems, triggerManualOverride, reset };
 }

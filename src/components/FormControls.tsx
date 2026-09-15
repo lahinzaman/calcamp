@@ -20,7 +20,7 @@ export function Field({ label, onFocus, onBlur, ...props }: TextInputProps & { l
       <TextInput accessibilityLabel={label} {...props}
         onFocus={event => { focus.value = withTiming(1, { duration: TIMING.fast, reduceMotion: ReduceMotion.System }); onFocus?.(event); }}
         onBlur={event => { focus.value = withTiming(0, { duration: TIMING.base, reduceMotion: ReduceMotion.System }); onBlur?.(event); }}
-        className="px-4 py-3 text-base text-ink" />
+        className="px-4 text-base text-ink" />
     </Animated.View>
   </View>;
 }

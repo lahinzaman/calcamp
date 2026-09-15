@@ -10,6 +10,7 @@ import { gramsToOz, ozToGrams } from '../../lib/units';
 import { readUnits, readWeight, showWeight, weightUnit } from '../settings/measurementUnits';
 import { MAX_ANGLES, useFoodVision } from '../vision/useFoodVision';
 import { MealReview } from '../vision/MealReview';
+import { ScanProgress, useScanProgress } from '../../components/ScanProgress';
 import type { RecognizedItem } from '../vision/resolveItems';
 import { lookupBarcode } from './barcode';
 import { LabelUnavailable, recognizeLabel } from './recognizeLabel';
@@ -42,22 +43,31 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
   const locked=useRef(false); const alive=useRef(true); const request=useRef<AbortController|null>(null); const vision=useFoodVision();
   const [angles,setAngles]=useState<string[]>([]);
   const [described,setDescribed]=useState('');
+  // Barcode and label scans have their own steps to report; the photo path reports its own.
+  const scan=useScanProgress();
   const [reference,setReference]=useState<{grams:number;macros:MacroTotals}|null>(null);
   useEffect(()=>()=>{alive.current=false;request.current?.abort();},[]);
   const fill=(food:{grams:number;macros:MacroTotals},label:string,source:string)=>{
     setReference(food);setName(label);setPortion(String(Number(gramsToOz(food.grams).toFixed(3))));
     setValues(Object.fromEntries(Object.entries(food.macros).map(([k,v])=>[k,String(v)])) as Record<keyof MacroTotals,string>);setNotice(source);setEditing(true);
   };
-  const scan=async(code:string)=>{
-    if(locked.current)return;locked.current=true;setBusy(true);setError(null);request.current=new AbortController();
-    try{const food=await lookupBarcode(code,request.current.signal);if(alive.current)fill(food,food.name,food.source);}
-    catch{if(alive.current){setError('No complete food label found. Enter the package values manually.');setEditing(true);}}
+  const lookUp=async(code:string)=>{
+    if(locked.current)return;locked.current=true;setBusy(true);setError(null);scan.begin();request.current=new AbortController();
+    try{
+      scan.reach(.35);
+      const food=await lookupBarcode(code,request.current.signal);
+      scan.reach(.9);
+      if(alive.current){scan.done();fill(food,food.name,food.source);}
+    }
+    catch{if(alive.current){scan.reset();setError('No complete food label found. Enter the package values manually.');setEditing(true);}}
     finally{if(alive.current)setBusy(false);locked.current=false;}
   };
   const readLabel=async(uri:string)=>{
-    if(locked.current)return;locked.current=true;setBusy(true);setError(null);
+    if(locked.current)return;locked.current=true;setBusy(true);setError(null);scan.begin();
     try{
+      scan.reach(.4);
       const reading=await recognizeLabel(uri);if(!alive.current)return;
+      scan.done();
       if(!Object.keys(reading.macros).length){setEditing(true);setError('No nutrition panel was readable in that photo. Fill the frame with the label, or enter it by hand.');return;}
       setReference({grams:ozToGrams(1),macros:reading.macros as MacroTotals});
       setName('Packaged food');setPortion('1');
@@ -67,7 +77,7 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
       setEditing(true);
       const missing=missingMacros(reading);
       if(missing.length)setError(`The ${missing.join(' and ')} line could not be read. Fill it in from the package.`);
-    }catch(cause){if(alive.current){setEditing(true);
+    }catch(cause){if(alive.current){scan.reset();setEditing(true);
       setError(cause instanceof LabelUnavailable?cause.message:'That label could not be read. Try again, or enter it by hand.');}}
     finally{locked.current=false;if(alive.current)setBusy(false);}
   };
@@ -141,7 +151,7 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
   if(scanner&&!editing)return <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose} statusBarTranslucent>
     <CameraScanner mode={action==='photo'?'photo':action==='label'?'label':'barcode'} busy={busy} notice={error}
       angles={angles.length} maxAngles={action==='photo'?MAX_ANGLES:1} onDone={()=>{void estimate();}}
-      onBarcode={code=>{void scan(code);}} onCapture={base64=>{capture(base64);}} onCaptureUri={uri=>{void readLabel(uri);}}
+      onBarcode={code=>{void lookUp(code);}} onCapture={base64=>{capture(base64);}} onCaptureUri={uri=>{void readLabel(uri);}}
       onManual={()=>{setError(null);setAngles([]);setEditing(true);}} onClose={onClose} />
   </Modal>;
   if(photoWeight!==null)return <WeightPhotoSheet weightLbs={photoWeight} onClose={()=>setPhotoWeight(null)}
@@ -155,7 +165,7 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
     {action==='barcode'&&!reference&&<>
       <Text className="mb-3">Scanner not cooperating, or the code is damaged? Type the digits printed under the barcode.</Text>
       <Field label="Barcode number" value={code} onChangeText={setCode} keyboardType="number-pad" maxLength={14} />
-      <Action label={busy?'Looking up…':'Look up this barcode'} disabled={busy||!code.trim()} onPress={()=>{void scan(code.trim());}} />
+      <Action label={busy?'Looking up…':'Look up this barcode'} disabled={busy||!code.trim()} onPress={()=>{void lookUp(code.trim());}} />
       <Action secondary label="Back to the scanner" disabled={busy} onPress={()=>{setError(null);setEditing(false);}} />
     </>}
     {action==='weight'&&<Text className="mb-4">A photo alongside the number is what actually shows change — the scale moves with water and food. Photos stay on this device and are never uploaded.</Text>}
@@ -163,6 +173,8 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
       onChange={vision.setItems}
       onRefine={description=>{void (action==='describe'?vision.describe(description):estimate(description));}}
       onConfirm={()=>logItems(vision.result!.items)} onCancel={onClose} />}
+    {busy&&<ScanProgress value={action==='photo'||action==='describe'?vision.progress:scan.value}
+      label={action==='barcode'?'Looking up that barcode…':action==='label'?'Reading that label…':action==='describe'?'Working out what that was…':'Working out what is on the plate…'} />}
     {action==='describe'&&!vision.result&&<>
       <Text className="mb-4">Write it the way you would say it — portions, how it was cooked, anything a photo would not show. Each food comes back as its own row for you to check.</Text>
       <Field label="What did you eat?" value={described} onChangeText={setDescribed} multiline maxLength={500}

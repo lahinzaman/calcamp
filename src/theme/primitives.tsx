@@ -17,10 +17,11 @@ export const TextInput = forwardRef<NativeInput, TextInputProps>(function CalCam
   // placeholderTextColor sits BEFORE the spread so a caller can still override it. It used to
   // sit after, which both ignored the caller and drew the placeholder in full ink — a hint
   // indistinguishable from text you had already typed.
+  // A single-line box is centred by the platform only when nothing pushes the text down. Any
+  // vertical padding defeats that on iOS and leaves the glyphs riding high inside a 48pt tap
+  // target; textAlignVertical does the same job on Android. This rule sits LAST so a caller's
+  // `py-3` styles the box without silently moving the text off centre.
+  const vertical = { paddingVertical: props.multiline ? 12 : 0, textAlignVertical: props.multiline ? 'top' as const : 'center' as const };
   return <NativeInput ref={ref} placeholderTextColor={palette.muted} {...props} selectionColor={palette.protein}
-    style={[{ minHeight: 48, fontSize: 16, paddingVertical: 12,
-      // A single-line box taller than its text lays out from the top on Android, leaving the
-      // text sitting high against the border instead of centred in it.
-      textAlignVertical: props.multiline ? 'top' : 'center' },
-      style, typography(style, props.className), { color: palette.ink }]} />;
+    style={[{ minHeight: 48, fontSize: 16 }, style, typography(style, props.className), { color: palette.ink }, vertical]} />;
 });

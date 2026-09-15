@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useCameraPermissions } from 'expo-camera';
 import { Text } from '../../theme/primitives';
@@ -42,6 +42,14 @@ export function PermissionsCard() {
   const [camera, requestCamera] = useCameraPermissions();
   const [notifications, setNotifications] = useState<State>('idle');
   const [cameraOutcome, setCameraOutcome] = useState<State>('idle');
+  // The camera row reads its permission from the system on every render; this one had no such
+  // source and started from nothing, so an already-granted permission asked to be granted again
+  // every time the app opened.
+  useEffect(() => {
+    let alive = true;
+    void Promise.resolve().then(notificationsGranted).then(allowed => { if (alive && allowed) setNotifications('granted'); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
   const cameraState: State = camera?.granted ? 'granted'
     : cameraOutcome !== 'idle' ? cameraOutcome
     : camera && !camera.canAskAgain ? 'refused' : 'idle';

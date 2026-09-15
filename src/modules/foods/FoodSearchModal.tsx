@@ -156,6 +156,8 @@ export function FoodLibrary({ meal, onDone, footer, header }: {
       }
     }
     if (tab === 'drinks') {
+      out.push({ kind: 'note', id: 'note-abv',
+        text: 'Beer, wine, spirits and the rest, with the alcohol counted. Energy is calculated from ABV — a label always wins over this estimate.' });
       for (const drink of drinksInCategory(category)) food(drink.name, drink.name,
         `${drinkMacros(drink).caloriesKcal} kcal · ${servingLabelFor(drink)}`, drinkCandidate(drink));
     }
@@ -215,13 +217,12 @@ export function FoodLibrary({ meal, onDone, footer, header }: {
         <Field label="Search today's menu" value={dining.query} onChangeText={dining.setQuery} autoCorrect={false}
           placeholder="grilled chicken, rice, tofu…" />
       </>}
-      {tab === 'drinks' && <>
-        <Text className="mb-3">Beer, wine, spirits and the rest, with the alcohol counted. Energy is calculated from ABV — a label always wins over this estimate.</Text>
-        <View className="mb-3 flex-row flex-wrap">{DRINK_CATEGORIES.map(([value, label]) => <Choice key={value} label={label}
-          selected={category === value} onPress={() => setCategory(value)} />)}</View>
-      </>}
+      {tab === 'drinks' && <View className="mb-3 flex-row flex-wrap">{DRINK_CATEGORIES.map(([value, label]) => <Choice key={value} label={label}
+        selected={category === value} onPress={() => setCategory(value)} />)}</View>}
     </View>
-    <FlashList ref={listRef} data={items} keyExtractor={item => item.id}
+    {/* flex-1 is load-bearing: a FlashList needs a bounded height. Sized to its content it
+        overflowed the column instead of scrolling, which only showed on the longest tabs. */}
+    <FlashList ref={listRef} data={items} keyExtractor={item => item.id} style={{ flex: 1 }}
       keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
       contentContainerStyle={{ paddingBottom: 24 }}
       renderItem={({ item }) => <LibraryRow item={item} onChoose={setChosen} onPickMenuItem={dining.setSelected} />}

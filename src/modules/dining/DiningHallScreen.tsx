@@ -73,13 +73,15 @@ export default function DiningHallScreen() {
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} className="flex-1 bg-background">
+      {/* The loading skeletons stand where the menu will be. In the header they drew above the
+          page title, announcing the wait somewhere the food was never going to appear. */}
       <FlashList
         data={rows} keyExtractor={(item) => item.id} getItemType={item => item.kind}
         contentContainerStyle={{ padding: 20, paddingBottom: 110, maxWidth: 760, width: '100%', alignSelf: 'center' }}
         refreshing={menu.isRefetching} onRefresh={() => { void menu.refetch(); }}
         ListFooterComponent={period === 'takeout' ? TakeoutCatalog : undefined}
+        ListEmptyComponent={period !== 'takeout' && menu.isPending ? <LoadingCards label="Loading campus menus…" /> : null}
         ListHeaderComponent={<>
-          {period !== 'takeout' && menu.isPending && <LoadingCards label="Loading campus menus…" />}
           {period !== 'takeout' && menu.data?.some(item => item.dataFreshness === 'stale') && <Text className="mb-4 rounded-xl bg-raised p-3 text-ink">Showing a saved menu while Rutgers is unavailable. Confirm current portions and availability.</Text>}
           <View className="mb-6 flex-row items-center justify-between"><Text className="text-sm font-black tracking-widest text-ink">CALCAMP</Text><Text className="text-xs font-semibold text-ink">NEW BRUNSWICK</Text></View>
           <Text className="text-4xl font-bold tracking-tight text-ink">Campus dining</Text>

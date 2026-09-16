@@ -10,7 +10,11 @@
       "rulocked"
     ],
     "userInterfaceStyle": "automatic",
-    "ios": {},
+    "ios": {
+      "infoPlist": {
+        "NSSupportsLiveActivities": true
+      }
+    },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#101115",
@@ -44,8 +48,8 @@
       [
         "react-native-health",
         {
-          "healthSharePermission": "Allow CalCamp to read steps, active energy, and recent workouts for activity tracking.",
-          "healthUpdatePermission": "Allow CalCamp to save workouts and dietary energy you choose to share."
+          "healthSharePermission": "Allow CalCamp to read steps, active energy, and recent workouts so your day reflects what you actually did.",
+          "healthUpdatePermission": "Allow CalCamp to save the meals you log \u2014 energy, protein, carbohydrate and fat \u2014 and your workouts, to Apple Health."
         }
       ],
       "react-native-health-connect",
@@ -91,7 +95,8 @@
           "microphonePermission": false,
           "barcodeScannerEnabled": true
         }
-      ]
+      ],
+      "expo-live-activity"
     ],
     "experiments": {
       "typedRoutes": true,

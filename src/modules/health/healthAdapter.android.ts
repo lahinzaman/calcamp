@@ -41,6 +41,10 @@ export async function getHealthAdapter(): Promise<HealthAdapter> {
       await hc.insertRecords([{ recordType: 'Nutrition', startTime: meal.date,
         endTime: new Date(Date.parse(meal.date) + 1000).toISOString(), name: meal.name, mealType: hc.MealType.UNKNOWN,
         energy: { value: meal.caloriesKcal, unit: 'kilocalories' },
+        // Health Connect takes macros in grams on the same record. Omitted, not zeroed.
+        ...(typeof meal.proteinG === 'number' ? { protein: { value: meal.proteinG, unit: 'grams' } } : {}),
+        ...(typeof meal.carbsG === 'number' ? { totalCarbohydrate: { value: meal.carbsG, unit: 'grams' } } : {}),
+        ...(typeof meal.fatG === 'number' ? { totalFat: { value: meal.fatG, unit: 'grams' } } : {}),
         metadata: { clientRecordId: `meal-${meal.id}`, clientRecordVersion: 1 } }]);
     },
   };

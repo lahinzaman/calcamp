@@ -4,7 +4,7 @@ import type { AddressInfo } from 'node:net';
 import { test, type TestContext } from 'node:test';
 import express from 'express';
 
-import { createBrandedSearchRouter, parseFoodDescription, parseFoodsSearch, type BrandedSearchOptions } from '../fatsecret';
+import { createBrandedSearchRouter, parseFoodDescription, parseFoodServings, parseFoodsSearch, type BrandedSearchOptions } from '../fatsecret';
 import { createTokenManager } from '../fatsecret-token';
 
 const brandRow = (id: string, brand: string, name: string, description: string) =>
@@ -147,4 +147,70 @@ test('an unsigned caller and an empty query never reach FatSecret', async t => {
   assert.equal((await fetch(url)).status, 401);
   assert.equal((await get(url, '   ')).status, 400);
   assert.equal((await get(url, 'x'.repeat(250))).status, 400);
+});
+
+const serving = (id: string, description: string, calories: string, protein: string, carbs: string, fat: string, extra: Record<string, unknown> = {}) =>
+  ({ serving_id: id, serving_description: description, calories, protein, carbohydrate: carbs, fat, ...extra });
+const FOOD = { food: { food_id: '33691', food_name: 'Cheeseburger', brand_name: "McDonald's", servings: { serving: [
+  serving('1', '100 g', '263', '13.00', '30.00', '10.00', { metric_serving_amount: '100.000', metric_serving_unit: 'g' }),
+  serving('2', '1 burger', '300', '15.00', '32.00', '13.00', { is_default: '1', metric_serving_amount: '114.000', metric_serving_unit: 'g' }),
+] } } };
+
+const barcode = (url: string, gtin = '0036000291452', bearer = 'session') =>
+  fetch(`${url}/barcode?gtin=${gtin}`, { headers: { Authorization: `Bearer ${bearer}` } });
+
+test('each serving keeps the macros that belong to it, and the default is the one marked', () => {
+  const food = parseFoodServings(FOOD)!;
+  assert.equal(food.itemName, 'Cheeseburger');
+  assert.equal(food.brandName, "McDonald's");
+  assert.equal(food.servings.length, 2);
+  // The bug this replaces took the first serving's figures whatever portion was chosen, so
+  // picking "1 burger" logged the numbers for 100 g.
+  assert.deepEqual(food.servings[0].macros, { caloriesKcal: 263, proteinG: 13, carbsG: 30, fatG: 10 });
+  assert.deepEqual(food.servings[1].macros, { caloriesKcal: 300, proteinG: 15, carbsG: 32, fatG: 13 });
+  assert.equal(food.defaultServingId, '2', 'is_default picks it, not position');
+  assert.equal(food.servings[1].metricAmount, 114);
+
+  // A lone serving arrives as a bare object, as everything else in this API does.
+  assert.equal(parseFoodServings({ food: { food_id: '1', food_name: 'X', servings: { serving: serving('9', '1 cup', '10', '1', '1', '1') } } })!.servings.length, 1);
+  // A serving missing a macro is dropped rather than logged as containing none of it.
+  assert.equal(parseFoodServings({ food: { food_id: '1', food_name: 'X', servings: { serving: [serving('9', '1 cup', '10', '1', '1', '')] } } }), null);
+  assert.equal(parseFoodServings({ food: { food_id: '1', food_name: 'X' } }), null);
+  assert.equal(parseFoodServings({}), null);
+});
+
+test('a scanned barcode resolves to a food with every serving it is sold in', async t => {
+  const asked: string[] = [];
+  const url = await serve(t, { searchFetch: async input => {
+    asked.push(String(input));
+    if (String(input).includes('food.find_id_for_barcode')) return Response.json({ food_id: { value: '33691' } });
+    return Response.json(FOOD);
+  } });
+  const response = await barcode(url);
+  assert.equal(response.status, 200);
+  const food = await response.json() as ReturnType<typeof parseFoodServings>;
+  assert.equal(food!.foodId, '33691');
+  assert.equal(food!.defaultServingId, '2');
+  assert.ok(asked[0].includes('barcode=0036000291452'), 'the thirteen digits go through unchanged');
+  assert.ok(asked[1].includes('method=food.get.v2') && asked[1].includes('food_id=33691'));
+});
+
+test('an unknown barcode is a dead end the person can still work around', async t => {
+  // FatSecret answers an unknown barcode with food_id 0 rather than an error, and a shelf full
+  // of real products is in no database. Reporting that as a provider failure would be a lie.
+  const zero = await serve(t, { searchFetch: async () => Response.json({ food_id: { value: '0' } }) });
+  const answer = await barcode(zero);
+  assert.equal(answer.status, 404);
+  assert.equal((await answer.json() as { error: { code: string } }).error.code, 'BARCODE_UNKNOWN');
+
+  const unusable = await serve(t, { searchFetch: async input =>
+    String(input).includes('find_id_for_barcode') ? Response.json({ food_id: { value: '7' } }) : Response.json({ food: { food_id: '7', food_name: 'X' } }) });
+  assert.equal((await barcode(unusable)).status, 404);
+
+  // Anything that is not thirteen digits never reaches FatSecret: normalising is the client's job.
+  const guarded = await serve(t, { searchFetch: async () => assert.fail('FatSecret was called') });
+  for (const bad of ['036000291452', '04252614', 'abcdefghijklm', '']) {
+    assert.equal((await barcode(guarded, bad)).status, 400, bad);
+  }
+  assert.equal((await barcode(guarded, '0036000291452', 'expired')).status, 401);
 });

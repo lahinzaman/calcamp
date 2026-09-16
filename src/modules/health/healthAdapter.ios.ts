@@ -22,7 +22,10 @@ export async function getHealthAdapter(): Promise<HealthAdapter> {
       if (!available) throw new Error('HealthKit is unavailable on this device.');
       const p = kit.Constants.Permissions;
       await callback<void>(done => kit.initHealthKit({ permissions: {
-        read: [p.Steps, p.ActiveEnergyBurned, p.Workout], write: [p.Workout, p.EnergyConsumed],
+        read: [p.Steps, p.ActiveEnergyBurned, p.Workout],
+        // A meal exported as energy alone shows up in Apple Health with no macros against it,
+        // which is most of what was logged. Each is a separate authorisation on iOS.
+        write: [p.Workout, p.EnergyConsumed, p.Protein, p.Carbohydrates, p.FatTotal],
       } }, error => done(error, undefined)));
       // iOS intentionally does not disclose whether read permission was denied.
     },
@@ -55,8 +58,13 @@ export async function getHealthAdapter(): Promise<HealthAdapter> {
     },
     async writeDietaryEnergy(meal) {
       await requireWrite(kit.Constants.Permissions.EnergyConsumed);
-      // The native saveFood implementation uses kilocalories for the energy field.
-      const food = { date: meal.date, foodName: meal.name, energy: meal.caloriesKcal, metadata: { HKSyncIdentifier: `rulocked:meal:${meal.id}`, HKSyncVersion: 1 } };
+      // The native saveFood implementation uses kilocalories for the energy field, and grams
+      // for each macro. A macro the meal does not carry is left out of the payload entirely:
+      // sending 0 would claim the food contains none of it.
+      const macros = Object.fromEntries(([['protein', meal.proteinG], ['carbohydrates', meal.carbsG], ['fatTotal', meal.fatG]] as const)
+        .filter(([, value]) => typeof value === 'number' && Number.isFinite(value) && value >= 0));
+      const food = { date: meal.date, foodName: meal.name, energy: meal.caloriesKcal, ...macros,
+        metadata: { HKSyncIdentifier: `rulocked:meal:${meal.id}`, HKSyncVersion: 1 } };
       await callback(done => kit.saveFood(food, done));
     },
   };

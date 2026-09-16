@@ -12,7 +12,7 @@ import { MAX_ANGLES, useFoodVision } from '../vision/useFoodVision';
 import { MealReview } from '../vision/MealReview';
 import { ScanProgress, useScanProgress } from '../../components/ScanProgress';
 import type { RecognizedItem } from '../vision/resolveItems';
-import { lookupBarcode } from './barcode';
+import { BarcodeUnknown, lookupBarcode } from './barcode';
 import { LabelUnavailable, recognizeLabel } from './recognizeLabel';
 import { missingMacros } from './nutritionLabel';
 import { WeightPhotoSheet } from '../progress/WeightPhotoSheet';
@@ -57,9 +57,21 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
       scan.reach(.35);
       const food=await lookupBarcode(code,request.current.signal);
       scan.reach(.9);
-      if(alive.current){scan.done();fill(food,food.name,food.source);}
+      if(alive.current){
+        scan.done();
+        // The serving the package leads with, with the macros published for that serving —
+        // never another serving's figures shown against this one.
+        const serving=food.servings[food.selected]??food.servings[0];
+        const grams=serving.metricUnit==='g'&&serving.metricAmount?serving.metricAmount:ozToGrams(1);
+        fill({grams,macros:serving.macros},food.brand?`${food.brand} ${food.name}`:food.name,
+          `${food.source} · ${serving.description}`);
+      }
     }
-    catch{if(alive.current){scan.reset();setError('No complete food label found. Enter the package values manually.');setEditing(true);}}
+    catch(cause){if(alive.current){scan.reset();
+      // An unknown barcode is a dead end, not a failure to explain away: the form is already
+      // open and filling it in by hand is the way through.
+      setError(cause instanceof BarcodeUnknown?cause.message:'Barcode lookup is unavailable. Enter the package values manually.');
+      setEditing(true);}}
     finally{if(alive.current)setBusy(false);locked.current=false;}
   };
   const readLabel=async(uri:string)=>{

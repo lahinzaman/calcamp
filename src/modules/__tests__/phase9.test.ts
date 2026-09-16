@@ -11,7 +11,7 @@ import { validateOnboarding } from '../../types/profile';
 import { useOnboardingStore } from '../../store/onboardingStore';
 import { EXERCISE_CATALOG } from '../workout/catalog';
 import { validateRoutine } from '../workout/routines';
-import { parseBarcodeProduct } from '../quickActions/barcode';
+import { parseBarcodeFood } from '../quickActions/barcode';
 import { servingLabel } from '../dining/serving';
 
 test('Imperial snapshot migration converts old drafts and pending workouts once while preserving retry payloads', async()=>{
@@ -73,7 +73,11 @@ test('all 101 presets have distinct IDs and motion help; routine creation surviv
   const next=new SyncEngine(storage,async()=>{sends++;});next.activate('alice');assert.deepEqual(next.data.routines,[routine]);assert.equal(sends,0);await next.drain();assert.equal(sends,1);assert.equal(next.data.queue.length,0);next.activate('bob');assert.equal(next.data.routines,undefined);
 });
 test('barcode normalization rejects unknown macros and displays Imperial food portions',()=>{
-  assert.throws(()=>parseBarcodeProduct({status:1,product:{product_name:'Food',nutriments:{}}}));
-  const food=parseBarcodeProduct({status:1,product:{product_name:'Food',nutriments:{'energy-kcal_100g':100,proteins_100g:3,carbohydrates_100g:20,fat_100g:1}}});assert.equal(food.grams,100);assert.equal(food.macros.proteinG,3);
+  assert.throws(()=>parseBarcodeFood({itemName:'Food',servings:[]}));
+  const food=parseBarcodeFood({itemName:'Food',brandName:'Brand',defaultServingId:'2',servings:[
+    {servingId:'1',description:'100 g',metricAmount:100,metricUnit:'g',isDefault:false,macros:{caloriesKcal:100,proteinG:3,carbsG:20,fatG:1}},
+    {servingId:'2',description:'1 bar',metricAmount:45,metricUnit:'g',isDefault:true,macros:{caloriesKcal:190,proteinG:5,carbsG:24,fatG:8}}]});
+  assert.equal(food.servings.length,2);assert.equal(food.selected,1,'the serving the package leads with');
+  assert.equal(food.servings[food.selected].macros.proteinG,5);
   assert.equal(servingLabel({amount:100,unit:'g',label:'100 g'}),'3.53 oz');assert.equal(servingLabel({amount:1,unit:'cup',label:'1 cup'}),'1 cup');
 });

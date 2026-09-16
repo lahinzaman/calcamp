@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import cors from 'cors';
 import { structuredLimit as rateLimit } from './http';
 import { verifyBearer } from './supabase-auth';
@@ -77,6 +77,68 @@ export function parseFoodsSearch(value: unknown): BrandedSuggestion[] {
   return suggestions;
 }
 
+/** One way a food is sold, with the macros FatSecret already scaled to it. */
+export interface FoodServing {
+  servingId: string;
+  description: string;
+  metricAmount: number | null;
+  metricUnit: string | null;
+  isDefault: boolean;
+  macros: BrandedSuggestion['macros'];
+}
+export interface BarcodeFood {
+  foodId: string;
+  brandName: string | null;
+  itemName: string;
+  servings: FoodServing[];
+  /** The serving a caller gets if it does not choose one. */
+  defaultServingId: string;
+}
+
+const figure = (value: unknown, max: number) => {
+  // Number('') is 0, so an empty field would read as a food containing none of that macro
+  // rather than one whose panel did not report it. An empty string is absence, not zero.
+  const amount = typeof value === 'number' ? value
+    : typeof value === 'string' && value.trim() ? Number(value) : Number.NaN;
+  return Number.isFinite(amount) && amount >= 0 && amount <= max ? amount : null;
+};
+
+/**
+ * FatSecret returns every serving a food is sold in, each already carrying its own macros. The
+ * bug this replaces read the first serving's numbers and presented them as whatever portion the
+ * user picked — so choosing "1 cup" logged the figures for "100 g". Each serving keeps its own,
+ * and the caller scales by choosing a serving rather than by arithmetic on the wrong one.
+ */
+export function parseFoodServings(value: unknown): BarcodeFood | null {
+  const food = (value as { food?: Record<string, unknown> })?.food;
+  if (!food) return null;
+  const itemName = text(food.food_name, 200);
+  const foodId = text(food.food_id, 64);
+  if (!itemName || !foodId) return null;
+  const raw = (food.servings as { serving?: unknown } | undefined)?.serving;
+  // A single serving comes back as a bare object, exactly as `food` does in a one-hit search.
+  const rows = raw === undefined || raw === null ? [] : Array.isArray(raw) ? raw : [raw];
+  const servings: FoodServing[] = [];
+  for (const entry of rows) {
+    const row = entry as Record<string, unknown>;
+    const servingId = text(row.serving_id, 64);
+    const description = text(row.serving_description, 120);
+    const caloriesKcal = figure(row.calories, 20000);
+    const proteinG = figure(row.protein, 2000);
+    const carbsG = figure(row.carbohydrate, 2000);
+    const fatG = figure(row.fat, 2000);
+    // A serving missing any macro cannot be logged against; it is dropped, not zero-filled.
+    if (!servingId || !description || caloriesKcal === null || proteinG === null || carbsG === null || fatG === null) continue;
+    servings.push({ servingId, description,
+      metricAmount: figure(row.metric_serving_amount, 100000), metricUnit: text(row.metric_serving_unit, 20),
+      isDefault: String(row.is_default ?? '') === '1',
+      macros: { caloriesKcal, proteinG, carbsG, fatG } });
+  }
+  if (!servings.length) return null;
+  return { foodId, brandName: text(food.brand_name, 120), itemName, servings,
+    defaultServingId: (servings.find(serving => serving.isDefault) ?? servings[0]).servingId };
+}
+
 export interface BrandedSearchOptions extends TokenManagerOptions {
   authenticate?: (bearer: string) => Promise<string | null>;
   searchFetch?: typeof fetch;
@@ -92,8 +154,8 @@ export function createBrandedSearchRouter(options: BrandedSearchOptions = {}) {
   router.use(cors({ origin: process.env.VISION_ALLOWED_ORIGIN?.split(',') ?? false,
     methods: ['GET'], allowedHeaders: ['Content-Type', 'Authorization'] }));
   router.use(rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false }));
-  router.get('/', async (req, res, next) => {
-    // Every route here that spends someone else's quota is behind a session, so this one is too.
+  // Every route here spends someone else's quota, so every one of them is behind a session.
+  const requireSession: RequestHandler = async (req, res, next) => {
     const match = /^Bearer (\S+)$/.exec(req.headers.authorization ?? '');
     if (!match) { res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Sign in to search branded foods.' } }); return; }
     try {
@@ -101,7 +163,8 @@ export function createBrandedSearchRouter(options: BrandedSearchOptions = {}) {
       if (!userId) { res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Your session is invalid or expired.' } }); return; }
       res.locals.userId = userId; next();
     } catch { res.status(503).json({ error: { code: 'AUTH_UNAVAILABLE', message: 'Authentication is unavailable.' } }); }
-  }, rateLimit({ windowMs: 60_000, limit: 20, keyGenerator: (_req, res) => res.locals.userId as string,
+  };
+  router.get('/', requireSession, rateLimit({ windowMs: 60_000, limit: 20, keyGenerator: (_req, res) => res.locals.userId as string,
     standardHeaders: 'draft-8', legacyHeaders: false }), async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     const raw = req.query.query;
@@ -141,6 +204,66 @@ export function createBrandedSearchRouter(options: BrandedSearchOptions = {}) {
         ? { status: 503, code: 'NOT_CONFIGURED', message: 'Branded food search is not configured on this server.' }
         : describeProviderFailure(cause, aborted, { notFoundCode: 'UPSTREAM_NOT_FOUND' });
       logProviderFailure('fatsecret', 'foods.search', cause, failure);
+      if (!res.destroyed) res.status(failure.status).json({ error: { code: failure.code, message: failure.message } });
+    } finally { clearTimeout(timer); res.off('close', disconnect); }
+  });
+
+  /**
+   * A scanned package. The caller sends thirteen digits because the scanner reported something
+   * else — a twelve-digit UPC-A, or an eight-digit UPC-E — and normalising that is the client's
+   * job before it ever gets here. Anything else is refused rather than looked up, because a
+   * lookup for the wrong digits answers for the wrong product.
+   */
+  router.get('/barcode', requireSession, rateLimit({ windowMs: 60_000, limit: 20,
+    keyGenerator: (_req, res) => res.locals.userId as string, standardHeaders: 'draft-8', legacyHeaders: false }), async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    const gtin = typeof req.query.gtin === 'string' ? req.query.gtin.trim() : '';
+    if (!/^\d{13}$/.test(gtin)) {
+      res.status(400).json({ error: { code: 'INVALID_BARCODE', message: 'Send a 13-digit GTIN.' } }); return;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), options.searchTimeoutMs ?? 12_000);
+    const disconnect = () => { if (!res.writableEnded) controller.abort(); };
+    res.on('close', disconnect);
+    try {
+      const call = async (params: Record<string, string>) => {
+        const url = `${SEARCH_URL}?${new URLSearchParams({ format: 'json', ...params })}`;
+        const send = async (token: string) => fetcher(url, { signal: controller.signal,
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
+        let response = await send(await tokens.token());
+        if (response.status === 401) { tokens.invalidate(); response = await send(await tokens.token()); }
+        if (!response.ok) {
+          const body = await response.json().catch(() => null) as { error?: { message?: unknown; code?: unknown } } | null;
+          throw Object.assign(new Error(text(body?.error?.message, 300) ?? `HTTP ${response.status}`),
+            { status: response.status, code: body?.error?.code === undefined ? undefined : String(body.error.code) });
+        }
+        const payload = await response.json() as { error?: { message?: unknown; code?: unknown } };
+        if (payload?.error) {
+          throw Object.assign(new Error(text(payload.error.message, 300) ?? 'FatSecret rejected the request.'),
+            { status: 502, code: payload.error.code === undefined ? undefined : String(payload.error.code) });
+        }
+        return payload;
+      };
+      const found = await call({ method: 'food.find_id_for_barcode', barcode: gtin }) as { food_id?: { value?: unknown } };
+      const foodId = text(found.food_id?.value, 64);
+      // FatSecret answers an unknown barcode with food_id 0, not an error. A shelf full of real
+      // products is not in any database; saying so is the difference between a dead end and a
+      // form the person can fill in themselves.
+      if (!foodId || foodId === '0') {
+        res.status(404).json({ error: { code: 'BARCODE_UNKNOWN', message: 'That barcode is not in the food database. Enter the package values by hand.' } });
+        return;
+      }
+      const food = parseFoodServings(await call({ method: 'food.get.v2', food_id: foodId }));
+      if (!food) {
+        res.status(404).json({ error: { code: 'BARCODE_UNKNOWN', message: 'That product has no usable nutrition panel. Enter the package values by hand.' } });
+        return;
+      }
+      res.json(food);
+    } catch (cause) {
+      const failure = cause instanceof TokenUnavailable
+        ? { status: 503, code: 'NOT_CONFIGURED', message: 'Barcode lookup is not configured on this server.' }
+        : describeProviderFailure(cause, controller.signal.aborted, { notFoundCode: 'UPSTREAM_NOT_FOUND' });
+      logProviderFailure('fatsecret', 'food.find_id_for_barcode', cause, failure);
       if (!res.destroyed) res.status(failure.status).json({ error: { code: failure.code, message: failure.message } });
     } finally { clearTimeout(timer); res.off('close', disconnect); }
   });

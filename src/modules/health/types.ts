@@ -1,6 +1,11 @@
 export interface HealthSummary { steps: number | null; activeEnergyKcal: number | null; date: string }
 export interface HealthWorkout { id: string; name: string; start: string; end: string }
-export interface HealthMeal { id: string; name: string; date: string; caloriesKcal: number }
+export interface HealthMeal {
+  id: string; name: string; date: string; caloriesKcal: number;
+  /** Absent on a meal queued before macros were exported; absent is not zero, so it is simply
+   *  not written rather than written as none. */
+  proteinG?: number; carbsG?: number; fatG?: number;
+}
 export interface HealthAdapter {
   initialize(): Promise<void>;
   readToday(now: Date): Promise<HealthSummary>;
@@ -20,4 +25,10 @@ export function validateHealthWorkout(workout: HealthWorkout) {
 export function validateHealthMeal(meal: HealthMeal) {
   if (!meal.id || !meal.name.trim() || !Number.isFinite(Date.parse(meal.date)) || !Number.isFinite(meal.caloriesKcal)
     || meal.caloriesKcal < 0 || meal.caloriesKcal > 100_000) throw new Error('Enter valid dietary energy in kcal.');
+  // A macro may be absent; what it may not be is present and nonsense, which would export a
+  // figure into Apple Health that nothing in the app could later explain.
+  for (const grams of [meal.proteinG, meal.carbsG, meal.fatG]) {
+    if (grams === undefined) continue;
+    if (!Number.isFinite(grams) || grams < 0 || grams > 10_000) throw new Error('Enter valid macros in grams.');
+  }
 }

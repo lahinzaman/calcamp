@@ -263,6 +263,9 @@ export function createNutritionStore(options: { now?: () => Date; repository?: T
       const entry = state.entries.find(e => e.id === id) ?? null;
       if (!entry) return null;
       set({ entries: state.entries.filter(e => e.id !== id), ...shiftTotals(state, entry.macros, entry.micros, -1), syncStatus: 'idle' });
+      // The new HealthKit library can delete what it wrote, so a removed meal no longer lingers
+      // in Apple Health. Nothing is overwritten with a zero, which would skew the history.
+      void import('../modules/health/exportMeal').then(({ removeMealFromHealth }) => removeMealFromHealth(id)).catch(() => {});
       return entry;
     },
     updateEntry: (id, patch) => {

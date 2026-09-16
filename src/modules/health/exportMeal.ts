@@ -36,3 +36,15 @@ export function exportMealToHealth(entry: FoodEntry) {
     } catch { /* Logged either way; the export queue retries. */ }
   })();
 }
+
+/** Removes a meal this app wrote from Apple Health. Silent where the platform cannot delete —
+ *  Health Connect has no equivalent here — and silent on failure, for the same reason the
+ *  export is: the diary is the record. */
+export function removeMealFromHealth(id: string) {
+  void (async () => {
+    try {
+      const { healthStore } = await import('./useHealthSync');
+      await healthStore.getState().deleteMeal(id);
+    } catch { /* Nothing to undo; the diary already dropped it. */ }
+  })();
+}

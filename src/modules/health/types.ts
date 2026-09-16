@@ -14,6 +14,9 @@ export interface HealthAdapter {
   readWorkouts?(now: Date): Promise<HealthWorkout[]>;
   writeWorkout(workout: HealthWorkout): Promise<void>;
   writeDietaryEnergy(meal: HealthMeal): Promise<void>;
+  /** Removes a meal this app wrote. Optional: a platform that cannot delete says so by not
+   *  implementing it, rather than by pretending to and leaving the sample behind. */
+  deleteMeal?(id: string): Promise<void>;
 }
 export function localDay(now: Date) {
   const start = new Date(now); start.setHours(0, 0, 0, 0);

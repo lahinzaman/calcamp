@@ -16,6 +16,7 @@ interface HealthState extends HealthSummary {
   refresh(): Promise<void>;
   writeWorkout(workout: HealthWorkout): Promise<void>;
   writeDietaryEnergy(meal: HealthMeal): Promise<void>;
+  deleteMeal(id: string): Promise<void>;
 }
 export function createHealthStore(loadAdapter: () => Promise<HealthAdapter> = getHealthAdapter, now = () => new Date(), durable = false) {
   let generation = 0;
@@ -65,6 +66,11 @@ export function createHealthStore(loadAdapter: () => Promise<HealthAdapter> = ge
         syncEngine.queue({ kind: 'health-workout', data: workout }, `health-workout:${syncEngine.owner}:${workout.id}`); await drainSync(); return; }
       if (!adapter || !get().initialized) throw new Error('Connect health before writing a workout.');
       await writeOnce(`workout-${workout.id}`, () => adapter!.writeWorkout(workout));
+    },
+    deleteMeal: async id => {
+      // Only meaningful once Health is connected, and only on a platform that can delete.
+      if (!adapter || !get().initialized || !adapter.deleteMeal) return;
+      await adapter.deleteMeal(id);
     },
     writeDietaryEnergy: async meal => {
       validateHealthMeal(meal);

@@ -46,10 +46,10 @@
       ],
       "expo-secure-store",
       [
-        "react-native-health",
+        "@kingstinct/react-native-healthkit",
         {
-          "healthSharePermission": "Allow CalCamp to read steps, active energy, and recent workouts so your day reflects what you actually did.",
-          "healthUpdatePermission": "Allow CalCamp to save the meals you log \u2014 energy, protein, carbohydrate and fat \u2014 and your workouts, to Apple Health."
+          "NSHealthShareUsageDescription": "Allow CalCamp to read steps, active energy, and recent workouts so your day reflects what you actually did.",
+          "NSHealthUpdateUsageDescription": "Allow CalCamp to save the meals you log \u2014 energy, protein, carbohydrate and fat \u2014 and your workouts, to Apple Health."
         }
       ],
       "react-native-health-connect",

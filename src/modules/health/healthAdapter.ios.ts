@@ -1,14 +1,33 @@
-import { NativeModules } from 'react-native';
-import type { AnchoredQueryResults, HealthValue, HealthStatusResult } from 'react-native-health';
-import { localDay, type HealthAdapter } from './types';
+import { localDay, type HealthAdapter, type HealthWorkout } from './types';
+
 /**
- * Whatever iOS actually said, as text. A generic message here is the difference between a bug
- * that can be read off the screen and one that needs a debugger attached to a TestFlight build.
+ * Apple Health through @kingstinct/react-native-healthkit, which is a Nitro module and so is
+ * built for the New Architecture. The library this replaced was a legacy bridge module — no
+ * codegen spec, `RCT_EXPORT_MODULE` only — and on React Native 0.86 the old bridge is gone, so
+ * every one of its methods resolved to undefined at runtime.
+ *
+ * The HealthAdapter interface is unchanged, so the sync queue, the export path and their tests
+ * never learn that any of this moved.
  */
+type Kit = typeof import('@kingstinct/react-native-healthkit');
+
+/** Everything written, so a single list drives the permission request and the write checks. */
+const SHARE = ['HKQuantityTypeIdentifierDietaryEnergyConsumed', 'HKQuantityTypeIdentifierDietaryProtein',
+  'HKQuantityTypeIdentifierDietaryCarbohydrates', 'HKQuantityTypeIdentifierDietaryFatTotal', 'HKWorkoutTypeIdentifier'] as const;
+const READ = ['HKQuantityTypeIdentifierStepCount', 'HKQuantityTypeIdentifierActiveEnergyBurned', 'HKWorkoutTypeIdentifier'] as const;
+/** The macro each identifier carries, and the unit HealthKit stores it in. */
+const MACROS = [
+  ['HKQuantityTypeIdentifierDietaryProtein', 'proteinG'],
+  ['HKQuantityTypeIdentifierDietaryCarbohydrates', 'carbsG'],
+  ['HKQuantityTypeIdentifierDietaryFatTotal', 'fatG'],
+] as const;
+
+/** Whatever HealthKit actually said, as text: a generic message cannot be read off a TestFlight
+ *  build, where there is no debugger to attach. */
 export function describeHealthError(value: unknown): string {
   if (value === null || value === undefined || value === '') return 'no detail given';
   if (typeof value === 'string') return value;
-  const error = value as { message?: unknown; code?: unknown; domain?: unknown; nativeStackIOS?: unknown };
+  const error = value as { message?: unknown; code?: unknown; domain?: unknown };
   const parts = [
     typeof error.message === 'string' && error.message ? error.message : null,
     error.code !== undefined && error.code !== null ? `code ${String(error.code)}` : null,
@@ -18,91 +37,96 @@ export function describeHealthError(value: unknown): string {
   try { const json = JSON.stringify(value); if (json && json !== '{}') return json; } catch { /* fall through */ }
   return String(value);
 }
-
-/**
- * `label` names the native call, because the two failure shapes mean different things: an error
- * handed back through the callback is iOS refusing, while a synchronous throw means the method
- * was never really there — a module that did not link, or one whose surface has moved.
- */
-function callback<T>(label: string, run: (done: (error: string, result: T) => void) => void): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`HealthKit ${label} did not answer within 30 seconds.`)), 30_000);
-    try {
-      run((error, result) => {
-        clearTimeout(timer);
-        if (error) reject(new Error(`HealthKit ${label} failed: ${describeHealthError(error)}`));
-        else resolve(result);
-      });
-    } catch (cause) {
-      clearTimeout(timer);
-      reject(new Error(`HealthKit ${label} threw before iOS answered: ${describeHealthError(cause)}`));
-    }
-  });
+async function named<T>(label: string, run: () => Promise<T> | T): Promise<T> {
+  try { return await run(); }
+  catch (cause) { throw new Error(`HealthKit ${label} failed: ${describeHealthError(cause)}`); }
 }
+
 export async function getHealthAdapter(): Promise<HealthAdapter> {
-  if (!NativeModules.AppleHealthKit) throw new Error('HealthKit is not linked into this build. Install a development or TestFlight build that includes react-native-health.');
-  type HealthKit = typeof import('react-native-health').default;
-  const imported = require('react-native-health') as HealthKit & { default?: HealthKit };
-  const kit = imported.default ?? imported;
-  // A JS module that loaded but whose methods are absent is the shape that produced a bare
-  // "HealthKit is unavailable": the call threw synchronously because there was nothing to call.
-  const missing = (['isAvailable', 'initHealthKit', 'getAuthStatus', 'getStepCount', 'saveFood'] as const)
+  let kit: Kit;
+  try { kit = await import('@kingstinct/react-native-healthkit'); }
+  catch (cause) { throw new Error(`HealthKit is not linked into this build: ${describeHealthError(cause)}`); }
+  // A module that loaded but has no methods is the shape the old bridge library failed in.
+  const missing = (['isHealthDataAvailableAsync', 'requestAuthorization', 'saveQuantitySample'] as const)
     .filter(name => typeof (kit as unknown as Record<string, unknown>)[name] !== 'function');
-  if (missing.length) throw new Error(`HealthKit linked, but these native methods are missing: ${missing.join(', ')}. The build and the JS bundle are out of step — install a build made from this commit.`);
-  async function requireWrite(permission: typeof kit.Constants.Permissions.Workout | typeof kit.Constants.Permissions.EnergyConsumed) {
-    const status = await callback<HealthStatusResult>('getAuthStatus', done => kit.getAuthStatus({ permissions: { read: [], write: [permission] } }, done));
-    if (status.permissions.write[0] !== 2) throw Object.assign(new Error('Health write permission is unavailable. Review access in Apple Health, then retry the queued export.'), { code: 'HEALTH_PERMISSION' });
+  if (missing.length) throw new Error(`HealthKit linked, but these methods are missing: ${missing.join(', ')}. The build and the JS bundle are out of step.`);
+
+  /** iOS never discloses read permission, but it does disclose write, and writing without it
+   *  fails silently — so the export says so rather than reporting a success it did not have. */
+  function requireWrite(identifier: (typeof SHARE)[number]) {
+    if (kit.authorizationStatusFor(identifier) !== 2) {
+      throw Object.assign(new Error('Health write permission is unavailable. Review access in Apple Health, then retry the queued export.'), { code: 'HEALTH_PERMISSION' });
+    }
   }
+  const total = async (identifier: 'HKQuantityTypeIdentifierStepCount' | 'HKQuantityTypeIdentifierActiveEnergyBurned', unit: string, day: { start: string; end: string }) => {
+    const result = await kit.queryStatisticsForQuantity(identifier, ['cumulativeSum'],
+      { filter: { startDate: new Date(day.start), endDate: new Date(day.end) }, unit } as never);
+    const sum = (result as { sumQuantity?: { quantity?: number } })?.sumQuantity?.quantity;
+    return typeof sum === 'number' && Number.isFinite(sum) ? sum : null;
+  };
+
   return {
     async initialize() {
-      const available = await callback<boolean>('isAvailable', done => kit.isAvailable((error, result) => done(error ? String(error) : '', result)));
+      const available = await named('isHealthDataAvailable', () => kit.isHealthDataAvailableAsync());
       if (!available) throw new Error('HealthKit is unavailable on this device.');
-      const p = kit.Constants.Permissions;
-      await callback<void>('initHealthKit', done => kit.initHealthKit({ permissions: {
-        read: [p.Steps, p.ActiveEnergyBurned, p.Workout],
-        // A meal exported as energy alone shows up in Apple Health with no macros against it,
-        // which is most of what was logged. Each is a separate authorisation on iOS.
-        write: [p.Workout, p.EnergyConsumed, p.Protein, p.Carbohydrates, p.FatTotal],
-      } }, error => done(error, undefined)));
+      await named('requestAuthorization', () => kit.requestAuthorization({ toShare: SHARE, toRead: READ }));
       // iOS intentionally does not disclose whether read permission was denied.
     },
     async readToday(now) {
       const day = localDay(now);
-      const [steps, energy] = await Promise.all([
-        callback<HealthValue>('getStepCount', done => kit.getStepCount({ date: now.toISOString(), includeManuallyAdded: false }, done)),
-        callback<HealthValue[]>('getActiveEnergyBurned', done => kit.getActiveEnergyBurned({ startDate: day.start, endDate: day.end, includeManuallyAdded: false }, done)),
-      ]);
-      return { date: day.date, steps: Number.isFinite(steps.value) ? Math.max(0, Math.floor(steps.value)) : null,
-        activeEnergyKcal: energy.every(sample => Number.isFinite(sample.value)) ? energy.reduce((sum, sample) => sum + sample.value, 0) : null };
+      const [steps, energy] = await named('queryStatistics', () => Promise.all([
+        total('HKQuantityTypeIdentifierStepCount', 'count', day),
+        total('HKQuantityTypeIdentifierActiveEnergyBurned', 'kcal', day),
+      ]));
+      return { date: day.date, steps: steps === null ? null : Math.max(0, Math.floor(steps)), activeEnergyKcal: energy };
     },
     async readWorkouts(now) {
-      const result = await callback<AnchoredQueryResults>('getAnchoredWorkouts', done => kit.getAnchoredWorkouts({
-        startDate: new Date(now.getTime() - 7 * 86400_000).toISOString(), endDate: now.toISOString(), limit: 0,
-      }, (error, result) => done(error ? 'Health access unavailable' : '', result)));
-      const unique = new Map<string, import('./types').HealthWorkout>();
-      for (const sample of result.data) {
-        // Exclude this app's exports (including older builds with the default bundle ID).
-        if (String(sample.metadata?.HKSyncIdentifier ?? '').startsWith('rulocked:') || /^com\.rulocked\.app(?:\.|$)/.test(sample.sourceId)) continue;
-        if (!sample.id || !Number.isFinite(Date.parse(sample.start)) || !Number.isFinite(Date.parse(sample.end)) || !sample.activityName || Date.parse(sample.end) <= Date.parse(sample.start)) continue;
-        unique.set(sample.id, { id: sample.id, name: sample.activityName, start: sample.start, end: sample.end });
+      const samples = await named('queryWorkoutSamples', () => kit.queryWorkoutSamples({
+        filter: { startDate: new Date(now.getTime() - 7 * 86400_000), endDate: now },
+      } as never));
+      const unique = new Map<string, HealthWorkout>();
+      for (const sample of samples as unknown as readonly Record<string, unknown>[]) {
+        const metadata = (sample.metadata ?? {}) as Record<string, unknown>;
+        const source = String((sample.sourceRevision as { source?: { bundleIdentifier?: string } })?.source?.bundleIdentifier ?? '');
+        // Exclude this app's own exports, including older builds under the previous bundle ID.
+        if (String(metadata.HKSyncIdentifier ?? '').startsWith('rulocked:') || /^com\.rulocked\.app(?:\.|$)/.test(source)) continue;
+        const id = String(sample.uuid ?? '');
+        const start = sample.startDate as unknown as Date; const end = sample.endDate as unknown as Date;
+        if (!id || !(start instanceof Date) || !(end instanceof Date)) continue;
+        unique.set(id, { id, name: String(sample.workoutActivityType ?? 'Workout'), start: start.toISOString(), end: end.toISOString() });
       }
       return [...unique.values()];
     },
     async writeWorkout(workout) {
-      await requireWrite(kit.Constants.Permissions.Workout);
-      await callback('saveWorkout', done => kit.saveWorkout({ type: kit.Constants.Activities.TraditionalStrengthTraining,
-        startDate: workout.start, endDate: workout.end, metadata: { HKSyncIdentifier: `rulocked:workout:${workout.id}`, HKSyncVersion: 1 } } as Parameters<typeof kit.saveWorkout>[0], done));
+      requireWrite('HKWorkoutTypeIdentifier');
+      await named('saveWorkoutSample', () => kit.saveWorkoutSample('traditionalStrengthTraining' as never, [],
+        new Date(workout.start), new Date(workout.end), undefined,
+        { HKSyncIdentifier: `rulocked:workout:${workout.id}`, HKSyncVersion: 1 } as never));
     },
     async writeDietaryEnergy(meal) {
-      await requireWrite(kit.Constants.Permissions.EnergyConsumed);
-      // The native saveFood implementation uses kilocalories for the energy field, and grams
-      // for each macro. A macro the meal does not carry is left out of the payload entirely:
-      // sending 0 would claim the food contains none of it.
-      const macros = Object.fromEntries(([['protein', meal.proteinG], ['carbohydrates', meal.carbsG], ['fatTotal', meal.fatG]] as const)
-        .filter(([, value]) => typeof value === 'number' && Number.isFinite(value) && value >= 0));
-      const food = { date: meal.date, foodName: meal.name, energy: meal.caloriesKcal, ...macros,
-        metadata: { HKSyncIdentifier: `rulocked:meal:${meal.id}`, HKSyncVersion: meal.version ?? 1 } };
-      await callback('saveFood', done => kit.saveFood(food, done));
+      requireWrite('HKQuantityTypeIdentifierDietaryEnergyConsumed');
+      const at = new Date(meal.date);
+      // One sync identifier for the meal, one version for this export. HealthKit replaces a
+      // known identifier only when the version is higher, which is what makes an edit a
+      // replacement rather than a duplicate it ignores.
+      const metadata = { HKSyncIdentifier: `rulocked:meal:${meal.id}`, HKSyncVersion: meal.version ?? 1 } as never;
+      await named('saveQuantitySample', () => kit.saveQuantitySample(
+        'HKQuantityTypeIdentifierDietaryEnergyConsumed', 'kcal' as never, meal.caloriesKcal, at, at, metadata));
+      // A macro the meal does not carry is not written at all; a zero would claim it had none.
+      for (const [identifier, key] of MACROS) {
+        const grams = meal[key];
+        if (typeof grams !== 'number' || !Number.isFinite(grams) || grams < 0) continue;
+        requireWrite(identifier);
+        await named(`saveQuantitySample(${key})`, () => kit.saveQuantitySample(identifier, 'g' as never, grams, at, at, metadata));
+      }
+    },
+    /** Now possible, where the old library had no delete at all: a meal removed from the diary
+     *  can be removed from Health instead of being left behind or overwritten with a zero. */
+    async deleteMeal(id: string) {
+      const filter = { metadata: { HKSyncIdentifier: `rulocked:meal:${id}` } } as never;
+      for (const identifier of ['HKQuantityTypeIdentifierDietaryEnergyConsumed', ...MACROS.map(([type]) => type)] as const) {
+        try { await kit.deleteObjects(identifier, filter); } catch { /* Already gone, or never written. */ }
+      }
     },
   };
 }

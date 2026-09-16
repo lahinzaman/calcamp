@@ -5,6 +5,7 @@
   "dependencies": {
     "@expo/metro-runtime": "~57.0.15",
     "@expo/ui": "~57.0.16",
+    "@kingstinct/react-native-healthkit": "^15.1.0",
     "@react-native-community/netinfo": "12.0.1",
     "@react-native-ml-kit/text-recognition": "^2.0.0",
     "@sentry/react-native": "7.11.0",
@@ -55,8 +56,8 @@
     "react-native": "0.86.3",
     "react-native-background-timer": "^2.4.1",
     "react-native-gesture-handler": "~2.32.0",
-    "react-native-health": "1.19.0",
     "react-native-health-connect": "4.1.3",
+    "react-native-nitro-modules": "^0.37.1",
     "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
@@ -103,10 +104,5 @@
     "release:check": "node scripts/release-readiness.cjs",
     "launch:check": "node scripts/launch-readiness.cjs"
   },
-  "private": true,
-  "overrides": {
-    "react-native-health": {
-      "@xmldom/xmldom": "0.8.15"
-    }
-  }
+  "private": true
 }

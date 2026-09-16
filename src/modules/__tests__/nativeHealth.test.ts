@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { mock, test } from 'node:test';
-let iosWriteGranted = true;
+let iosWriteGranted = true; let iosAvailable = true;
 const calls: { kind: string; value: unknown }[] = [];
 const done = (callback: (error: string, value: unknown) => void, value: unknown) => callback('', value);
 mock.module('react-native', { namedExports: { NativeModules: { AppleHealthKit: {} } } });
 mock.module('react-native-health', { defaultExport: {
   Constants: { Permissions: { Steps: 'Steps', ActiveEnergyBurned: 'ActiveEnergyBurned', Workout: 'Workout', EnergyConsumed: 'EnergyConsumed', Protein: 'Protein', Carbohydrates: 'Carbohydrates', FatTotal: 'FatTotal' }, Activities: { TraditionalStrengthTraining: 'TraditionalStrengthTraining' } },
   getAuthStatus: (_value: unknown, callback: Parameters<typeof done>[0]) => done(callback, { permissions: { read: [], write: [iosWriteGranted ? 2 : 1] } }),
-  isAvailable: (callback: Parameters<typeof done>[0]) => done(callback, true),
+  isAvailable: (callback: (error: unknown, value: unknown) => void) => iosAvailable ? callback(null, true) : callback('Health data is not available on this device', false),
   initHealthKit: (value: unknown, callback: (error: string) => void) => { calls.push({ kind: 'permissions', value }); callback(''); },
   getStepCount: (value: unknown, callback: Parameters<typeof done>[0]) => { calls.push({ kind: 'steps', value }); done(callback, { value: 8000 }); },
   getActiveEnergyBurned: (_value: unknown, callback: Parameters<typeof done>[0]) => done(callback, [{ value: 100 }, { value: 50 }]),
@@ -88,4 +88,26 @@ test('a meal exports its macros, and a macro it does not have is left out rather
   for (const bad of [{ proteinG: -1 }, { carbsG: Number.NaN }, { fatG: 20_000 }]) {
     assert.throws(() => validateHealthMeal({ ...base, ...bad }), /macros in grams/);
   }
+});
+
+test('a HealthKit failure reaches the screen as what iOS actually said', async () => {
+  const { describeHealthError } = await import('../health/healthAdapter.ios');
+  // The generic fallback was unreadable on a TestFlight build, where there is no debugger to
+  // attach. Each shape iOS can hand back has to survive to the UI.
+  assert.equal(describeHealthError('Authorization not determined'), 'Authorization not determined');
+  assert.equal(describeHealthError({ message: 'Missing entitlement', code: 5, domain: 'com.apple.healthkit' }),
+    'Missing entitlement · code 5 · domain com.apple.healthkit');
+  assert.equal(describeHealthError(new TypeError('kit.isAvailable is not a function')), 'kit.isAvailable is not a function');
+  assert.equal(describeHealthError({ unexpected: true }), '{"unexpected":true}');
+  assert.equal(describeHealthError(null), 'no detail given');
+  assert.equal(describeHealthError(''), 'no detail given');
+});
+
+test('the two failure shapes are told apart, because they mean different things', async () => {
+  const { getHealthAdapter } = await import('../health/healthAdapter.ios');
+  const adapter = await getHealthAdapter();
+  // iOS refusing through the callback names the call and quotes the refusal.
+  iosAvailable = false;
+  await assert.rejects(adapter.initialize(), /HealthKit isAvailable failed: Health data is not available/);
+  iosAvailable = true;
 });

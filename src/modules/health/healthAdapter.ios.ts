@@ -64,7 +64,7 @@ export async function getHealthAdapter(): Promise<HealthAdapter> {
       const macros = Object.fromEntries(([['protein', meal.proteinG], ['carbohydrates', meal.carbsG], ['fatTotal', meal.fatG]] as const)
         .filter(([, value]) => typeof value === 'number' && Number.isFinite(value) && value >= 0));
       const food = { date: meal.date, foodName: meal.name, energy: meal.caloriesKcal, ...macros,
-        metadata: { HKSyncIdentifier: `rulocked:meal:${meal.id}`, HKSyncVersion: 1 } };
+        metadata: { HKSyncIdentifier: `rulocked:meal:${meal.id}`, HKSyncVersion: meal.version ?? 1 } };
       await callback(done => kit.saveFood(food, done));
     },
   };

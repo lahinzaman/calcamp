@@ -5,6 +5,8 @@ export interface HealthMeal {
   /** Absent on a meal queued before macros were exported; absent is not zero, so it is simply
    *  not written rather than written as none. */
   proteinG?: number; carbsG?: number; fatG?: number;
+  /** HKSyncVersion. A later export of the same id must carry a higher one to replace it. */
+  version?: number;
 }
 export interface HealthAdapter {
   initialize(): Promise<void>;

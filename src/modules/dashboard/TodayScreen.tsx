@@ -13,6 +13,7 @@ import { CalorieRing } from '../../components/charts/CalorieRing';
 import { haptic } from '../../theme/haptics';
 import { useAuthStore } from '../../store/authStore';
 import { localDateKey, nutritionStore, useNutritionStore } from '../../store/nutritionStore';
+import { useLiveActivity } from '../liveActivity/useLiveActivity';
 import { loadEntriesForRange, loadHistory } from '../../api/history';
 import { MEAL_SLOTS, SOURCE_LABELS, type FoodEntry } from '../../types/foodEntry';
 import { useT, type MessageKey } from '../../i18n';
@@ -62,6 +63,9 @@ export default function TodayScreen() {
   const owner = useAuthStore(s => s.session?.user.id);
   const split = useMemo(() => splitById(readSplitId(owner ?? 'anonymous')).split, [owner]);
   const targets = useNutritionStore(s => s.dailyTargets?.macros);
+  // Mirrors the day onto the lock screen and Dynamic Island. It follows the diary's own
+  // totals, so every way of logging moves it without each having to remember to.
+  useLiveActivity();
   const liveMacros = useNutritionStore(s => s.consumedMacros);
   const liveMicros = useNutritionStore(s => s.consumedMicros);
   const liveEntries = useNutritionStore(s => s.entries);

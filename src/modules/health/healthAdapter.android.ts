@@ -45,7 +45,7 @@ export async function getHealthAdapter(): Promise<HealthAdapter> {
         ...(typeof meal.proteinG === 'number' ? { protein: { value: meal.proteinG, unit: 'grams' } } : {}),
         ...(typeof meal.carbsG === 'number' ? { totalCarbohydrate: { value: meal.carbsG, unit: 'grams' } } : {}),
         ...(typeof meal.fatG === 'number' ? { totalFat: { value: meal.fatG, unit: 'grams' } } : {}),
-        metadata: { clientRecordId: `meal-${meal.id}`, clientRecordVersion: 1 } }]);
+        metadata: { clientRecordId: `meal-${meal.id}`, clientRecordVersion: meal.version ?? 1 } }]);
     },
   };
 }

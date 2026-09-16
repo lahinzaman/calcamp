@@ -253,6 +253,9 @@ export function createNutritionStore(options: { now?: () => Date; repository?: T
         return { ...(state.date === today.date ? {} : today), entries: [...current.entries, entry],
           ...shiftTotals(current, entry.macros, entry.micros, 1), syncStatus: 'idle' };
       });
+      // Apple Health mirrors the diary, so the export follows the write rather than each caller
+      // remembering to make it. It never throws back into logging.
+      void import('../modules/health/exportMeal').then(({ exportMealToHealth }) => exportMealToHealth(entry)).catch(() => {});
       return entry;
     },
     removeEntry: (id) => {
@@ -274,6 +277,9 @@ export function createNutritionStore(options: { now?: () => Date; repository?: T
       const removed = shiftTotals(state, entry.macros, entry.micros, -1);
       const readded = shiftTotals({ ...state, ...removed }, next.macros, next.micros, 1);
       set({ entries: state.entries.map(e => e.id === id ? next : e), ...readded, syncStatus: 'idle' });
+      // Re-exported under the same sync identifier with a higher version, so Health replaces the
+      // earlier sample rather than adding a second one for the same meal.
+      void import('../modules/health/exportMeal').then(({ exportMealToHealth }) => exportMealToHealth(next)).catch(() => {});
     },
     undoLastEntry: () => {
       const entries = get().entries;

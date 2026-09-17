@@ -95,7 +95,6 @@
     "backend:dev": "tsx watch backend/server.ts",
     "backend:build": "tsc --project backend/tsconfig.json",
     "backend:start": "node backend/dist/backend/server.js",
-    "eas:preflight": "node scripts/eas-preflight.cjs",
     "eas-build-post-install": "npm run eas:preflight",
     "verify:native": "node scripts/verify-native-config.cjs",
     "eas": "node scripts/eas.cjs",

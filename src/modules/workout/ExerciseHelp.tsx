@@ -7,6 +7,7 @@ import { Action } from '../../components/FormControls';
 import type { ExerciseDefinition } from '../../types/workout';
 import { exerciseById } from './catalog';
 import { muscleLabel, patternLabel } from './search';
+import { secondaryMuscles } from './synergists';
 
 /**
  * Text only. The generated stick-figure animations were never going to be good enough to
@@ -15,6 +16,7 @@ import { muscleLabel, patternLabel } from './search';
 export const ExerciseHelp = memo(function ExerciseHelp({ exercise }: { exercise: ExerciseDefinition }) {
   const [open, setOpen] = useState(false);
   const details = exerciseById(exercise.id);
+  const partial = details ? secondaryMuscles(details) : [];
   const facts = [
     details ? muscleLabel(details.primaryMuscle) : null,
     exercise.equipment ?? details?.equipment ?? null,
@@ -26,9 +28,13 @@ export const ExerciseHelp = memo(function ExerciseHelp({ exercise }: { exercise:
     {open && <Modal visible presentationStyle="pageSheet" animationType="slide" onRequestClose={() => setOpen(false)}>
       <SafeAreaView className="flex-1 bg-background"><ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 48 }}>
         <Text className="text-3xl font-bold">{exercise.name}</Text>
-        <View className="mb-5 mt-3 flex-row flex-wrap gap-2">
+        <View className="mb-3 mt-3 flex-row flex-wrap gap-2">
           {facts.map(fact => <View key={fact} className="rounded-full bg-raised px-3 py-2"><Text className="text-sm">{fact}</Text></View>)}
         </View>
+        {!!partial.length && <Text className="mb-5 text-sm">
+          Also works {partial.map(muscleLabel).join(', ')} — partially, alongside the main target. Your weekly volume shows this partial work, but meeting a muscle's target still takes direct sets.
+        </Text>}
+        {!partial.length && details && <Text className="mb-5 text-sm">An isolation movement: it works {muscleLabel(details.primaryMuscle)} and little else.</Text>}
         <Text className="mb-5 text-lg leading-7">
           {details?.description ?? exercise.variationNotes ?? 'Follow the setup and range of motion your coach gave you for this custom variation.'}
         </Text>

@@ -1,4 +1,5 @@
 import { exerciseById } from './catalog';
+import { PARTIAL_SET_CREDIT, secondaryMuscles } from './synergists';
 export const EXPERIENCE_LEVELS = ['beginner', 'intermediate', 'advanced'] as const;
 export type ExperienceLevel = typeof EXPERIENCE_LEVELS[number];
 /** Hard sets per muscle per week. Advanced lifters get a wide band to choose within. */
@@ -27,39 +28,62 @@ export const MUSCLE_LABELS: Record<string, string> = {
 export interface RoutineExercise { exerciseId: string; sets: number; restSeconds: number; repLow: number; repHigh: number }
 export interface ScheduledRoutine { exercises: RoutineExercise[]; timesPerWeek: number }
 export interface MuscleVolume {
-  muscle: string; label: string; sets: number; frequency: number;
+  muscle: string; label: string;
+  /** Hard sets where this muscle was the target. Unchanged in meaning from before. */
+  sets: number;
+  /** Sets where it assisted another target: triceps in a bench press, biceps in a row. */
+  partialSets: number;
+  /** Direct sets plus partial sets at PARTIAL_SET_CREDIT — an estimate of total stimulus,
+   *  shown for information. The range is not judged on it; see weeklyVolume. */
+  effectiveSets: number;
+  frequency: number;
   status: 'none' | 'under' | 'in-range' | 'over';
   frequencyOk: boolean;
 }
 /**
  * Weekly hard sets and how many separate sessions hit each muscle.
- * Only the primary mover is counted — crediting every assisting muscle inflates
- * the total and is what makes most volume calculators useless.
+ *
+ * Assisting work is counted and reported, but the in-range verdict is still judged on direct
+ * sets alone. The set targets were calibrated against direct work; measuring effective sets
+ * against them is a units mismatch, and it flagged a textbook plan — ten direct sets a muscle —
+ * as overtraining eight muscles, because every row and pulldown also credits the biceps.
+ *
+ * What assisting work does change is the claim that a muscle goes untrained. A program full of
+ * pressing used to report the triceps as untouched; they are not, and it no longer says so.
+ *
+ * Frequency stays direct-only. A session is a session for a muscle when it was the point of it.
  */
 export function weeklyVolume(schedule: readonly ScheduledRoutine[], experience: ExperienceLevel): MuscleVolume[] {
   const [low, high] = WEEKLY_SET_TARGETS[experience];
   const sets = new Map<string, number>();
+  const partial = new Map<string, number>();
   const sessions = new Map<string, number>();
   for (const routine of schedule) {
     if (!Number.isFinite(routine.timesPerWeek) || routine.timesPerWeek <= 0) continue;
     const hit = new Set<string>();
     for (const entry of routine.exercises) {
-      const muscle = exerciseById(entry.exerciseId)?.primaryMuscle;
-      if (!muscle || !Number.isFinite(entry.sets) || entry.sets <= 0) continue;
-      sets.set(muscle, (sets.get(muscle) ?? 0) + entry.sets * routine.timesPerWeek);
+      const exercise = exerciseById(entry.exerciseId);
+      const muscle = exercise?.primaryMuscle;
+      if (!exercise || !muscle || !Number.isFinite(entry.sets) || entry.sets <= 0) continue;
+      const weekly = entry.sets * routine.timesPerWeek;
+      sets.set(muscle, (sets.get(muscle) ?? 0) + weekly);
       hit.add(muscle);
+      for (const assisting of secondaryMuscles(exercise)) partial.set(assisting, (partial.get(assisting) ?? 0) + weekly);
     }
     for (const muscle of hit) sessions.set(muscle, (sessions.get(muscle) ?? 0) + routine.timesPerWeek);
   }
-  return [...new Set([...CORE_MUSCLES, ...sets.keys()])].map((muscle): MuscleVolume => {
-    const total = sets.get(muscle) ?? 0;
+  return [...new Set([...CORE_MUSCLES, ...sets.keys(), ...partial.keys()])].map((muscle): MuscleVolume => {
+    const direct = sets.get(muscle) ?? 0;
+    const assisted = partial.get(muscle) ?? 0;
+    const effective = direct + assisted * PARTIAL_SET_CREDIT;
     const frequency = sessions.get(muscle) ?? 0;
     return {
-      muscle, label: MUSCLE_LABELS[muscle] ?? muscle, sets: total, frequency,
-      status: total === 0 ? 'none' : total < low ? 'under' : total > high ? 'over' : 'in-range',
-      frequencyOk: total === 0 || frequency >= TARGET_FREQUENCY,
+      muscle, label: MUSCLE_LABELS[muscle] ?? muscle, sets: direct, partialSets: assisted, effectiveSets: effective, frequency,
+      status: direct === 0 ? 'none' : direct < low ? 'under' : direct > high ? 'over' : 'in-range',
+      // Assisted work alone is not a reason to call the frequency short: there is no direct work to space out.
+      frequencyOk: direct === 0 || frequency >= TARGET_FREQUENCY,
     };
-  }).sort((a, b) => b.sets - a.sets || a.label.localeCompare(b.label));
+  }).sort((a, b) => b.effectiveSets - a.effectiveSets || a.label.localeCompare(b.label));
 }
 export interface VolumeAdvice { tone: 'good' | 'warn'; text: string }
 /** Plain-language coaching on a plan, in priority order: frequency first, then volume. */
@@ -77,8 +101,12 @@ export function volumeAdvice(volume: readonly MuscleVolume[], experience: Experi
   if (under.length) advice.push({ tone: 'warn', text: `${under.map(entry => `${entry.label} (${entry.sets})`).join(', ')} fall short of ${low} sets a week. Add a set or two where you recover best.` });
   const over = judged.filter(entry => entry.status === 'over');
   if (over.length) advice.push({ tone: 'warn', text: `${over.map(entry => `${entry.label} (${entry.sets})`).join(', ')} exceed ${high} sets a week. More is not better once recovery is the limit — cut the least productive sets.` });
-  const missing = volume.filter(entry => entry.sets === 0 && (CORE_MUSCLES as readonly string[]).includes(entry.muscle));
+  // A muscle that only assists is still trained, so it is not reported as untrained; it is
+  // named separately, because partial work is not a substitute a person should assume.
+  const missing = volume.filter(entry => entry.sets === 0 && entry.partialSets === 0 && (CORE_MUSCLES as readonly string[]).includes(entry.muscle));
   if (missing.length) advice.push({ tone: 'warn', text: `Nothing trains ${missing.map(entry => entry.label).join(', ')}. That is fine if it is deliberate.` });
+  const assistedOnly = volume.filter(entry => entry.sets === 0 && entry.partialSets > 0 && (CORE_MUSCLES as readonly string[]).includes(entry.muscle));
+  if (assistedOnly.length) advice.push({ tone: 'warn', text: `${assistedOnly.map(entry => entry.label).join(', ')} only work partially, assisting other exercises. That builds some muscle, but not what direct sets would — add one if they matter to you.` });
   if (!advice.length) advice.push({ tone: 'good', text: `Every muscle sits inside ${low}–${high} sets a week and gets trained at least twice. This is a plan worth repeating — progress it by adding reps or weight, not more sets.` });
   return advice;
 }

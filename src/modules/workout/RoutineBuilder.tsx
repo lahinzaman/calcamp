@@ -45,7 +45,9 @@ export function RoutineBuilder({ onClose, onSave, existing }: { onClose: () => v
   const [low, high] = WEEKLY_SET_TARGETS[experience];
   const volume = useMemo(() => weeklyVolume([{ exercises: entries, timesPerWeek }], experience), [entries, timesPerWeek, experience]);
   const advice = useMemo(() => volumeAdvice(volume, experience), [volume, experience]);
-  const trained = volume.filter(entry => entry.sets > 0);
+  // A muscle only assisted is still trained, and leaving it off the list is what made a
+  // pressing-heavy routine look like it never touched the triceps.
+  const trained = volume.filter(entry => entry.effectiveSets > 0);
 
   const toggle = (id: string) => {
     setEntries(current => current.some(entry => entry.exerciseId === id)
@@ -125,14 +127,18 @@ export function RoutineBuilder({ onClose, onSave, existing }: { onClose: () => v
 
         <View className="my-4 rounded-3xl border border-border bg-surface p-5">
           <Text className="mb-1 text-sm font-bold tracking-widest">WEEKLY VOLUME</Text>
-          <Text className="mb-3 text-sm">Target {low}–{high} hard sets per muscle, each trained at least twice a week.</Text>
+          <Text className="mb-3 text-sm">Target {low}–{high} hard sets per muscle, each trained at least twice a week. Muscles an exercise only works partially are listed under each bar, but the target is met with direct sets.</Text>
           {trained.map(entry => <View key={entry.muscle} className="mb-3">
-            <View className="mb-1 flex-row justify-between">
-              <Text className="text-sm">{entry.label}{entry.frequencyOk ? '' : ' · once a week'}</Text>
+            <View className="mb-1 flex-row justify-between gap-3">
+              <Text className="flex-1 text-sm">{entry.label}{entry.frequencyOk ? '' : ' · once a week'}</Text>
               <Text className="text-sm font-bold">{entry.sets} sets</Text>
             </View>
             <ProgressBar value={Math.min(entry.sets, high)} target={high} height={6}
               tone={entry.status === 'in-range' ? 'protein' : entry.status === 'over' ? 'fat' : 'carbs'} />
+            {/* Where the number came from, so half-credit from assisting never passes for direct work. */}
+            {entry.partialSets > 0 && <Text className="mt-1 text-xs">
+              {entry.sets > 0 ? 'Also ' : 'Only assisting · '}{entry.partialSets} partial {entry.partialSets === 1 ? 'set' : 'sets'} from other exercises
+            </Text>}
           </View>)}
           {advice.map((item, index) => <Text key={index} className={item.tone === 'good' ? 'mt-2 text-sm font-bold' : 'mt-2 text-sm'}>{item.text}</Text>)}
         </View>

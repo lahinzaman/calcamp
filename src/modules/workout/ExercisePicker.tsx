@@ -9,6 +9,7 @@ import { useT } from '../../i18n';
 import { EXERCISE_CATALOG, type CatalogExercise } from './catalog';
 import { ExerciseHelp } from './ExerciseHelp';
 import { activeFilterCount, equipmentFacets, filterExercises, muscleFacets, muscleLabel, patternFacets, patternLabel, type Facet } from './search';
+import { secondaryMuscles } from './synergists';
 
 type Group = 'muscles' | 'equipment' | 'patterns';
 const GROUP_LABELS: Record<Group, string> = { muscles: 'Muscle', equipment: 'Equipment', patterns: 'Movement' };
@@ -20,6 +21,7 @@ const ExerciseRow = memo(function ExerciseRow({ exercise, chosen, onToggle }: { 
       className={`flex-1 rounded-2xl border p-4 ${chosen ? 'border-accent bg-raised' : 'border-border bg-surface'}`}>
       <Text className="font-bold">{chosen ? '✓ ' : ''}{exercise.name}</Text>
       <Text className="mt-0.5 text-sm">{muscleLabel(exercise.primaryMuscle)} · {exercise.equipment} · {patternLabel(exercise.movementPattern ?? '')}</Text>
+      {secondaryMuscles(exercise).length > 0 && <Text className="mt-0.5 text-xs">Also works {secondaryMuscles(exercise).map(muscleLabel).join(', ')}</Text>}
     </Pressable>
     <ExerciseHelp exercise={exercise} />
   </View>;

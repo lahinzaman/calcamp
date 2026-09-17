@@ -4,7 +4,7 @@ import { AppState } from 'react-native';
 import { useStore } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 import { getHealthAdapter } from './healthAdapter';
-import { localDay, validateHealthMeal, validateHealthWorkout, type HealthAdapter, type HealthMeal, type HealthSummary, type HealthWorkout } from './types';
+import { localDay, validateHealthMeal, validateHealthWorkout, type HealthAdapter, type HealthMeal, type HealthSummary, type HealthWorkout, type PermissionPrompt } from './types';
 
 interface HealthState extends HealthSummary {
   status: 'idle' | 'initializing' | 'ready' | 'error';
@@ -13,6 +13,8 @@ interface HealthState extends HealthSummary {
   refreshedAt: number | null;
   reset(): void;
   initialize(): Promise<void>;
+  /** Asks, before requesting, whether iOS will actually show its sheet. */
+  permissionPrompt(): Promise<PermissionPrompt>;
   refresh(): Promise<void>;
   writeWorkout(workout: HealthWorkout): Promise<void>;
   writeDietaryEnergy(meal: HealthMeal): Promise<void>;
@@ -43,6 +45,12 @@ export function createHealthStore(loadAdapter: () => Promise<HealthAdapter> = ge
         breadcrumb('health.permission', { outcome: 'ok' }); set({ initialized: true }); await get().refresh(); }
       catch (error) { if (token !== generation) return; breadcrumb('health.permission', { outcome: 'unavailable' }); set({ status: 'error', initialized: false, error: error instanceof Error ? error.message : 'Health sync is unavailable.' }); }
       finally { initializing = false; }
+    },
+    permissionPrompt: async () => {
+      try {
+        const loaded = await loadAdapter();
+        return loaded.permissionPrompt ? await loaded.permissionPrompt() : 'unknown';
+      } catch { return 'unknown'; }
     },
     refresh: async () => {
       if (!get().initialized || reading) return;

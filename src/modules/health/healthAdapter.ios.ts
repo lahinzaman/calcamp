@@ -92,6 +92,15 @@ export async function getHealthAdapter(): Promise<HealthAdapter> {
   };
 
   return {
+    async permissionPrompt() {
+      try {
+        const status = await named('getRequestStatusForAuthorization',
+          () => kit.getRequestStatusForAuthorization({ toShare: SHARE, toRead: READ }), AVAILABILITY_TIMEOUT_MS);
+        // 1 is shouldRequest: at least one type has never been asked about, so the sheet shows.
+        // 2 is unnecessary: iOS already has an answer for every type and will not ask again.
+        return status === 1 ? 'will-show' : status === 2 ? 'already-answered' : 'unknown';
+      } catch { return 'unknown'; }
+    },
     async initialize() {
       const available = await named('isHealthDataAvailable', () => kit.isHealthDataAvailableAsync(), AVAILABILITY_TIMEOUT_MS);
       if (!available) throw new Error('HealthKit is unavailable on this device.');

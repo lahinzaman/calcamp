@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import { mock, test } from 'node:test';
-let iosAvailable = true; let iosWriteStatus = 2;
+let iosAvailable = true; let iosWriteStatus = 2; let iosRequestStatus: number | Error = 1;
 const calls: { kind: string; value: unknown }[] = [];
 const kitCalls: { kind: string; value: unknown }[] = [];
 mock.module('@kingstinct/react-native-healthkit', { namedExports: {
   isHealthDataAvailableAsync: async () => { if (!iosAvailable) throw new Error('Health data is not available on this device'); return true; },
   requestAuthorization: async (toRequest: unknown) => { kitCalls.push({ kind: 'permissions', value: toRequest }); return true; },
   authorizationStatusFor: () => iosWriteStatus,
+  getRequestStatusForAuthorization: async () => { if (iosRequestStatus instanceof Error) throw iosRequestStatus; return iosRequestStatus; },
   queryStatisticsForQuantity: async (identifier: string) => ({ sumQuantity: { quantity: identifier.includes('StepCount') ? 8000 : 150 } }),
   queryWorkoutSamples: async () => [],
   saveWorkoutSample: async (...value: unknown[]) => { kitCalls.push({ kind: 'workout', value }); },
@@ -156,4 +157,21 @@ test('a sheet that never appeared says so, rather than blaming permissions', asy
   assert.equal(explainAuthorizationFailure(new Error('HealthKit requestAuthorization failed: Not entitled')).message,
     'HealthKit requestAuthorization failed: Not entitled');
   assert.equal(explainAuthorizationFailure('raw string').message, 'raw string');
+});
+
+test('the app can tell, before asking, whether iOS will show its permission sheet', async () => {
+  const { getHealthAdapter } = await import('../health/healthAdapter.ios');
+  const adapter = await getHealthAdapter();
+  // iOS asks only about types it has never asked about. Once it has every answer, a request
+  // returns at once with no sheet — which looks exactly like the connection breaking.
+  iosRequestStatus = 1;
+  assert.equal(await adapter.permissionPrompt!(), 'will-show');
+  iosRequestStatus = 2;
+  assert.equal(await adapter.permissionPrompt!(), 'already-answered');
+  iosRequestStatus = 0;
+  assert.equal(await adapter.permissionPrompt!(), 'unknown');
+  // A check that fails is not a reason to stop someone connecting; it just cannot say.
+  iosRequestStatus = new Error('status unavailable');
+  assert.equal(await adapter.permissionPrompt!(), 'unknown');
+  iosRequestStatus = 1;
 });

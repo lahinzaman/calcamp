@@ -8,8 +8,16 @@ export interface HealthMeal {
   /** HKSyncVersion. A later export of the same id must carry a higher one to replace it. */
   version?: number;
 }
+/**
+ * Whether iOS is going to show its permission sheet. It only asks about types it has never
+ * asked about before; once it has an answer — yes or no — a request returns at once with no
+ * sheet at all, which is indistinguishable from a request that broke unless someone checks.
+ */
+export type PermissionPrompt = 'will-show' | 'already-answered' | 'unknown';
 export interface HealthAdapter {
   initialize(): Promise<void>;
+  /** Optional: a platform with no such signal says nothing rather than guessing. */
+  permissionPrompt?(): Promise<PermissionPrompt>;
   readToday(now: Date): Promise<HealthSummary>;
   readWorkouts?(now: Date): Promise<HealthWorkout[]>;
   writeWorkout(workout: HealthWorkout): Promise<void>;

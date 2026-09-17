@@ -132,3 +132,28 @@ test('iOS refusing names the call it refused', async () => {
   await assert.rejects(adapter.initialize(), /HealthKit isHealthDataAvailable failed: Health data is not available/);
   iosAvailable = true;
 });
+
+test('a permission sheet that never presents fails instead of spinning forever', async () => {
+  const { named } = await import('../health/healthAdapter.ios');
+  // The request a dropped sheet leaves behind: a promise nothing will ever settle.
+  const never = () => new Promise<never>(() => {});
+  const started = Date.now();
+  await assert.rejects(named('requestAuthorization', never, 40), /did not answer within 0 seconds/);
+  assert.ok(Date.now() - started < 1000, 'it gave up at its bound, not after twenty minutes');
+
+  // A call that does answer is untouched by the bound, and its own failure keeps its wording.
+  assert.equal(await named('isHealthDataAvailable', async () => true, 40), true);
+  await assert.rejects(named('saveQuantitySample', async () => { throw new Error('Not authorized'); }, 40),
+    /HealthKit saveQuantitySample failed: Not authorized/);
+});
+
+test('a sheet that never appeared says so, rather than blaming permissions', async () => {
+  const { explainAuthorizationFailure } = await import('../health/healthAdapter.ios');
+  // A timed-out request is a sheet iOS dropped, not a person who said no.
+  assert.match(explainAuthorizationFailure(new Error('HealthKit requestAuthorization did not answer within 180 seconds.')).message,
+    /permission sheet never appeared/);
+  // Anything else keeps what iOS said.
+  assert.equal(explainAuthorizationFailure(new Error('HealthKit requestAuthorization failed: Not entitled')).message,
+    'HealthKit requestAuthorization failed: Not entitled');
+  assert.equal(explainAuthorizationFailure('raw string').message, 'raw string');
+});

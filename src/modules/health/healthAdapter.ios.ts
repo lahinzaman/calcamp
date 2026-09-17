@@ -37,10 +37,36 @@ export function describeHealthError(value: unknown): string {
   try { const json = JSON.stringify(value); if (json && json !== '{}') return json; } catch { /* fall through */ }
   return String(value);
 }
-async function named<T>(label: string, run: () => Promise<T> | T): Promise<T> {
-  try { return await run(); }
-  catch (cause) { throw new Error(`HealthKit ${label} failed: ${describeHealthError(cause)}`); }
+/**
+ * Every native call is bounded. The rewrite onto this library dropped the timeout the old helper
+ * had, and a HealthKit permission sheet that never presents leaves its promise pending forever —
+ * which is a spinner that reads "Connecting…" for twenty minutes rather than an error.
+ */
+export async function named<T>(label: string, run: () => Promise<T> | T, timeoutMs = 30_000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`HealthKit ${label} did not answer within ${Math.round(timeoutMs / 1000)} seconds.`)), timeoutMs);
+  });
+  try { return await Promise.race([Promise.resolve().then(run), expired]); }
+  catch (cause) {
+    if (cause instanceof Error && cause.message.startsWith(`HealthKit ${label} did not answer`)) throw cause;
+    throw new Error(`HealthKit ${label} failed: ${describeHealthError(cause)}`);
+  }
+  finally { clearTimeout(timer); }
 }
+/** A request that timed out is almost always a permission sheet iOS declined to present over
+ *  another one still closing — so it says that, rather than blaming the person's permissions. */
+export function explainAuthorizationFailure(cause: unknown): Error {
+  if (cause instanceof Error && cause.message.includes('did not answer')) {
+    return new Error('The Apple Health permission sheet never appeared. Close this screen, reopen it, and try Connect again.');
+  }
+  return cause instanceof Error ? cause : new Error(describeHealthError(cause));
+}
+/** Availability is a local check and answers at once; anything slower is not going to. */
+const AVAILABILITY_TIMEOUT_MS = 10_000;
+/** The permission sheet waits on a person reading it, so it gets long enough for that — and no
+ *  longer, because a sheet that never presented looks exactly like one still being read. */
+const AUTHORIZATION_TIMEOUT_MS = 180_000;
 
 export async function getHealthAdapter(): Promise<HealthAdapter> {
   let kit: Kit;
@@ -67,9 +93,10 @@ export async function getHealthAdapter(): Promise<HealthAdapter> {
 
   return {
     async initialize() {
-      const available = await named('isHealthDataAvailable', () => kit.isHealthDataAvailableAsync());
+      const available = await named('isHealthDataAvailable', () => kit.isHealthDataAvailableAsync(), AVAILABILITY_TIMEOUT_MS);
       if (!available) throw new Error('HealthKit is unavailable on this device.');
-      await named('requestAuthorization', () => kit.requestAuthorization({ toShare: SHARE, toRead: READ }));
+      await named('requestAuthorization', () => kit.requestAuthorization({ toShare: SHARE, toRead: READ }), AUTHORIZATION_TIMEOUT_MS)
+        .catch(cause => { throw explainAuthorizationFailure(cause); });
       // iOS intentionally does not disclose whether read permission was denied.
     },
     async readToday(now) {

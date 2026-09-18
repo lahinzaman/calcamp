@@ -14,7 +14,9 @@ import { ExercisePicker } from './ExercisePicker';
 import { CustomExerciseSheet } from './CustomExerciseSheet';
 import { archiveOwnExercise, saveOwnExercise } from '../sync/runtime';
 import { fromCatalogExercise, type CustomExercise } from '../../api/customExercises';
-import { defaultRoutineExercise, validateRoutine, REST_CHOICES, type WorkoutRoutine } from './routines';
+import { clearRoutineSuperset, defaultRoutineExercise, groupRoutineSuperset, pruneRoutineSupersets,
+  routineSupersets, validateRoutine, REST_CHOICES, type WorkoutRoutine } from './routines';
+import { supersetLabel, SUPERSET_LIMIT } from './supersets';
 import { EXPERIENCE_LEVELS, EXPERIENCE_NOTES, MUSCLE_LABELS, WEEKLY_SET_TARGETS, volumeAdvice, weeklyVolume, type ExperienceLevel, type RoutineExercise } from './volume';
 import { readExperience, writeExperience } from './experience';
 const newId = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(16)}-0000-4000-8000-000000000000`.slice(0, 36);
@@ -45,17 +47,19 @@ export function RoutineBuilder({ onClose, onSave, existing }: { onClose: () => v
   const [experience, setExperience] = useState<ExperienceLevel>(() => readExperience(owner));
   const [error, setError] = useState<string | null>(null); const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState<true | CustomExercise | null>(null);
+  const [pairing, setPairing] = useState<string[]>([]);
   const ids = entries.map(entry => entry.exerciseId);
   const [low, high] = WEEKLY_SET_TARGETS[experience];
   const volume = useMemo(() => weeklyVolume([{ exercises: entries, timesPerWeek }], experience), [entries, timesPerWeek, experience]);
   const advice = useMemo(() => volumeAdvice(volume, experience), [volume, experience]);
+  const groups = useMemo(() => routineSupersets(entries), [entries]);
   // A muscle only assisted is still trained, and leaving it off the list is what made a
   // pressing-heavy routine look like it never touched the triceps.
   const trained = volume.filter(entry => entry.effectiveSets > 0);
 
   const toggle = (id: string) => {
     setEntries(current => current.some(entry => entry.exerciseId === id)
-      ? current.filter(entry => entry.exerciseId !== id)
+      ? pruneRoutineSupersets(current.filter(entry => entry.exerciseId !== id))
       : current.length < 30 ? [...current, defaultRoutineExercise(id)] : current);
     haptic('selection');
   };
@@ -112,10 +116,11 @@ export function RoutineBuilder({ onClose, onSave, existing }: { onClose: () => v
           return <View key={entry.exerciseId} className="mb-3 rounded-2xl border border-border bg-surface p-4">
             <View className="mb-3 flex-row items-center gap-3">
               <View className="flex-1"><Text className="font-bold">{exercise?.name ?? 'Exercise'}</Text>
-                <Text className="text-sm">{MUSCLE_LABELS[exercise?.primaryMuscle ?? ''] ?? exercise?.primaryMuscle}</Text></View>
+                <Text className="text-sm">{MUSCLE_LABELS[exercise?.primaryMuscle ?? ''] ?? exercise?.primaryMuscle}
+                  {entry.supersetId ? ` · superset ${supersetLabel(groups.findIndex(group => group.id === entry.supersetId))}` : ''}</Text></View>
               {exercise && <ExerciseHelp exercise={exercise} />}
               <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${exercise?.name ?? 'exercise'}`} tone="warning" weight="subtle"
-                onPress={() => setEntries(current => current.filter(item => item.exerciseId !== entry.exerciseId))}
+                onPress={() => setEntries(current => pruneRoutineSupersets(current.filter(item => item.exerciseId !== entry.exerciseId)))}
                 className="h-10 w-10 items-center justify-center rounded-full bg-raised"><Text>×</Text></Pressable>
             </View>
             <View className="flex-row gap-3">
@@ -131,6 +136,32 @@ export function RoutineBuilder({ onClose, onSave, existing }: { onClose: () => v
           </View>;
         })}
         <Action secondary label="Add more exercises" onPress={() => setStep('pick')} />
+
+        {entries.length > 1 && <View className="my-4 rounded-3xl border border-border bg-surface p-5">
+          <Text className="mb-1 text-sm font-bold tracking-widest">SUPERSETS</Text>
+          <Text className="mb-3 text-sm">Pair exercises you do back to back. Saved with the routine, so every session that runs it starts already paired — the rest timer waits for the round, and finishing a set takes you to the partner.</Text>
+          {groups.map((group, index) => <View key={group.id} className="mb-2 rounded-2xl border border-accent p-3">
+            <View className="mb-1 flex-row items-center justify-between gap-3">
+              <Text className="flex-1 font-bold">Superset {supersetLabel(index)}</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel={`Break up superset ${supersetLabel(index)}`} weight="subtle"
+                onPress={() => { setEntries(current => clearRoutineSuperset(current, group.id)); haptic('warning'); }}
+                className="min-h-11 justify-center rounded-full bg-raised px-4"><Text className="text-sm font-semibold">Break up</Text></Pressable>
+            </View>
+            {group.exerciseIds.map(id => <Text key={id} className="text-sm">· {exerciseById(id)?.name ?? 'Exercise'}</Text>)}
+          </View>)}
+          <Text className="mb-2 mt-2 text-sm">Pick two to {SUPERSET_LIMIT} to pair. They move together in the order below, because that is what doing them back to back means.</Text>
+          <View className="flex-row flex-wrap">{entries.map(entry => <Choice key={entry.exerciseId}
+            label={exerciseById(entry.exerciseId)?.name ?? 'Exercise'} selected={pairing.includes(entry.exerciseId)}
+            onPress={() => setPairing(current => current.includes(entry.exerciseId)
+              ? current.filter(id => id !== entry.exerciseId)
+              : current.length < SUPERSET_LIMIT ? [...current, entry.exerciseId] : current)} />)}</View>
+          <Action label={pairing.length < 2 ? 'Pick at least two' : `Superset these ${pairing.length}`}
+            disabled={pairing.length < 2} tone={pairing.length >= 2 ? 'success' : 'none'}
+            onPress={() => {
+              try { setEntries(current => groupRoutineSuperset(current, pairing, newId())); setPairing([]); setError(null); haptic('success'); }
+              catch (cause) { setError(cause instanceof Error ? cause.message : 'Those exercises could not be paired.'); haptic('error'); }
+            }} />
+        </View>}
 
         <View className="my-4 rounded-3xl border border-border bg-surface p-5">
           <Text className="mb-1 text-sm font-bold tracking-widest">WEEKLY VOLUME</Text>

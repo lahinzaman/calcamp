@@ -193,13 +193,19 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
     const actions = workoutStore.getState();
     const detail = routineExercises(plan.routine);
     actions.startSession({ id: localId(), name: plan.name });
+    // The routine names exercises; the session works in instances, so pairings are re-keyed
+    // onto the instances as they are created.
+    const instances = new Map<string, string[]>();
     for (const entry of detail) {
       const exercise = exerciseById(entry.exerciseId);
       if (!exercise) continue;
       const id = localId();
       actions.addExercise({ id, exercise, defaultRestSeconds: entry.restSeconds });
+      if (entry.supersetId) instances.set(entry.supersetId, [...(instances.get(entry.supersetId) ?? []), id]);
       for (let set = 0; set < entry.sets; set++) actions.addSet({ id: localId(), sessionExerciseId: id });
     }
+    // A pairing whose partner is missing from the catalogue is no longer a pairing.
+    for (const [, ids] of instances) if (ids.length > 1) actions.groupSuperset(ids);
     setFinished(null); haptic('success');
   };
 

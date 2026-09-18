@@ -25,7 +25,15 @@ export const MUSCLE_LABELS: Record<string, string> = {
   calves: 'Calves', abdominals: 'Abs', traps: 'Traps', forearms: 'Forearms', obliques: 'Obliques',
   adductors: 'Adductors', abductors: 'Abductors', lower_back: 'Lower back',
 };
-export interface RoutineExercise { exerciseId: string; sets: number; restSeconds: number; repLow: number; repHigh: number }
+export interface RoutineExercise {
+  exerciseId: string; sets: number; restSeconds: number; repLow: number; repHigh: number;
+  /**
+   * Exercises sharing this are supersetted: done back to back, with the rest after the round.
+   * Stored on the routine so a pairing is built once and applied to every session that runs it.
+   * Absent on routines saved before supersets existed, and on the exercises you do on their own.
+   */
+  supersetId?: string;
+}
 export interface ScheduledRoutine { exercises: RoutineExercise[]; timesPerWeek: number }
 export interface MuscleVolume {
   muscle: string; label: string;

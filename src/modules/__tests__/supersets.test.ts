@@ -97,3 +97,81 @@ test('swapping an exercise keeps the slot in its superset, because the pairing i
   assert.equal(swapped.exercise.name, 'Machine Fly');
   assert.equal(swapped.supersetId, 'g1', 'the rack being busy does not dissolve the pairing');
 });
+
+// --- Supersets saved into a routine, so a pairing is built once rather than every session.
+import { clearRoutineSuperset, groupRoutineSuperset, pruneRoutineSupersets, routineSupersets, validateRoutine, type WorkoutRoutine } from '../workout/routines';
+import { EXERCISE_CATALOG } from '../workout/catalog';
+import type { RoutineExercise } from '../workout/volume';
+
+const lift = (index: number) => EXERCISE_CATALOG[index].id;
+const plan = (exerciseId: string): RoutineExercise => ({ exerciseId, sets: 3, restSeconds: 120, repLow: 6, repHigh: 12 });
+const routine = (exercises: RoutineExercise[]): WorkoutRoutine => ({
+  id: '11111111-1111-4111-8111-111111111111', name: 'Push A',
+  exerciseIds: exercises.map(entry => entry.exerciseId), exercises, timesPerWeek: 2,
+});
+
+test('pairing in a routine moves the partners together, because that is what the pairing means', () => {
+  const entries = [0, 1, 2, 3].map(index => plan(lift(index)));
+  // Pair the first and the third: the second cannot stay between them.
+  const paired = groupRoutineSuperset(entries, [lift(0), lift(2)], 'g1');
+  assert.deepEqual(paired.map(entry => entry.exerciseId), [lift(0), lift(2), lift(1), lift(3)]);
+  assert.deepEqual(routineSupersets(paired), [{ id: 'g1', exerciseIds: [lift(0), lift(2)] }]);
+  assert.doesNotThrow(() => validateRoutine(routine(paired)));
+
+  assert.throws(() => groupRoutineSuperset(entries, [lift(0)], 'g1'), /at least two/);
+  assert.throws(() => groupRoutineSuperset(entries, [0, 1, 2, 3, 4].map(lift), 'g1'), /at most/);
+  // Naming the same exercise twice is one exercise, not two, so it is still too small a group.
+  assert.throws(() => groupRoutineSuperset(entries, [lift(0), lift(0)], 'g1'), /at least two/);
+  assert.throws(() => groupRoutineSuperset(entries, [lift(0), 'not-in-this-routine'], 'g1'), /not in this routine/);
+
+  // Joining a second group leaves the first, and a partner left alone stops being a superset.
+  const moved = groupRoutineSuperset(paired, [lift(2), lift(1)], 'g2');
+  assert.deepEqual(routineSupersets(moved), [{ id: 'g2', exerciseIds: [lift(2), lift(1)] }]);
+  assert.deepEqual(routineSupersets(clearRoutineSuperset(moved, 'g2')), []);
+  assert.deepEqual(pruneRoutineSupersets([{ ...plan(lift(0)), supersetId: 'g1' }, plan(lift(1))])[0].supersetId, undefined);
+});
+
+test('a routine cannot be saved claiming a pairing a session could never run', () => {
+  const entries = [0, 1, 2].map(index => plan(lift(index)));
+  // Tagged in place rather than moved: an exercise sits between the partners.
+  const split = [{ ...entries[0], supersetId: 'g1' }, entries[1], { ...entries[2], supersetId: 'g1' }];
+  assert.throws(() => validateRoutine(routine(split)), /sit together/);
+
+  const lonely = [{ ...entries[0], supersetId: 'g1' }, entries[1], entries[2]];
+  assert.throws(() => validateRoutine(routine(lonely)), /at least two/);
+
+  const crowded = [0, 1, 2, 3, 4].map(index => ({ ...plan(lift(index)), supersetId: 'g1' }));
+  assert.throws(() => validateRoutine(routine(crowded)), /at most/);
+
+  assert.throws(() => validateRoutine(routine([{ ...entries[0], supersetId: '  ' }, entries[1]])), /invalid identifier/);
+  // A routine saved before supersets existed carries none, and is still perfectly valid.
+  assert.doesNotThrow(() => validateRoutine(routine(entries)));
+  assert.deepEqual(routineSupersets(entries), []);
+});
+
+test('starting a routine re-keys its pairings onto the session’s own exercises', () => {
+  const store = createWorkoutStore({ now: () => 1_000 });
+  const entries = groupRoutineSuperset([0, 1, 2].map(index => plan(lift(index))), [lift(0), lift(1)], 'g1');
+  const actions = () => store.getState();
+  actions().startSession({ id: 'session', name: 'Push A' });
+
+  // What ActiveWorkoutScreen does: instances are created, then the routine's groups applied.
+  const instances = new Map<string, string[]>();
+  entries.forEach((entry, index) => {
+    const id = `slot-${index}`;
+    actions().addExercise({ id, exercise: EXERCISE_CATALOG.find(e => e.id === entry.exerciseId)!, defaultRestSeconds: entry.restSeconds });
+    if (entry.supersetId) instances.set(entry.supersetId, [...(instances.get(entry.supersetId) ?? []), id]);
+    actions().addSet({ id: `set-${index}`, sessionExerciseId: id, weightLbs: 100, reps: 5 });
+  });
+  for (const [, ids] of instances) if (ids.length > 1) actions().groupSuperset(ids);
+
+  const sequence = store.getState().exerciseSequence;
+  assert.equal(sequence[0].supersetId, sequence[1].supersetId, 'the pair arrives already paired');
+  assert.ok(sequence[0].supersetId);
+  assert.equal(sequence[2].supersetId, undefined);
+
+  // And it behaves like a superset without anyone pairing it again this session.
+  actions().completeSet('set-0', 2_000);
+  assert.equal(store.getState().restTimer, null, 'no rest between the halves');
+  assert.equal(store.getState().activeExerciseId, 'slot-1');
+});

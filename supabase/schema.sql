@@ -233,6 +233,20 @@ comment on column public.sets.exercise_position is
   'One-based exercise occurrence in session order; repeating the same exercise later may use another position.';
 create index sets_exercise_idx on public.sets (exercise_id);
 
+-- What you want to remember about a lift next time: seat height, pin number, which side lagged.
+-- Keyed on the exercise's occurrence within one session, so it survives the same lift appearing
+-- twice. workouts.notes stays what it is: a note about the session as a whole.
+create table public.workout_exercise_notes (
+  workout_id uuid not null references public.workouts (id) on delete cascade,
+  exercise_position integer not null check (exercise_position > 0),
+  note text not null check (length(btrim(note)) between 1 and 280),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (workout_id, exercise_position)
+);
+comment on table public.workout_exercise_notes is
+  'One note per exercise occurrence in a session. exercise_position matches public.sets.exercise_position.';
+
 -- Check even service-role writes: private exercises must belong to the workout owner.
 create function public.validate_set_ownership() returns trigger
 language plpgsql security definer set search_path = '' as $$
@@ -285,6 +299,7 @@ create trigger nutrition_updated_at before update on public.daily_nutrition_logs
 create trigger workouts_updated_at before update on public.workouts for each row execute function public.set_updated_at();
 create trigger exercises_updated_at before update on public.exercises for each row execute function public.set_updated_at();
 create trigger sets_updated_at before update on public.sets for each row execute function public.set_updated_at();
+create trigger workout_exercise_notes_updated_at before update on public.workout_exercise_notes for each row execute function public.set_updated_at();
 
 -- Explicit grants and RLS protect every public table; no anonymous access.
 alter table public.users enable row level security;
@@ -293,18 +308,19 @@ alter table public.daily_nutrition_logs enable row level security;
 alter table public.workouts enable row level security;
 alter table public.exercises enable row level security;
 alter table public.sets enable row level security;
+alter table public.workout_exercise_notes enable row level security;
 
 revoke all on public.users, public.nutrient_definitions, public.daily_nutrition_logs,
-  public.workouts, public.exercises, public.sets from public, anon, authenticated;
+  public.workouts, public.exercises, public.sets, public.workout_exercise_notes from public, anon, authenticated;
 grant usage on schema public to authenticated, service_role;
 grant select, insert, update, delete on public.users, public.daily_nutrition_logs,
-  public.exercises, public.sets to authenticated;
+  public.exercises, public.sets, public.workout_exercise_notes to authenticated;
 grant select on public.nutrient_definitions to authenticated;
 grant select, delete on public.workouts to authenticated;
 grant insert (id, user_id, workout_date, name, started_at, finished_at, duration_seconds, notes),
   update (workout_date, name, started_at, finished_at, duration_seconds, notes) on public.workouts to authenticated;
 grant all on public.users, public.nutrient_definitions, public.daily_nutrition_logs,
-  public.workouts, public.exercises, public.sets to service_role;
+  public.workouts, public.exercises, public.sets, public.workout_exercise_notes to service_role;
 
 create policy users_own_select on public.users for select to authenticated using (id = (select auth.uid()));
 create policy users_own_insert on public.users for insert to authenticated with check (id = (select auth.uid()));
@@ -379,6 +395,17 @@ create policy sets_own_update on public.sets for update to authenticated using (
   exists (select 1 from public.workouts where id = workout_id and user_id = (select auth.uid())) and
   exists (select 1 from public.exercises where id = exercise_id and (owner_user_id is null or owner_user_id = (select auth.uid()))));
 create policy sets_own_delete on public.sets for delete to authenticated using (
+  exists (select 1 from public.workouts where id = workout_id and user_id = (select auth.uid())));
+
+-- Ownership is the parent workout's, exactly as it is for sets.
+create policy workout_exercise_notes_own_select on public.workout_exercise_notes for select to authenticated using (
+  exists (select 1 from public.workouts where id = workout_id and user_id = (select auth.uid())));
+create policy workout_exercise_notes_own_insert on public.workout_exercise_notes for insert to authenticated with check (
+  exists (select 1 from public.workouts where id = workout_id and user_id = (select auth.uid())));
+create policy workout_exercise_notes_own_update on public.workout_exercise_notes for update to authenticated using (
+  exists (select 1 from public.workouts where id = workout_id and user_id = (select auth.uid()))) with check (
+  exists (select 1 from public.workouts where id = workout_id and user_id = (select auth.uid())));
+create policy workout_exercise_notes_own_delete on public.workout_exercise_notes for delete to authenticated using (
   exists (select 1 from public.workouts where id = workout_id and user_id = (select auth.uid())));
 
 

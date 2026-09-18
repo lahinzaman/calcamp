@@ -24,6 +24,30 @@ export function clearNotifications() { return serialize(async () => {
   for (const request of await Notifications.getAllScheduledNotificationsAsync()) if (request.identifier.startsWith('rulocked:')) await Notifications.cancelScheduledNotificationAsync(request.identifier);
   await Notifications.dismissAllNotificationsAsync();
 }); }
+/**
+ * A daily reminder keeps its request identifier, but every delivery is a *new* entry in
+ * Notification Center and nothing was removing them — three weeks of untouched reminders is the
+ * twenty-deep stack of CalCamp banners. iOS SDK 57 exposes no `threadIdentifier` on scheduled
+ * content, so the pile cannot be collapsed into one; it has to be dismissed.
+ *
+ * Called from the notification handler before the new copy is presented: dismissing by
+ * identifier clears every earlier delivery of that same reminder, so the arriving one is the
+ * only one left. Only the foreground path can do this — iOS presents background deliveries
+ * without consulting us — which is why opening the app also clears the tray.
+ */
+export function dismissEarlierDeliveries(identifier: string) {
+  if (!identifier.startsWith('rulocked:')) return Promise.resolve();
+  return serialize(async () => {
+    const delivered = await Notifications.getPresentedNotificationsAsync();
+    if (delivered.some(item => item.request.identifier === identifier)) await Notifications.dismissNotificationAsync(identifier);
+  });
+}
+/**
+ * Opening the app answers every reminder it could have sent, so none of them should still be
+ * sitting in Notification Center behind it. This is what bounds a stack that built up while the
+ * app was closed, where nothing else runs.
+ */
+export function dismissDeliveredNotifications() { return serialize(() => Notifications.dismissAllNotificationsAsync()); }
 export async function removePushRegistration(owner: string) {
   await verifyOwner(owner); const { error } = await getSupabase().rpc('set_push_installation', { p_owner: owner, p_installation: installation(), p_registration: null });
   if (error) throw new Error('Push registration could not be removed. Try again when connected.');
@@ -74,15 +98,28 @@ export function configureNotifications(owner: string, preferences: NotificationP
     durableStorage.set(`push-registered:${owner}`, String(Date.now()));
   });
 }
+/** One arrival alert every two hours, whichever corner of campus you walked through. */
+const ARRIVAL_COOLDOWN_MS = 2 * 3600_000;
 export async function notifyOnce(owner: string, key: string, kind: 'workout' | 'rescue', title: string, body: string) {
   if (!readPreferences(owner).enabled) return;
   await verifyOwner(owner);
   const storageKey = `notification-cooldown:${owner}:${key}`;
   if (Date.now() - Number(durableStorage.get(storageKey) ?? 0) < 4 * 3600_000) return;
+  // The per-region cooldown alone let a walk across campus stack one alert per region, and
+  // there are eight of them. Arrivals share a single budget so only one can land at a time.
+  const globalKey = `notification-cooldown:${owner}:arrival`;
+  if (Date.now() - Number(durableStorage.get(globalKey) ?? 0) < ARRIVAL_COOLDOWN_MS) return;
   const permission = await Notifications.getPermissionsAsync();
   await verifyOwner(owner); const preferences = readPreferences(owner);
   if (!preferences.enabled || !preferences.geofencing || (!permission.granted && permission.ios?.status !== Notifications.IosAuthorizationStatus.PROVISIONAL)) return;
   // Claim before scheduling: an interrupted callback cannot create a burst on restart.
   durableStorage.set(storageKey, String(Date.now()));
-  await Notifications.scheduleNotificationAsync({ identifier: `rulocked:${owner}:${key}`, content: { title, body, data: { kind, owner } }, trigger: null });
+  durableStorage.set(globalKey, String(Date.now()));
+  // Each region carries its own identifier, so the previous arrival is a separate entry in the
+  // tray rather than something the new one replaces. Take it down by hand.
+  const previous = durableStorage.get(`notification-last-arrival:${owner}`);
+  if (previous) await Notifications.dismissNotificationAsync(previous).catch(() => {});
+  const identifier = `rulocked:${owner}:${key}`;
+  durableStorage.set(`notification-last-arrival:${owner}`, identifier);
+  await Notifications.scheduleNotificationAsync({ identifier, content: { title, body, data: { kind, owner } }, trigger: null });
 }

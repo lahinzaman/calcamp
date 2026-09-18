@@ -22,6 +22,12 @@ export interface SessionExercise {
   id: string;
   exercise: ExerciseDefinition;
   defaultRestSeconds: number;
+  /**
+   * What you want to remember for next time: the pin setting, the bench number, which cue
+   * worked. Belongs to the instance, not the catalogue entry, so the same lift can carry a
+   * different note in a different session.
+   */
+  note?: string;
 }
 
 export interface WorkoutSet {
@@ -49,4 +55,10 @@ export interface CompletedWorkout {
   endedAtMs: number;
   exercises: SessionExercise[];
   sets: WorkoutSet[];
+  /**
+   * Set when the session has been edited after it finished. The first upload of a workout is
+   * write-once so a retried send cannot duplicate it; an edit has to say so explicitly to get
+   * past that guard, and its value makes each revision its own idempotent queue entry.
+   */
+  editedAtMs?: number;
 }

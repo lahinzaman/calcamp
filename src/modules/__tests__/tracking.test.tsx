@@ -43,6 +43,8 @@ mock.module('react-native-safe-area-context', { namedExports: { SafeAreaView: 'S
 
 const { default: DiningHallScreen } = require('../dining/DiningHallScreen') as typeof import('../dining/DiningHallScreen');
 const { default: ActiveWorkoutScreen } = require('../workout/ActiveWorkoutScreen') as typeof import('../workout/ActiveWorkoutScreen');
+const { default: WorkoutHistoryScreen } = require('../workout/WorkoutHistoryScreen') as typeof import('../workout/WorkoutHistoryScreen');
+const { SessionEditor } = require('../workout/SessionEditor') as typeof import('../workout/SessionEditor');
 const { useFoodVision } = require('../vision/useFoodVision') as typeof import('../vision/useFoodVision');
 const { nutritionStore } = require('../../store/nutritionStore') as typeof import('../../store/nutritionStore');
 const { workoutStore } = require('../../store/workoutStore') as typeof import('../../store/workoutStore');
@@ -99,6 +101,37 @@ test('workout screen mounts an active session, estimates 1RM, and completes a se
   assert.equal(workoutStore.getState().sets[0].estimatedOneRepMaxLbs, 112.5);
   assert.equal(workoutStore.getState().restTimer?.durationSeconds, 90);
   assert.ok(workoutStore.getState().sets[0].completedAtMs !== null);
+});
+
+test('a session takes an exercise the routine never mentioned, and a swap does not inherit its numbers', async () => {
+  const store = workoutStore.getState();
+  store.startSession({ id: 'session', name: 'Upper A' });
+  store.addExercise({ id: 'row', exercise: { id: 'lift', name: 'High-Pronated Grip Row' }, defaultRestSeconds: 90 });
+  store.addSet({ id: 'set', sessionExerciseId: 'row' });
+  await act(async () => { rendered = create(<ActiveWorkoutScreen />); });
+
+  // A warm-up is logged like any other set but is numbered W and stays out of hard-set volume.
+  await act(async () => findLabel('Warm-up set 1').props.onPress());
+  assert.equal(workoutStore.getState().sets[0].isWarmup, true);
+  await act(async () => findLabel('Warm-up set 1').props.onPress());
+  assert.equal(workoutStore.getState().sets[0].isWarmup, false);
+
+  // The note is behind one tap so it never sits between you and the set you are logging.
+  await act(async () => findLabel('Add a note for High-Pronated Grip Row').props.onPress());
+  await act(async () => findLabel('Note for High-Pronated Grip Row').props.onChangeText('  seat 4  '));
+  await act(async () => findLabel('Note for High-Pronated Grip Row').props.onBlur());
+  assert.equal(workoutStore.getState().exerciseSequence[0].note, 'seat 4');
+
+  // Both routes into the picker exist from inside a running session.
+  assert.ok(findLabel('Add an exercise to this session'));
+  assert.ok(findLabel('Replace High-Pronated Grip Row'));
+
+  // Swapping the slot keeps the order and clears what belonged to the lift being replaced.
+  await act(async () => { workoutStore.getState().replaceExercise('row', { id: 'lift-2', name: 'Chest-Supported Row' }); });
+  assert.equal(workoutStore.getState().exerciseSequence[0].id, 'row');
+  assert.equal(workoutStore.getState().exerciseSequence[0].note, undefined);
+  assert.equal(workoutStore.getState().sets[0].completedAtMs, null);
+  assert.ok(textContent().includes('Chest-Supported Row'));
 });
 
 const MEAL = { items: [{ name: 'White rice, cooked', grams: 200, confidence: .7, macros: { caloriesKcal: 260, proteinG: 5, carbsG: 56, fatG: 1 } }], note: null };
@@ -298,4 +331,54 @@ test('starting a routine builds the sets and rest it specifies, and removal clea
   assert.equal(workoutStore.getState().exerciseSequence[1].defaultRestSeconds, 60);
   workoutStore.getState().removeSet(workoutStore.getState().sets[0].id);
   assert.equal(workoutStore.getState().sets.length, 5);
+});
+
+/** An Action's accessible name is its Text child, not an accessibilityLabel. */
+const pressText = async (label: string) => {
+  const target = rendered!.root.findAll(node => node.type === ('Pressable' as React.ElementType)
+    && node.findAll(child => child.type === ('Text' as React.ElementType) && child.props.children === label).length > 0)[0];
+  assert.ok(target, `no button labelled ${label}`);
+  await act(async () => { await target.props.onPress(); });
+};
+
+const FINISHED = {
+  session: { id: 'past-1', name: 'Upper A', startedAtMs: 1_700_000_000_000 - 3_600_000 },
+  endedAtMs: 1_700_000_000_000,
+  exercises: [{ id: 'slot', exercise: { id: 'bench', name: 'Bench Press' }, defaultRestSeconds: 120, note: 'seat 4' }],
+  sets: [{ id: 'one', sessionExerciseId: 'slot', weightLbs: 315, reps: 5, rpe: 8, isWarmup: false,
+    restSeconds: 120, estimatedOneRepMaxLbs: 354.4, completedAtMs: 1_700_000_000_000 - 900_000 }],
+};
+
+test('workout history mounts its tabs without a session archive to show', async () => {
+  await act(async () => { rendered = create(<WorkoutHistoryScreen />); });
+  assert.ok(textContent().includes('Sessions'), 'the sessions tab is offered');
+  await act(async () => findLabel('Sessions').props.onPress());
+  assert.ok(textContent().includes('No sessions saved yet'));
+});
+
+test('a finished session can be corrected, and emptying it is refused rather than silently saved', async () => {
+  let saved: typeof FINISHED | null = null; let deleted = false;
+  await act(async () => { rendered = create(<SessionEditor workout={FINISHED}
+    onSave={workout => { saved = workout as typeof FINISHED; }} onDelete={() => { deleted = true; }} onClose={() => {}} />); });
+
+  // The number that was mistyped, corrected in place.
+  await act(async () => findLabel('Weight lbs set 1').props.onChangeText('135'));
+  await pressText('Save changes');
+  assert.equal(saved!.sets[0].weightLbs, 135);
+  assert.equal(saved!.sets[0].estimatedOneRepMaxLbs, 151.875, 'the estimate follows the weight, it is not left stale');
+  assert.equal(saved!.exercises[0].note, 'seat 4', 'and the note survives the edit');
+
+  // Removing the only exercise leaves nothing to save; that has to be a deletion.
+  await act(async () => { rendered = create(<SessionEditor workout={FINISHED}
+    onSave={() => { throw new Error('must not save an empty session'); }} onDelete={() => { deleted = true; }} onClose={() => {}} />); });
+  await act(async () => findLabel('Remove Bench Press').props.onPress());
+  assert.ok(textContent().includes('Delete it instead'));
+  // The save button is disabled in this state, so pressing it is a no-op rather than a throw.
+  await pressText('Save changes');
+
+  // Deleting is behind a confirmation, because it recalculates history and cannot be undone.
+  await act(async () => findLabel('Delete this session').props.onPress());
+  assert.equal(deleted, false);
+  await pressText('Yes, delete it');
+  assert.equal(deleted, true);
 });

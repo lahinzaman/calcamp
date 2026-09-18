@@ -5,6 +5,7 @@ import { createStore } from 'zustand/vanilla';
 
 import type {
   CompletedWorkout,
+  ExerciseDefinition,
   RestTimer,
   SessionExercise,
   WorkoutSession,
@@ -29,10 +30,21 @@ export type SetInput = Pick<WorkoutSet, 'id' | 'sessionExerciseId'> &
   Partial<Omit<WorkoutSet, 'id' | 'sessionExerciseId' | 'completedAtMs'>>;
 export type SetUpdate = Partial<Omit<WorkoutSet, 'id' | 'sessionExerciseId' | 'completedAtMs'>>;
 
+/** The longest note that still reads as a note rather than a diary entry. */
+export const MAX_EXERCISE_NOTE = 280;
+
 export interface WorkoutActions {
   startSession: (session: { id: string; name: string; startedAtMs?: number }) => void;
   addExercise: (exercise: SessionExercise) => void;
   removeExercise: (sessionExerciseId: string) => void;
+  /**
+   * Swaps the lift in a slot, keeping its place in the order and its rest. Logged sets belong
+   * to the exercise that was actually performed, so they cannot follow it to a different one:
+   * every set is reset to empty. Callers warn first — see `completedSetsFor`.
+   */
+  replaceExercise: (sessionExerciseId: string, exercise: ExerciseDefinition, defaultRestSeconds?: number) => void;
+  /** An empty or blank note removes it rather than storing whitespace. */
+  setExerciseNote: (sessionExerciseId: string, note: string) => void;
   reorderExercises: (sessionExerciseIds: string[]) => void;
   setActiveExercise: (sessionExerciseId: string) => void;
   addSet: (set: SetInput) => void;
@@ -145,7 +157,12 @@ export function createWorkoutStore(options: { now?: () => number; repository?: T
       if (!input.exercise.name.trim()) throw new TypeError('An exercise name is required.');
       if (state.exerciseSequence.some((exercise) => exercise.id === input.id)) throw new Error('Duplicate exercise instance ID.');
       validateRestDuration(input.defaultRestSeconds);
-      const exercise = { ...input, exercise: { ...input.exercise } };
+      const exercise: SessionExercise = { ...input, exercise: { ...input.exercise } };
+      if (exercise.note !== undefined) {
+        const trimmed = exercise.note.trim();
+        if (trimmed.length > MAX_EXERCISE_NOTE) throw new RangeError(`A note is at most ${MAX_EXERCISE_NOTE} characters.`);
+        if (trimmed) exercise.note = trimmed; else delete exercise.note;
+      }
       set({
         exerciseSequence: [...state.exerciseSequence, exercise],
         activeExerciseId: state.activeExerciseId ?? input.id,
@@ -161,6 +178,37 @@ export function createWorkoutStore(options: { now?: () => number; repository?: T
         activeExerciseId: state.activeExerciseId === id ? (exerciseSequence[0]?.id ?? null) : state.activeExerciseId,
         restTimer: state.restTimer?.sourceSetId && removedSetIds.has(state.restTimer.sourceSetId) ? null : state.restTimer,
       });
+    },
+    replaceExercise: (id, exercise, defaultRestSeconds) => {
+      const state = get();
+      requireSession(state);
+      requireId(exercise.id);
+      if (!exercise.name.trim()) throw new TypeError('An exercise name is required.');
+      const current = state.exerciseSequence.find((entry) => entry.id === id);
+      if (!current) throw new Error('Unknown exercise instance.');
+      const rest = defaultRestSeconds ?? current.defaultRestSeconds;
+      validateRestDuration(rest);
+      // The note described the lift being replaced, so it goes with it.
+      const next: SessionExercise = { id, exercise: { ...exercise }, defaultRestSeconds: rest };
+      const removedSetIds = new Set(state.sets.filter((entry) => entry.sessionExerciseId === id).map((entry) => entry.id));
+      set({
+        exerciseSequence: state.exerciseSequence.map((entry) => entry.id === id ? next : entry),
+        // Same number of slots to work through, none of them carrying the old lift's numbers.
+        sets: state.sets.map((entry) => entry.sessionExerciseId === id
+          ? { ...entry, weightLbs: null, reps: null, rpe: null, estimatedOneRepMaxLbs: null, restSeconds: rest, completedAtMs: null }
+          : entry),
+        restTimer: state.restTimer?.sourceSetId && removedSetIds.has(state.restTimer.sourceSetId) ? null : state.restTimer,
+      });
+    },
+    setExerciseNote: (id, note) => {
+      const state = get();
+      const current = state.exerciseSequence.find((entry) => entry.id === id);
+      if (!current) throw new Error('Unknown exercise instance.');
+      const trimmed = note.trim();
+      if (trimmed.length > MAX_EXERCISE_NOTE) throw new RangeError(`A note is at most ${MAX_EXERCISE_NOTE} characters.`);
+      const { note: _previous, ...rest } = current;
+      set({ exerciseSequence: state.exerciseSequence.map((entry) => entry.id === id
+        ? (trimmed ? { ...rest, note: trimmed } : rest) : entry) });
     },
     reorderExercises: (ids) => {
       const state = get();

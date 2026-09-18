@@ -4,5 +4,7 @@ export async function configureNotifications(_owner: string, _preferences: Notif
 /** Web has no notification permission to hold, so nothing here was ever granted. */
 export async function notificationsGranted() { return false; }
 export async function clearNotifications() {}
+export async function dismissEarlierDeliveries(_identifier: string) {}
+export async function dismissDeliveredNotifications() {}
 export async function removePushRegistration(_owner: string) {}
 export async function notifyOnce(_owner: string, _key: string, _kind: 'workout' | 'rescue', _title: string, _body: string) {}

@@ -10,6 +10,9 @@ import { VolumeTrend } from './VolumeTrend';
 import { PlateCalculator } from './PlateCalculator';
 import { ExerciseHelp } from './ExerciseHelp';
 import { ExerciseOrder } from './ExerciseOrder';
+import { ExercisePickerSheet } from './ExercisePickerSheet';
+import { ExerciseNote } from './ExerciseNote';
+import { DEFAULT_REST_SECONDS } from './routines';
 import { SessionControls } from './SessionControls';
 import { exerciseById } from './catalog';
 import type { WorkoutRoutine } from './routines';
@@ -33,6 +36,10 @@ import { estimateBrzyckiOneRepMax } from './oneRepMax';
 
 export type PreviousSets = Record<string, { weightLbs: number; reps: number }[]>;
 const localId = () => `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+/** Whether a slot already holds work that a swap would throw away. */
+const loggedFor = (sets: WorkoutSet[], sessionExerciseId: string) =>
+  sets.some(entry => entry.sessionExerciseId === sessionExerciseId
+    && (entry.completedAtMs !== null || entry.weightLbs !== null || entry.reps !== null));
 const timerText = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 
 const SetRow = memo(function SetRow({ entry, index, previous, onRemove }: { entry: WorkoutSet; index: number; previous?: { weightLbs: number; reps: number }; onRemove: (id: string) => void }) {
@@ -60,7 +67,8 @@ const SetRow = memo(function SetRow({ entry, index, previous, onRemove }: { entr
 
   return <View className={completed ? 'mb-2 rounded-xl bg-raised px-2 py-3' : 'mb-2 rounded-xl bg-background px-2 py-3'}>
     <View className={roomy ? "flex-row flex-wrap items-center gap-2" : "flex-row items-center justify-between gap-1"}>
-      <Text className="w-5 text-center font-bold text-ink">{index + 1}</Text>
+      {/* A warm-up set is numbered W rather than 3, the way it reads on paper. */}
+      <Text className="w-5 text-center font-bold text-ink">{entry.isWarmup ? 'W' : index + 1}</Text>
       <Text className="w-10 text-center text-xs text-ink">{previous ? `${previous.weightLbs} × ${previous.reps}` : '—'}</Text>
       {(['weightLbs', 'reps', 'rpe'] as const).map((key) => <View key={key} style={roomy ? { minWidth: 88, flexBasis: '28%', flexGrow: 1 } : { flex: 1 }}>
         {roomy && <Text className="mb-1 text-sm">{key === 'weightLbs' ? 'Weight · lbs' : key === 'reps' ? 'Reps' : 'RPE'}</Text>}
@@ -80,7 +88,15 @@ const SetRow = memo(function SetRow({ entry, index, previous, onRemove }: { entr
     <Text accessibilityLiveRegion="polite" className={valid ? 'mt-2 pl-1 text-xs text-ink' : 'mt-2 pl-1 text-xs text-ink'}>
       {!valid ? 'Use lbs ≥ 0, whole reps 1–1000, and RPE 1–10.' : estimate !== null ? `Estimated 1RM · ${estimate.toFixed(1)} lbs` : 'Estimated 1RM · enter a loaded set of 1–12 reps'}
     </Text>
-    <Pressable accessibilityRole="button" accessibilityLabel={`Remove set ${index + 1}`} onPress={() => onRemove(entry.id)} className="min-h-12 justify-center self-end px-3"><Text className="text-sm">Remove set</Text></Pressable>
+    <View className="flex-row items-center justify-end gap-1">
+      {/* Warm-ups are logged but never counted: they must not inflate weekly hard sets. */}
+      <Pressable accessibilityRole="switch" accessibilityState={{ checked: entry.isWarmup }}
+        accessibilityLabel={`Warm-up set ${index + 1}`} weight="subtle"
+        onPress={() => safelyEdit(() => workoutStore.getState().updateSet(entry.id, { isWarmup: !entry.isWarmup }))}
+        className={`min-h-12 justify-center rounded-lg px-3 ${entry.isWarmup ? 'bg-accent' : 'bg-raised'}`}>
+        <Text className="text-sm font-semibold">{entry.isWarmup ? '✓ Warm-up' : 'Warm-up'}</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel={`Remove set ${index + 1}`} onPress={() => onRemove(entry.id)} className="min-h-12 justify-center px-3"><Text className="text-sm">Remove set</Text></Pressable>
+    </View>
   </View>;
 });
 
@@ -133,6 +149,8 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
   const [localHistory, setLocalHistory] = useState<PreviousSets>({});
   const [finished, setFinished] = useState<string | null>(null);
   const [ordering, setOrdering] = useState(false);
+  // Either adding a lift that was never in the routine, or swapping the one in a given slot.
+  const [picking, setPicking] = useState<{ mode: 'add' } | { mode: 'replace'; sessionExerciseId: string } | null>(null);
   const active = sequence.find((exercise) => exercise.id === activeId);
   const currentSets = useMemo(() => sets.filter((entry) => entry.sessionExerciseId === activeId), [sets, activeId]);
   const history = active ? (localHistory[active.exercise.id] ?? previousSets[active.exercise.id] ?? lifts[active.exercise.id]?.lastSets ?? []) : [];
@@ -200,8 +218,13 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
             <Text className="text-3xl font-bold" style={{ fontVariant: ['tabular-nums'] }}>{Math.round(volume).toLocaleString()}</Text>
             <Text className="mt-1 text-xs">{t('train.volume')}</Text></View>
         </View>
-        <View className="mb-2 flex-row items-center justify-between gap-3">
+        <View className="mb-2 flex-row items-center justify-between gap-2">
           <Text className="flex-1 text-sm font-bold tracking-widest">{t('train.exercises')}</Text>
+          {/* Whatever the routine said, the session is what you actually did: anything in the
+              catalogue can join it, and nothing has to be planned in advance to be logged. */}
+          <Pressable accessibilityRole="button" accessibilityLabel="Add an exercise to this session"
+            onPress={() => setPicking({ mode: 'add' })} weight="subtle"
+            className="min-h-11 justify-center rounded-full bg-surface px-4"><Text className="text-sm font-semibold">＋ Add</Text></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel={t('train.reorder')} onPress={() => setOrdering(true)} weight="subtle"
             className="min-h-11 justify-center rounded-full bg-surface px-4"><Text className="text-sm font-semibold">{t('train.reorder')}</Text></Pressable>
         </View>
@@ -214,7 +237,16 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
           </Pressable>)}
         </ScrollView>
         {active ? <View className="rounded-3xl bg-surface pt-4">
-          <View className="mx-4 flex-row items-center gap-3"><Text className="flex-1 text-xl font-bold">{active.exercise.name}</Text><ExerciseHelp exercise={active.exercise} /></View>
+          <View className="mx-4 flex-row items-center gap-3">
+            <Text className="flex-1 text-xl font-bold">{active.exercise.name}</Text>
+            {/* The rack is taken, the machine is broken: swap the slot without losing the order
+                you planned or the exercises either side of it. */}
+            <Pressable accessibilityRole="button" accessibilityLabel={`Replace ${active.exercise.name}`}
+              onPress={() => setPicking({ mode: 'replace', sessionExerciseId: active.id })} weight="subtle"
+              className="min-h-11 justify-center rounded-full bg-raised px-4"><Text className="text-sm font-semibold">Replace</Text></Pressable>
+            <ExerciseHelp exercise={active.exercise} />
+          </View>
+          <ExerciseNote entry={active} />
           <PlateCalculator suggested={suggestion?.weightLbs} />
           {suggestion && <View className="mx-4 mt-3 rounded-2xl bg-surface p-4"><Text className="font-bold">Suggested next set</Text><Text className="mt-1 text-lg font-bold">{suggestion.weightLbs} lbs × {suggestion.reps}</Text><Text className="mt-1 text-sm text-ink">{suggestion.reason}</Text></View>}
           {!!lifts[active.exercise.id] && <Text className="mx-4 mt-2 text-sm text-ink">Best so far: {Math.round(lifts[active.exercise.id].bestWeightLbs)} lbs · est. 1RM {Math.round(lifts[active.exercise.id].bestOneRepMaxLbs)} lbs · {lifts[active.exercise.id].sessions} session(s) logged.</Text>}
@@ -245,6 +277,28 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
     {builder && <RoutineBuilder existing={builder === 'new' ? undefined : builder}
       onClose={() => setBuilder(null)} onSave={saveRoutine} />}
     {ordering && <ExerciseOrder sequence={sequence} onClose={() => setOrdering(false)} />}
+    {picking?.mode === 'add' && <ExercisePickerSheet
+      title="Add an exercise" subtitle="Anything in the catalogue can join this session, routine or not."
+      confirmLabel={exercise => `Add ${exercise.name}`} onClose={() => setPicking(null)}
+      onChoose={exercise => safelyEdit(() => {
+        const id = localId();
+        const actions = workoutStore.getState();
+        actions.addExercise({ id, exercise, defaultRestSeconds: DEFAULT_REST_SECONDS });
+        actions.addSet({ id: localId(), sessionExerciseId: id });
+        actions.setActiveExercise(id);
+        haptic('success');
+      })} />}
+    {picking?.mode === 'replace' && <ExercisePickerSheet
+      title="Replace this exercise"
+      subtitle={`${sequence.find(entry => entry.id === picking.sessionExerciseId)?.exercise.name ?? 'This exercise'} keeps its place in the order.`}
+      warning={loggedFor(sets, picking.sessionExerciseId)
+        ? 'Sets you have already logged here will be cleared — they were done on a different lift. To keep them, cancel and add the new exercise instead.'
+        : undefined}
+      confirmLabel={exercise => `Swap in ${exercise.name}`} onClose={() => setPicking(null)}
+      onChoose={exercise => safelyEdit(() => {
+        workoutStore.getState().replaceExercise(picking.sessionExerciseId, exercise);
+        haptic('success');
+      })} />}
   </SafeAreaView>;
 }
 

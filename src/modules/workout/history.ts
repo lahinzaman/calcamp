@@ -10,7 +10,12 @@ export interface LiftRecord {
   sessions: number;
 }
 export type LiftHistory = Record<string, LiftRecord>;
-export interface SessionVolumePoint { date: string; value: number }
+/**
+ * `sessionId` is absent on points recorded before a session could be edited. An edit replaces
+ * the point it can identify and leaves the anonymous ones alone, rather than guessing which
+ * day's total belonged to the session that changed.
+ */
+export interface SessionVolumePoint { date: string; value: number; sessionId?: string }
 const working = (workout: CompletedWorkout) => workout.sets.filter(set => set.completedAtMs !== null && !set.isWarmup && set.weightLbs !== null && set.reps !== null);
 export function dateKeyOf(ms: number) {
   const date = new Date(ms);

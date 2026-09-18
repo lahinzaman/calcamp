@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, ScrollView, View } from 'react-native';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
+import { MAINTAIN_TOP } from '../../components/listBehavior';
 import { useQuery } from '@tanstack/react-query';
 import { SafeAreaView } from '../../theme/SafeArea';
 import { Text } from '../../theme/primitives';
@@ -86,7 +87,8 @@ export function FoodLibrary({ meal, onDone, footer, header }: {
   useEffect(() => { const id = setTimeout(() => setLocalQuery(term.trim()), 120); return () => clearTimeout(id); }, [term]);
   useEffect(() => { const id = setTimeout(() => setQuery(term), 400); return () => clearTimeout(id); }, [term]);
   // Switching tab or running a new search replaces every row. Without this the list kept its
-  // old offset and a short result set left you looking at empty space below it.
+  // old offset and a short result set left you looking at empty space below it. FlashList v2's
+  // default scroll anchoring re-applied that offset after the reset, so MAINTAIN_TOP turns it off.
   const listRef = useRef<FlashListRef<LibraryItem>>(null);
   useEffect(() => { listRef.current?.scrollToOffset({ offset: 0, animated: false }); }, [tab, localQuery]);
   const enabled = tab === 'search' && query.trim().length >= 2;
@@ -260,6 +262,7 @@ export function FoodLibrary({ meal, onDone, footer, header }: {
     {/* The title is not a control, so it scrolls away with the rows and gives the list back the
         height it was taking. Only the tabs and the field that filters them stay put. */}
     <FlashList ref={listRef} data={items} keyExtractor={item => item.id} style={{ flex: 1 }}
+      maintainVisibleContentPosition={MAINTAIN_TOP}
       ListHeaderComponent={header ? <View className="px-1">{header}</View> : null}
       keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
       contentContainerStyle={{ paddingBottom: 24 }}

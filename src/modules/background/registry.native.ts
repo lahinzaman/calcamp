@@ -13,6 +13,14 @@ Notifications.setNotificationHandler({ handleNotification: async notification =>
   const owner = durableStorage.get('active-sync-owner');
   const show = !!owner && notification.request.content.data?.owner === owner && readPreferences(owner).enabled
     && !!notificationRoute(notification.request.content.data);
+  // Clear the earlier copies of this same reminder before its replacement is presented, so a
+  // daily reminder is one entry in Notification Center rather than one per day.
+  if (show) {
+    try {
+      const { dismissEarlierDeliveries } = await import('../notifications/service');
+      await dismissEarlierDeliveries(notification.request.identifier);
+    } catch { /* Presenting the reminder matters more than tidying the ones behind it. */ }
+  }
   return { shouldShowBanner: show, shouldShowList: show, shouldPlaySound: false, shouldSetBadge: false };
 } });
 TaskManager.defineTask<Notifications.NotificationTaskPayload>(PUSH_TASK, async ({ data, error }) => {

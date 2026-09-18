@@ -161,6 +161,30 @@ test('fresh Supabase schema: permissions, nutrition constraints, and workout int
       assert.equal(await volume(), 0);
     });
 
+    await t.test('Phase 17 exercise notes are the workout owner’s and cascade with the session', async () => {
+      await signIn(alice);
+      const note = "insert into public.workout_exercise_notes (workout_id, exercise_position, note) values";
+      await db.exec(`${note} ('${aliceWorkout}', 1, 'Seat 4, pin 7')`);
+      // A note keys on the same (workout, exercise_position) pair its sets use, so one exercise
+      // occurrence carries one note however many sets it has.
+      await fails(`${note} ('${aliceWorkout}', 1, 'Second note')`, '23505');
+      await fails(`${note} ('${aliceWorkout}', 0, 'Bad position')`);
+      await fails(`${note} ('${aliceWorkout}', 2, '   ')`);
+      await fails(`${note} ('${aliceWorkout}', 2, '${'x'.repeat(281)}')`);
+      // Bob's workout is not Alice's to annotate, and hers is not his to read.
+      await fails(`${note} ('${bobWorkout}', 1, 'Not mine')`, '42501');
+      await signIn(bob);
+      assert.deepEqual((await db.query('select * from public.workout_exercise_notes')).rows, []);
+      assert.deepEqual((await db.query('delete from public.workout_exercise_notes returning note')).rows, []);
+      await signIn(alice);
+      assert.equal((await db.query('select * from public.workout_exercise_notes')).rows.length, 1);
+      await db.exec(`update public.workout_exercise_notes set note = 'Bench 3' where workout_id = '${aliceWorkout}'`);
+      await db.exec(`delete from public.workouts where id = '${aliceWorkout}'`);
+      assert.deepEqual((await db.query('select * from public.workout_exercise_notes')).rows, [],
+        'a deleted session takes its notes with it');
+      await db.exec(`insert into public.workouts (id, user_id, workout_date) values ('${aliceWorkout}', '${alice}', '2026-09-07')`);
+    });
+
     await t.test('Phase 3 retry writes obey grants and preserve generated Brzycki and volume', async () => {
       await signIn(alice);
       const id = '30000000-0000-4000-8000-000000000099';

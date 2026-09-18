@@ -8,8 +8,8 @@ import { LoadingCards } from '../../components/LoadingCards';
 import MacroRescue from './MacroRescue';
 import { CloudDiaryControls } from '../../components/CloudDiaryControls';
 import { useQuery } from '@tanstack/react-query';
-import { FlashList } from '@shopify/flash-list';
-import { memo, useEffect, useMemo, useState } from 'react';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, AppState, View } from 'react-native';
 import { Pressable } from '../../theme/Pressable';
 import { Text } from '../../theme/primitives';
@@ -23,6 +23,7 @@ import { FoodLogSheet } from './FoodLogSheet';
 import { MenuControls } from './MenuControls';
 import { EMPTY_FILTERS, filterMenu, groupByStation, proteinDensity, stationsOf, type MenuFilterState } from './menuFilters';
 import { FoodSearchModal } from '../foods/FoodSearchModal';
+import { MAINTAIN_TOP } from '../../components/listBehavior';
 
 const HALL_LABELS: Record<DiningHallSlug, string> = {
   'busch-dining-hall': 'Busch', 'livingston-dining-commons': 'Livingston', 'the-atrium': 'Atrium', 'neilson-dining-hall': 'Neilson',
@@ -48,6 +49,10 @@ export default function DiningHallScreen() {
     return () => { clearInterval(id); listener.remove(); };
   }, []);
   useEffect(() => { setSelected(null); setNotice(null); setFilters(EMPTY_FILTERS); }, [hall, date, period]);
+  // Searching or re-sorting the menu replaces every row, so the offset you had belongs to food
+  // that is no longer on screen. Without this a filtered menu opened halfway down itself.
+  const list = useRef<FlashListRef<DiningRow>>(null);
+  useEffect(() => { list.current?.scrollToOffset({ offset: 0, animated: false }); }, [hall, period, filters]);
   const menu = useQuery({
     enabled: period !== 'takeout',
     queryKey: ['nutrislice', hall, date],
@@ -76,6 +81,7 @@ export default function DiningHallScreen() {
       {/* The loading skeletons stand where the menu will be. In the header they drew above the
           page title, announcing the wait somewhere the food was never going to appear. */}
       <FlashList
+        ref={list} maintainVisibleContentPosition={MAINTAIN_TOP}
         data={rows} keyExtractor={(item) => item.id} getItemType={item => item.kind}
         contentContainerStyle={{ padding: 20, paddingBottom: 110, maxWidth: 760, width: '100%', alignSelf: 'center' }}
         refreshing={menu.isRefetching} onRefresh={() => { void menu.refetch(); }}

@@ -56,6 +56,15 @@ test('a narrowed exercise list returns to the top instead of staying parked past
   assert.ok(offsets.every(offset => offset === 0), 'always back to the very top');
 });
 
+test('narrowed results are not dragged back to where the old rows were', async () => {
+  await act(async () => { view = create(<ExercisePicker selectedIds={[]} onToggle={() => {}} footer={null} />); });
+  // FlashList v2 anchors the scroll to the visible row by default and re-applies that offset on
+  // the layout pass after the data changes, which beat the reset above: narrowing the list, and
+  // then clearing the search again, both left you parked in the middle of rows you never
+  // scrolled through. Only `disabled` opts out; there is no imperative escape from it.
+  assert.deepEqual(listProps.maintainVisibleContentPosition, { disabled: true });
+});
+
 test('dragging the results dismisses the keyboard while a tap still selects', async () => {
   await act(async () => { view = create(<ExercisePicker selectedIds={[]} onToggle={() => {}} footer={null} />); });
   // Both are needed together: persisting taps alone left the keyboard covering the list for the

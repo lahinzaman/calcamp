@@ -349,3 +349,69 @@ test('Phase 15 migration frees the training schedule without stranding the profi
     });
   } finally { await db.close(); }
 });
+
+const NOTES_MIGRATION = '20260917120000_phase17_workout_exercise_notes.sql';
+
+/** Applies against a database holding everything except the table it adds — the live shape. */
+test('Phase 17 migration adds exercise notes to a deployed database without disturbing it', async (t) => {
+  const db = new PGlite();
+  try {
+    await db.exec(`
+      create role anon;
+      create role authenticated;
+      create role service_role bypassrls;
+      create schema auth;
+      create table auth.users (id uuid primary key);
+      create function auth.uid() returns uuid language sql stable as
+        $$select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid$$;
+      grant usage on schema auth to anon, authenticated, service_role;
+      grant execute on function auth.uid() to anon, authenticated, service_role;
+    `);
+    await db.exec(await readFile(new URL('../schema.sql', import.meta.url), 'utf8'));
+    await db.exec('drop table public.workout_exercise_notes;');
+    const aliceWorkout = '30000000-0000-4000-8000-000000000001';
+    await db.exec(`
+      insert into auth.users (id) values ('${alice}'), ('${bob}');
+      insert into public.users (id) values ('${alice}'), ('${bob}');
+      insert into public.workouts (id, user_id, workout_date) values ('${aliceWorkout}', '${alice}', '2026-09-17');
+    `);
+    await db.exec(await readFile(new URL(`../migrations/${NOTES_MIGRATION}`, import.meta.url), 'utf8'));
+    const signIn = async (user: string) => {
+      await db.exec('reset role');
+      await db.query("select set_config('request.jwt.claim.sub', $1, false)", [user]);
+      await db.exec('set role authenticated');
+    };
+
+    await t.test('a migrated database enforces the same ownership a fresh one does', async () => {
+      await signIn(alice);
+      await db.exec(`insert into public.workout_exercise_notes (workout_id, exercise_position, note)
+        values ('${aliceWorkout}', 1, 'Seat 4')`);
+      await signIn(bob);
+      assert.deepEqual((await db.query('select * from public.workout_exercise_notes')).rows, []);
+      await assert.rejects(db.exec(`insert into public.workout_exercise_notes (workout_id, exercise_position, note)
+        values ('${aliceWorkout}', 2, 'Not mine')`), (error: unknown) => {
+        assert.equal((error as { code?: string }).code, '42501');
+        return true;
+      });
+      await signIn(alice);
+      // updated_at is maintained by the shared trigger, which the migration has to attach itself.
+      const before = (await db.query<{ updated_at: string }>('select updated_at from public.workout_exercise_notes')).rows[0].updated_at;
+      await db.exec("update public.workout_exercise_notes set note = 'Seat 5'");
+      const after = (await db.query<{ updated_at: string }>('select updated_at from public.workout_exercise_notes')).rows[0].updated_at;
+      assert.ok(new Date(after) >= new Date(before));
+    });
+  } finally { await db.close(); }
+});
+
+test('the exercise-notes migration and schema.sql agree', async () => {
+  const migration = await readFile(new URL(`../migrations/${NOTES_MIGRATION}`, import.meta.url), 'utf8');
+  const schema = await readFile(new URL('../schema.sql', import.meta.url), 'utf8');
+  const created = [...migration.matchAll(/create (?:table|index|policy) (?:public\.)?([a-z_]+)/g)].map(match => match[1]);
+  assert.ok(created.length >= 5);
+  for (const name of created) assert.ok(schema.includes(name), `schema.sql is missing ${name}`);
+  // A fresh database must grant exactly what the migration grants, or the two diverge silently.
+  for (const grant of ['grant select, insert, update, delete on public.workout_exercise_notes to authenticated']) {
+    assert.ok(migration.includes(grant), `the migration is missing: ${grant}`);
+  }
+  assert.ok(schema.includes('alter table public.workout_exercise_notes enable row level security'));
+});

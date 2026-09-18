@@ -4,7 +4,7 @@ import { AppState } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useAuthStore } from '../../store/authStore';
-import { configureNotifications, clearNotifications } from './service.native';
+import { configureNotifications, clearNotifications, dismissDeliveredNotifications } from './service.native';
 import { readPreferences } from './preferences';
 import { notificationRoute } from './policy';
 import { configureGeofencing, stopGeofencing } from '../background/geofencing';
@@ -39,7 +39,11 @@ export function NotificationLifecycle() {
     const received = Notifications.addNotificationReceivedListener(() => breadcrumb('notification.received', { source: 'push' }));
     const rotation = Notifications.addPushTokenListener(() => { void reconcile(true).catch(() => {}); });
     const network = NetInfo.addEventListener(state => { if (state.isConnected && state.isInternetReachable !== false) void reconcile().catch(() => {}); });
-    const foreground = AppState.addEventListener('change', state => { if (state === 'active') void reconcile().catch(() => {}); });
+    // Reminders that fired while the app was closed have been answered by opening it. Without
+    // this they stayed in Notification Center and a week of them read as twenty CalCamp alerts.
+    const tidy = () => { if (owner) void dismissDeliveredNotifications().catch(() => {}); };
+    tidy();
+    const foreground = AppState.addEventListener('change', state => { if (state === 'active') { tidy(); void reconcile().catch(() => {}); } });
     return () => { disposed = true; tap.remove(); received.remove(); rotation.remove(); foreground.remove(); network(); };
   }, [owner, profile]);
   return null;

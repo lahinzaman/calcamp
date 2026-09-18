@@ -11,6 +11,8 @@ import { healthStore } from '../health/useHealthSync';
 import { syncBridge } from './bridge';
 import { rememberFood } from '../foods/savedFoods';
 import { dateKeyOf, detectRecords, recordWorkout, sessionVolume } from '../workout/history';
+import { archiveSession, readArchive, rebuildHistory, removeSession, replaceSession, writeArchive } from '../workout/sessions';
+import type { CompletedWorkout } from '../../types/workout';
 import type { FoodEntry } from '../../types/foodEntry';
 
 /** Every logging path feeds recents from one place, so the second log of a food is one tap. */
@@ -52,6 +54,7 @@ export const syncEngine = new SyncEngine(durableStorage, async (owner, job) => {
     if (!repository.applyNutritionMutation) throw new Error('Update the sync repository.');
     return repository.applyNutritionMutation(owner, job.id, job.data);
   }
+  if (job.kind === 'workout-delete') { await repository.deleteWorkout(owner, job.data.sessionId); return; }
   await repository.saveWorkout(owner, job.data);
 }, () => {
   const state = syncEngine;
@@ -111,8 +114,12 @@ export function activateSync(owner: string | null) {
     for (const pending of next.pendingWorkouts) {
       if (data.liftSessions?.includes(pending.workout.session.id)) continue;
       data.lastRecords = detectRecords(data.lifts ?? {}, pending.workout);
+      // The session itself is kept outside this blob so it can be reopened and corrected later;
+      // the running totals above stay as they were, so finishing costs no extra recomputation.
+      try { writeArchive(syncEngine.owner!, archiveSession(readArchive(syncEngine.owner!), pending.workout, data.lifts ?? {})); }
+      catch { /* the archive is for editing; never block a session from being recorded */ }
       data.lifts = recordWorkout(data.lifts ?? {}, pending.workout);
-      data.volumeLog = [...(data.volumeLog ?? []), { date: dateKeyOf(pending.workout.endedAtMs), value: sessionVolume(pending.workout) }].slice(-120);
+      data.volumeLog = [...(data.volumeLog ?? []), { date: dateKeyOf(pending.workout.endedAtMs), value: sessionVolume(pending.workout), sessionId: pending.workout.session.id }].slice(-120);
       data.liftSessions = [...(data.liftSessions ?? []), pending.workout.session.id].slice(-200);
     }
     // Draft and all new completed sessions enter the same atomic SQLite write.
@@ -127,6 +134,40 @@ export function activateSync(owner: string | null) {
   };
   syncBridge.drain = drainSync; syncBridge.refresh = refreshDiary;
   useSyncStatus.setState({ ready: true });
+}
+
+/**
+ * Applies a correction to a session that has already finished. Bests are maxima, so a wrong
+ * number cannot be lowered in place: the whole retained window is folded again from the
+ * baseline, and the session is re-queued for upload as its own revision.
+ */
+export function saveEditedSession(workout: CompletedWorkout) {
+  const owner = syncEngine.owner;
+  if (!owner) throw new Error('Sign in to edit a saved workout.');
+  const edited: CompletedWorkout = { ...workout, editedAtMs: Date.now() };
+  const archive = replaceSession(readArchive(owner), edited);
+  if (!archive.sessions.some(entry => entry.session.id === edited.session.id)) throw new Error('This workout is no longer saved on this device.');
+  writeArchive(owner, archive);
+  const rebuilt = rebuildHistory(archive, syncEngine.data.volumeLog ?? []);
+  // A new id per revision: a retry of the previous upload must not be mistaken for this one.
+  const id = `workout:${edited.session.id}:${edited.editedAtMs}`;
+  syncEngine.queue({ kind: 'workout', data: edited }, id, rebuilt);
+  void syncEngine.drain();
+  return edited;
+}
+
+/** Removes a session from history entirely, on the device and in the cloud. */
+export function deleteSavedSession(sessionId: string) {
+  const owner = syncEngine.owner;
+  if (!owner) throw new Error('Sign in to delete a saved workout.');
+  const archive = removeSession(readArchive(owner), sessionId);
+  writeArchive(owner, archive);
+  const rebuilt = rebuildHistory(archive, (syncEngine.data.volumeLog ?? []).filter(point => point.sessionId !== sessionId));
+  syncEngine.queue({ kind: 'workout-delete', data: { sessionId } }, `workout-delete:${sessionId}:${Date.now()}`, {
+    ...rebuilt,
+    liftSessions: (syncEngine.data.liftSessions ?? []).filter(id => id !== sessionId),
+  });
+  void syncEngine.drain();
 }
 
 /** Fetch first; an unavailable cloud must never erase the user's queued edit. */

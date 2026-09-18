@@ -13,6 +13,7 @@ import type { DurableStorage } from './storage';
 export interface NutritionMutation { legacyMetricPatch?: { isAdherent?: boolean; bodyWeightKg?: number | null }; date: string; macros: MacroTotals; micros: MicronutrientTotals; patch: { isAdherent?: boolean; bodyWeightLbs?: number | null } }
 export interface FoodEntryMutation { op: 'upsert' | 'delete'; entry: FoodEntry }
 export type SyncPayload = { kind: 'routine'; data: WorkoutRoutine } | { kind: 'nutrition'; data: NutritionMutation } | { kind: 'workout'; data: CompletedWorkout }
+  | { kind: 'workout-delete'; data: { sessionId: string } }
   | { kind: 'food-entry'; data: FoodEntryMutation }
   | { kind: 'health-workout'; data: HealthWorkout } | { kind: 'health-meal'; data: HealthMeal } | { kind: 'activity'; data: ActivitySnapshot };
 export type Mutation = SyncPayload & { id: string; attempts: number; nextAttemptAt: number; blocked: boolean; error: string | null };

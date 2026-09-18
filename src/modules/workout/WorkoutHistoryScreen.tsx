@@ -10,18 +10,25 @@ import { exerciseById } from './catalog';
 import { MUSCLE_LABELS } from './volume';
 import { VolumeTrend } from './VolumeTrend';
 import type { LiftHistory, SessionVolumePoint } from './history';
+import { sessionVolume } from './history';
 import { bigThree } from './bigThree';
+import { byNewest, readArchive } from './sessions';
+import { SessionEditor } from './SessionEditor';
+import type { CompletedWorkout } from '../../types/workout';
 const WEEK = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const pad = (value: number) => String(value).padStart(2, '0');
 const keyFor = (year: number, month: number, day: number) => `${year}-${pad(month + 1)}-${pad(day)}`;
 const leadingBlanks = (year: number, month: number) => (new Date(year, month, 1).getDay() + 6) % 7;
 const dayLabel = (date: string) => new Date(`${date}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-type Tab = 'calendar' | 'records';
+type Tab = 'calendar' | 'sessions' | 'records';
 export default function WorkoutHistoryScreen() {
   const owner = useAuthStore(s => s.session?.user.id);
   const [lifts, setLifts] = useState<LiftHistory>({});
   const [volumeLog, setVolumeLog] = useState<SessionVolumePoint[]>([]);
   const [tab, setTab] = useState<Tab>('calendar');
+  const [sessions, setSessions] = useState<CompletedWorkout[]>([]);
+  const [editing, setEditing] = useState<CompletedWorkout | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [cursor, setCursor] = useState(() => { const now = new Date(); return { year: now.getFullYear(), month: now.getMonth() }; });
   useEffect(() => {
     let active = true;
@@ -30,9 +37,32 @@ export default function WorkoutHistoryScreen() {
       const { syncEngine } = await import('../sync/runtime');
       if (!active || syncEngine.owner !== owner) return;
       setLifts(syncEngine.data.lifts ?? {}); setVolumeLog(syncEngine.data.volumeLog ?? []);
+      setSessions(byNewest(readArchive(owner).sessions));
     })();
     return () => { active = false; };
   }, [owner]);
+  /** After an edit, every screen that reads derived history has to see the rebuilt numbers. */
+  const refresh = async () => {
+    if (!owner) return;
+    const { syncEngine } = await import('../sync/runtime');
+    if (syncEngine.owner !== owner) return;
+    setLifts(syncEngine.data.lifts ?? {}); setVolumeLog(syncEngine.data.volumeLog ?? []);
+    setSessions(byNewest(readArchive(owner).sessions));
+  };
+  const applyEdit = async (edited: CompletedWorkout) => {
+    try {
+      const { saveEditedSession } = await import('../sync/runtime');
+      saveEditedSession(edited);
+      await refresh(); setNotice('Session updated. Your bests and volume have been recalculated.');
+    } catch (cause) { setNotice(cause instanceof Error ? cause.message : 'That change could not be saved.'); }
+  };
+  const applyDelete = async (sessionId: string) => {
+    try {
+      const { deleteSavedSession } = await import('../sync/runtime');
+      deleteSavedSession(sessionId);
+      await refresh(); setNotice('Session deleted. It has been removed from your totals.');
+    } catch (cause) { setNotice(cause instanceof Error ? cause.message : 'That session could not be deleted.'); }
+  };
   const byDate = useMemo(() => {
     const map = new Map<string, number>();
     for (const point of volumeLog) map.set(point.date, (map.get(point.date) ?? 0) + point.value);
@@ -53,13 +83,15 @@ export default function WorkoutHistoryScreen() {
     <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 110, maxWidth: 760, width: '100%', alignSelf: 'center' }}>
       <Reveal index={0}>
         <View className="mb-4 flex-row flex-wrap">
-          {([['calendar', 'Calendar'], ['records', 'Personal records']] as const).map(([value, label]) =>
+          {([['calendar', 'Calendar'], ['sessions', 'Sessions'], ['records', 'Personal records']] as const).map(([value, label]) =>
             <Pressable key={value} accessibilityRole="tab" accessibilityState={{ selected: tab === value }} accessibilityLabel={label}
               onPress={() => { setTab(value); haptic('selection'); }} weight="firm"
               className={`mb-2 mr-2 rounded-full px-5 py-3 ${tab === value ? 'bg-accent' : 'bg-surface'}`}>
               <Text className="font-bold">{label}</Text></Pressable>)}
         </View>
       </Reveal>
+
+      {notice && <Text accessibilityRole="alert" className="mb-3 rounded-xl bg-raised p-3 text-sm">{notice}</Text>}
 
       {tab === 'calendar' && <>
         <Reveal index={1}>
@@ -88,6 +120,27 @@ export default function WorkoutHistoryScreen() {
         </Reveal>
         <Reveal index={2}><VolumeTrend log={volumeLog} /></Reveal>
       </>}
+
+      {tab === 'sessions' && <Reveal index={1}>
+        {/* A workout is a record of what happened, and what happened is sometimes only clear
+            afterwards — so any of these can be reopened and corrected, at any time. */}
+        {!sessions.length && <View className="rounded-3xl border border-border bg-surface p-6">
+          <Text className="text-xl font-bold">No sessions saved yet</Text>
+          <Text className="mt-2">Finish a workout and it appears here, where you can correct a set you mistyped, add one you forgot, or write down what to remember for next time.</Text>
+        </View>}
+        {sessions.map(entry => <Pressable key={entry.session.id} accessibilityRole="button"
+          accessibilityLabel={`Edit ${entry.session.name}, ${dayLabel(new Date(entry.endedAtMs).toISOString().slice(0, 10))}`}
+          onPress={() => { setNotice(null); setEditing(entry); }} weight="subtle"
+          className="mb-3 rounded-3xl border border-border bg-surface p-5">
+          <View className="flex-row items-baseline justify-between gap-3">
+            <Text className="flex-1 font-bold" numberOfLines={1}>{entry.session.name}</Text>
+            <Text className="text-sm">{dayLabel(new Date(entry.endedAtMs).toISOString().slice(0, 10))}</Text>
+          </View>
+          <Text className="mt-2 text-sm">{entry.exercises.length} exercise{entry.exercises.length === 1 ? '' : 's'} · {entry.sets.filter(set => !set.isWarmup).length} hard sets · {Math.round(sessionVolume(entry)).toLocaleString()} lbs</Text>
+          {entry.exercises.some(slot => slot.note) && <Text className="mt-2 text-sm" numberOfLines={2}>“{entry.exercises.find(slot => slot.note)!.note}”</Text>}
+          {entry.editedAtMs && <Text className="mt-2 text-xs">Edited {dayLabel(new Date(entry.editedAtMs).toISOString().slice(0, 10))}</Text>}
+        </Pressable>)}
+      </Reveal>}
 
       {tab === 'records' && <>
         <Reveal index={1}><View className="mb-3 rounded-3xl border border-border bg-surface p-5">
@@ -129,5 +182,7 @@ export default function WorkoutHistoryScreen() {
         </Reveal>
       </>}
     </ScrollView>
+    {editing && <SessionEditor workout={editing} onClose={() => setEditing(null)}
+      onSave={edited => void applyEdit(edited)} onDelete={() => void applyDelete(editing.session.id)} />}
   </SafeAreaView>;
 }

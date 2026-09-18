@@ -160,3 +160,50 @@ test('finishing returns a detached snapshot and clears all active workout state'
   completed.exercises[0].exercise.name = 'Caller mutation';
   assert.equal(before.exerciseSequence[0].exercise.name, 'High-Pronated Grip Row');
 });
+
+test('replacing an exercise keeps its slot and rest, and takes the old lift’s numbers with it', () => {
+  const { store } = workoutFixture();
+  store.getState().addSet({ id: 'set-1', sessionExerciseId: 'sequence-1', weightLbs: 135, reps: 8 });
+  store.getState().addSet({ id: 'set-2', sessionExerciseId: 'sequence-1' });
+  store.getState().completeSet('set-1', 2000);
+  store.getState().addSet({ id: 'other', sessionExerciseId: 'sequence-2', weightLbs: 50, reps: 10 });
+  store.getState().setExerciseNote('sequence-1', '  bench 4, pin 7  ');
+  assert.equal(store.getState().exerciseSequence[0].note, 'bench 4, pin 7');
+  assert.ok(store.getState().restTimer, 'completing a set started the rest timer');
+
+  store.getState().replaceExercise('sequence-1', { id: 'lift-9', name: 'Chest-Supported Row' }, 120);
+  const [first, second] = store.getState().exerciseSequence;
+  assert.equal(first.id, 'sequence-1', 'the slot keeps its identity, so order and active tab survive');
+  assert.equal(first.exercise.name, 'Chest-Supported Row');
+  assert.equal(first.defaultRestSeconds, 120);
+  assert.equal(first.note, undefined, 'the note described the lift that was replaced');
+  assert.equal(second.exercise.name, 'High-Pronated Grip Row', 'other slots are untouched');
+
+  const swapped = store.getState().sets.filter(s => s.sessionExerciseId === 'sequence-1');
+  assert.equal(swapped.length, 2, 'the same number of sets remain to be worked through');
+  assert.ok(swapped.every(s => s.weightLbs === null && s.reps === null && s.completedAtMs === null),
+    'a set logged against the old lift is not re-attributed to the new one');
+  assert.ok(swapped.every(s => s.restSeconds === 120));
+  assert.equal(store.getState().sets.find(s => s.id === 'other')?.weightLbs, 50);
+  assert.equal(store.getState().restTimer, null, 'the timer belonged to a set that no longer exists');
+
+  assert.throws(() => store.getState().replaceExercise('nope', { id: 'lift-9', name: 'Row' }), /Unknown exercise/);
+  assert.throws(() => store.getState().replaceExercise('sequence-1', { id: 'lift-9', name: '  ' }), TypeError);
+  assert.throws(() => store.getState().replaceExercise('sequence-1', { id: 'lift-9', name: 'Row' }, 5000), RangeError);
+});
+
+test('an exercise note is trimmed, bounded, and cleared by blanking it', () => {
+  const { store } = workoutFixture();
+  store.getState().setExerciseNote('sequence-1', ' seat 3 ');
+  assert.equal(store.getState().exerciseSequence[0].note, 'seat 3');
+  store.getState().setExerciseNote('sequence-1', '   ');
+  assert.ok(!('note' in store.getState().exerciseSequence[0]), 'a blank note is removed, not stored as whitespace');
+  assert.throws(() => store.getState().setExerciseNote('sequence-1', 'x'.repeat(281)), RangeError);
+  assert.throws(() => store.getState().setExerciseNote('missing', 'hi'), /Unknown exercise/);
+
+  // A note survives into the saved workout, which is the whole point of writing it down.
+  store.getState().setExerciseNote('sequence-1', 'left side lagging');
+  store.getState().addSet({ id: 'set-1', sessionExerciseId: 'sequence-1', weightLbs: 100, reps: 5 });
+  store.getState().completeSet('set-1', 3000);
+  assert.equal(store.getState().finishSession(4000).exercises[0].note, 'left side lagging');
+});

@@ -18,7 +18,11 @@ export interface TrackingRepository {
   loadDay(userId: string, date: string): Promise<DailyTotals | null>;
   saveDay(userId: string, totals: DailyTotals): Promise<void>;
   saveWorkout(userId: string, workout: CompletedWorkout): Promise<string>;
+  /** Removes a session and, by cascade, its sets and per-exercise notes. */
+  deleteWorkout(userId: string, sessionId: string): Promise<void>;
 }
+/** The row id a session gets in the cloud. Derived, so a retry addresses the same workout. */
+export const workoutRowId = (userId: string, sessionId: string) => uuid(`${userId}/${sessionId}`, uuid.URL);
 function check(error: { message: string } | null) {
   if (error) throw Object.assign(new Error(error.message), error);
 }
@@ -36,6 +40,33 @@ export function createTrackingRepository(client: SupabaseClient): TrackingReposi
     await verify(userId);
     // DO NOTHING preserves an existing profile and its measurements/advanced settings.
     const { error } = await client.from('users').upsert({ id: userId }, { onConflict: 'id', ignoreDuplicates: true });
+    check(error);
+  }
+  /** Drops rows an edit no longer has, addressed by id so a composite key needs no filter dance. */
+  async function pruneSets(workoutId: string, keep: string[]) {
+    const kept = new Set(keep);
+    const { data, error } = await client.from('sets')
+      .select('id, exercise_position, set_position').eq('workout_id', workoutId);
+    check(error);
+    const stale = (data ?? []).filter(row => !kept.has(`${row.exercise_position}:${row.set_position}`)).map(row => row.id);
+    if (!stale.length) return;
+    const { error: deleteError } = await client.from('sets').delete().in('id', stale);
+    check(deleteError);
+  }
+  /** A note belongs to an exercise's place in the session, the same key its sets use. */
+  async function saveExerciseNotes(workoutId: string, workout: CompletedWorkout) {
+    const rows = workout.exercises
+      .map((entry, index) => ({ workout_id: workoutId, exercise_position: index + 1, note: entry.note?.trim() ?? '' }))
+      .filter(row => row.note.length > 0);
+    if (rows.length) {
+      const { error } = await client.from('workout_exercise_notes')
+        .upsert(rows, { onConflict: 'workout_id,exercise_position' });
+      check(error);
+    }
+    const kept = rows.map(row => row.exercise_position);
+    const query = client.from('workout_exercise_notes').delete().eq('workout_id', workoutId);
+    // A cleared note is a deletion; with none left, every row for this workout goes.
+    const { error } = await (kept.length ? query.not('exercise_position', 'in', `(${kept.join(',')})`) : query);
     check(error);
   }
   return {
@@ -95,7 +126,9 @@ export function createTrackingRepository(client: SupabaseClient): TrackingReposi
       const { data: existing, error: readError } = await client.from('workouts')
         .select('finished_at').eq('id', id).eq('user_id', userId).single();
       check(readError);
-      if (existing?.finished_at) return id;
+      // Write-once, so a retry after an ambiguous response cannot double up — unless the caller
+      // is deliberately revising a session that was already saved.
+      if (existing?.finished_at && !workout.editedAtMs) return id;
       const positions = new Map(workout.exercises.map((e, i) => [e.id, { id: e.exercise.id, position: i + 1 }]));
       const counts = new Map<string, number>();
       const rows = completed.map(s => {
@@ -113,13 +146,27 @@ export function createTrackingRepository(client: SupabaseClient): TrackingReposi
         const { error } = await client.from('sets').upsert(rows, { onConflict: 'workout_id,exercise_position,set_position' });
         check(error);
       }
+      // Written after the upsert, never before: a set the edit removed must not be deleted
+      // until its replacements are safely in, or a failure here would lose both.
+      await pruneSets(id, rows.map(row => `${row.exercise_position}:${row.set_position}`));
+      await saveExerciseNotes(id, workout);
       await verify(userId);
       const { error } = await client.from('workouts').update({
+        name: workout.session.name,
+        workout_date: dateKey(workout.session.startedAtMs),
+        started_at: new Date(workout.session.startedAtMs).toISOString(),
         finished_at: new Date(workout.endedAtMs).toISOString(),
         duration_seconds: Math.floor((workout.endedAtMs - workout.session.startedAtMs) / 1000),
       }).eq('id', id).eq('user_id', userId).select('id').single();
       check(error);
       return id;
+    },
+    async deleteWorkout(userId, sessionId) {
+      await verify(userId);
+      // Sets and exercise notes both cascade from the workout row.
+      const { error } = await client.from('workouts').delete()
+        .eq('id', workoutRowId(userId, sessionId)).eq('user_id', userId);
+      check(error);
     },
   };
 }

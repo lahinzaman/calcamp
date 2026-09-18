@@ -7,7 +7,7 @@ import type { TrackingRepository, DailyTotals } from '../../api/trackingReposito
 const macros = { caloriesKcal: 400, proteinG: 20, carbsG: 40, fatG: 18 };
 const date = new Date(2026, 8, 7, 12);
 function repository(overrides: Partial<TrackingRepository> = {}): TrackingRepository {
-  return { userId: async () => 'alice', loadDay: async () => null, saveDay: async () => {}, saveWorkout: async () => 'saved-id', ...overrides };
+  return { userId: async () => 'alice', loadDay: async () => null, saveDay: async () => {}, saveWorkout: async () => 'saved-id', deleteWorkout: async () => {}, ...overrides };
 }
 test('cloud diary hydration precedes edits; retries write complete totals without double counting', async () => {
   let saved: DailyTotals | null = null;

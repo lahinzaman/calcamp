@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { Text } from '../../theme/primitives';
+import { MAINTAIN_TOP } from '../../components/listBehavior';
 import { Pressable } from '../../theme/Pressable';
 import { TextInput } from '../../theme/primitives';
 import { haptic } from '../../theme/haptics';
@@ -62,6 +63,12 @@ export function ExercisePicker({ catalog = EXERCISE_CATALOG, selectedIds, onTogg
   const matches = useMemo(() => filterExercises(catalog, { query, ...filters }), [catalog, query, filters]);
   // Narrowing 232 exercises to a handful while scrolled halfway down left the list parked past
   // its own end, showing nothing. New results start at the top.
+  //
+  // The reset alone was not enough. FlashList v2 turns `maintainVisibleContentPosition` on by
+  // default, which anchors the scroll to whatever row was visible and re-applies that offset on
+  // the layout pass *after* this effect runs — so narrowing, and then clearing the search again,
+  // both put you back in the middle of the list. Search results are read from the top, so
+  // MAINTAIN_TOP turns the anchoring off.
   const list = useRef<FlashListRef<CatalogExercise>>(null);
   useEffect(() => { list.current?.scrollToOffset({ offset: 0, animated: false }); }, [query, filters]);
   const count = activeFilterCount(filters);
@@ -95,6 +102,7 @@ export function ExercisePicker({ catalog = EXERCISE_CATALOG, selectedIds, onTogg
     {matches.length === 0
       ? <View className="flex-1 items-center justify-center px-8"><Text className="text-center">Nothing matches that. Clear a filter or search for a shorter word.</Text></View>
       : <FlashList ref={list} data={matches} keyExtractor={exercise => exercise.id} style={{ flex: 1 }} keyboardShouldPersistTaps="always" keyboardDismissMode="on-drag"
+          maintainVisibleContentPosition={MAINTAIN_TOP}
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
           renderItem={({ item }) => <ExerciseRow exercise={item} chosen={selectedIds.includes(item.id)} onToggle={onToggle} />} />}
     <View className="gap-2 px-5 pb-4">{footer}</View>

@@ -11,6 +11,9 @@ import { useAuthStore } from '../../store/authStore';
 import { exerciseById } from './catalog';
 import { ExerciseHelp } from './ExerciseHelp';
 import { ExercisePicker } from './ExercisePicker';
+import { CustomExerciseSheet } from './CustomExerciseSheet';
+import { archiveOwnExercise, saveOwnExercise } from '../sync/runtime';
+import { fromCatalogExercise, type CustomExercise } from '../../api/customExercises';
 import { defaultRoutineExercise, validateRoutine, REST_CHOICES, type WorkoutRoutine } from './routines';
 import { EXPERIENCE_LEVELS, EXPERIENCE_NOTES, MUSCLE_LABELS, WEEKLY_SET_TARGETS, volumeAdvice, weeklyVolume, type ExperienceLevel, type RoutineExercise } from './volume';
 import { readExperience, writeExperience } from './experience';
@@ -41,6 +44,7 @@ export function RoutineBuilder({ onClose, onSave, existing }: { onClose: () => v
   const [timesPerWeek, setTimesPerWeek] = useState(existing?.timesPerWeek ?? 2);
   const [experience, setExperience] = useState<ExperienceLevel>(() => readExperience(owner));
   const [error, setError] = useState<string | null>(null); const [busy, setBusy] = useState(false);
+  const [creating, setCreating] = useState<true | CustomExercise | null>(null);
   const ids = entries.map(entry => entry.exerciseId);
   const [low, high] = WEEKLY_SET_TARGETS[experience];
   const volume = useMemo(() => weeklyVolume([{ exercises: entries, timesPerWeek }], experience), [entries, timesPerWeek, experience]);
@@ -76,12 +80,15 @@ export function RoutineBuilder({ onClose, onSave, existing }: { onClose: () => v
           <Text className="text-2xl font-bold">{t('train.chooseExercises')}</Text>
           <Text className="mt-1 text-sm">Search or filter down to what your gym actually has. Sets and rest come next.</Text>
         </View>
-        <ExercisePicker selectedIds={ids} onToggle={toggle} onClose={onClose} footer={<>
+        <ExercisePicker selectedIds={ids} onToggle={toggle} onClose={onClose} onCreate={() => setCreating(true)} onEdit={exercise => setCreating(fromCatalogExercise(exercise))} footer={<>
           <Action label={ids.length ? `Set up ${ids.length} exercise${ids.length > 1 ? 's' : ''}` : 'Pick at least one exercise'}
             disabled={!ids.length} onPress={() => setStep('tune')} tone={ids.length ? 'success' : 'none'} />
           <Action secondary label={t('common.cancel')} onPress={onClose} />
         </>} />
       </SafeAreaView>
+      {creating && <CustomExerciseSheet existing={creating === true ? undefined : creating}
+        onClose={() => setCreating(null)} onArchive={archiveOwnExercise}
+        onSave={exercise => { const saved = saveOwnExercise(exercise); toggle(saved.id); return saved; }} />}
     </Modal>;
   }
 

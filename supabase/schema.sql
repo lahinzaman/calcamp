@@ -189,7 +189,10 @@ create table public.exercises (
   default_rest_seconds integer not null default 120 check (default_rest_seconds between 0 and 3600),
   is_archived boolean not null default false,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  -- How a set of this exercise is measured. Appended for the same reason as on public.sets.
+  tracking_type text not null default 'weight_reps'
+    check (tracking_type in ('weight_reps', 'bodyweight_reps', 'duration', 'distance_duration'))
 );
 comment on column public.exercises.owner_user_id is
   'NULL is a shared server-managed catalogue lift. Non-null exercises are private custom variations. Archive used exercises instead of deleting historical set references.';
@@ -212,7 +215,6 @@ create table public.sets (
   weight_kg numeric(9,3) check (weight_kg >= 0 and weight_kg < 'Infinity'::numeric),
   reps integer check (reps between 1 and 1000),
   rpe numeric(3,1) check (rpe between 1 and 10),
-  is_warmup boolean not null default false,
   is_completed boolean not null default false,
   rest_seconds integer check (rest_seconds between 0 and 3600),
   completed_at timestamptz,
@@ -224,8 +226,17 @@ create table public.sets (
   ) stored,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  -- Appended, because ADD COLUMN appends: a migrated database and a fresh one must agree on
+  -- column order or a positional insert means different things in each.
+  duration_seconds integer check (duration_seconds is null or duration_seconds between 1 and 86400),
+  distance_m numeric(12,3) check (distance_m is null or (distance_m > 0 and distance_m <= 1000000)),
+  set_type text not null default 'normal'
+    check (set_type in ('normal', 'warmup', 'drop', 'failure')),
   unique (workout_id, exercise_position, set_position),
-  check (not is_completed or (weight_kg is not null and reps is not null))
+  -- A plank has no weight and no reps. A completed set needs to have been measured by
+  -- something; which measurement is the right one is settled by set_measurements, below.
+  constraint sets_completed_has_a_measurement
+    check (not is_completed or reps is not null or duration_seconds is not null or distance_m is not null)
 );
 comment on column public.sets.estimated_1rm_kg is
   'Brzycki estimate matching the frontend for completed loaded sets of 2-12 reps; one rep uses actual load. Other cases are NULL. This is an estimate, not a prescription.';
@@ -263,16 +274,48 @@ $$;
 create trigger set_ownership before insert or update of workout_id, exercise_id on public.sets
   for each row execute function public.validate_set_ownership();
 
+-- A row check cannot see which exercise a set belongs to, so it can only insist that a
+-- completed set was measured by *something*. Which measurement is the right one depends on the
+-- exercise: reps and load for a bench press, seconds for a plank, metres for a carry. This is
+-- where that is enforced, so the database cannot hold a plank recorded as five reps.
+create function public.validate_set_measurements() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare kind text;
+begin
+  if not new.is_completed then return new; end if;
+  select tracking_type into kind from public.exercises where id = new.exercise_id;
+  if kind = 'weight_reps' and (new.weight_kg is null or new.reps is null) then
+    raise exception 'This exercise is measured in weight and reps' using errcode = '23514';
+  elsif kind = 'bodyweight_reps' and new.reps is null then
+    raise exception 'This exercise is measured in reps' using errcode = '23514';
+  elsif kind = 'duration' and new.duration_seconds is null then
+    raise exception 'This exercise is measured in time' using errcode = '23514';
+  elsif kind = 'distance_duration' and new.distance_m is null then
+    raise exception 'This exercise is measured in distance' using errcode = '23514';
+  end if;
+  -- A measurement the exercise does not have is not a detail to ignore; it is wrong data.
+  if kind in ('duration', 'distance_duration') and new.reps is not null then
+    raise exception 'This exercise is not measured in reps' using errcode = '23514';
+  end if;
+  if kind in ('weight_reps', 'bodyweight_reps') and (new.duration_seconds is not null or new.distance_m is not null) then
+    raise exception 'This exercise is not measured in time or distance' using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+create trigger set_measurements before insert or update on public.sets
+  for each row execute function public.validate_set_measurements();
+
 -- Atomic deltas prevent concurrent set writes from losing volume updates.
 create function public.update_workout_volume() returns trigger
 language plpgsql security definer set search_path = '' as $$
 declare old_volume numeric := 0; new_volume numeric := 0;
 begin
-  if tg_op <> 'INSERT' and old.is_completed and not old.is_warmup then
-    old_volume := old.weight_kg * old.reps;
+  if tg_op <> 'INSERT' and old.is_completed and old.set_type <> 'warmup' then
+    old_volume := coalesce(old.weight_kg, 0) * coalesce(old.reps, 0);
   end if;
-  if tg_op <> 'DELETE' and new.is_completed and not new.is_warmup then
-    new_volume := new.weight_kg * new.reps;
+  if tg_op <> 'DELETE' and new.is_completed and new.set_type <> 'warmup' then
+    new_volume := coalesce(new.weight_kg, 0) * coalesce(new.reps, 0);
   end if;
   if tg_op = 'UPDATE' and old.workout_id = new.workout_id then
     update public.workouts set volume_kg_reps = volume_kg_reps + new_volume - old_volume where id = new.workout_id;
@@ -411,7 +454,8 @@ create policy workout_exercise_notes_own_delete on public.workout_exercise_notes
 
 -- Trigger functions cannot be invoked as public RPCs. PostgreSQL invokes them via triggers.
 revoke all on function public.validate_micronutrients(), public.validate_set_ownership(),
-  public.update_workout_volume(), public.set_updated_at() from public, anon, authenticated;
+  public.validate_set_measurements(), public.update_workout_volume(), public.set_updated_at()
+  from public, anon, authenticated;
 
 commit;
 

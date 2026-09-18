@@ -1,4 +1,5 @@
 import type { WorkoutRoutine } from '../workout/routines';
+import type { CustomExercise } from '../../api/customExercises';
 import { migrateImperialSnapshot } from './imperialMigration';
 import { breadcrumb } from '../telemetry/events';
 import type { ActivitySnapshot } from '../../api/activity';
@@ -9,20 +10,24 @@ import type { HealthSummary, HealthWorkout, HealthMeal } from '../health/types';
 import type { CompletedWorkout } from '../../types/workout';
 import type { FoodEntry } from '../../types/foodEntry';
 import type { LiftHistory, PersonalRecord, SessionVolumePoint } from '../workout/history';
+import { normalizeSet } from '../workout/setShape';
 import type { DurableStorage } from './storage';
 export interface NutritionMutation { legacyMetricPatch?: { isAdherent?: boolean; bodyWeightKg?: number | null }; date: string; macros: MacroTotals; micros: MicronutrientTotals; patch: { isAdherent?: boolean; bodyWeightLbs?: number | null } }
 export interface FoodEntryMutation { op: 'upsert' | 'delete'; entry: FoodEntry }
 export type SyncPayload = { kind: 'routine'; data: WorkoutRoutine } | { kind: 'nutrition'; data: NutritionMutation } | { kind: 'workout'; data: CompletedWorkout }
   | { kind: 'workout-delete'; data: { sessionId: string } }
+  | { kind: 'custom-exercise'; data: CustomExercise } | { kind: 'custom-exercise-archive'; data: { id: string } }
   | { kind: 'food-entry'; data: FoodEntryMutation }
   | { kind: 'health-workout'; data: HealthWorkout } | { kind: 'health-meal'; data: HealthMeal } | { kind: 'activity'; data: ActivitySnapshot };
 export type Mutation = SyncPayload & { id: string; attempts: number; nextAttemptAt: number; blocked: boolean; error: string | null };
 export interface AccountData {
   version: 2; routines?: WorkoutRoutine[]; days: Record<string, DailyTotals>; entries?: Record<string, FoodEntry[]>;
+  /** Exercises this account created. Small, and needed offline before anything can be logged. */
+  customExercises?: CustomExercise[];
   lifts?: LiftHistory; volumeLog?: SessionVolumePoint[]; liftSessions?: string[]; lastRecords?: PersonalRecord[]; workout: WorkoutState | null; queue: Mutation[]; workoutReceipts: string[];
   health: { enabled: boolean; summary: HealthSummary | null; workouts: HealthWorkout[]; lastBatchAt: number | null; error: string | null; exported: string[] };
 }
-const fresh = (): AccountData => ({ version: 2, days: {}, entries: {}, lifts: {}, volumeLog: [], liftSessions: [], lastRecords: [], workout: null, queue: [], workoutReceipts: [], health: { enabled: false, summary: null, workouts: [], lastBatchAt: null, error: null, exported: [] } });
+const fresh = (): AccountData => ({ version: 2, days: {}, entries: {}, customExercises: [], lifts: {}, volumeLog: [], liftSessions: [], lastRecords: [], workout: null, queue: [], workoutReceipts: [], health: { enabled: false, summary: null, workouts: [], lastBatchAt: null, error: null, exported: [] } });
 export function retryDelay(attempt: number, random = Math.random) { return Math.min(300_000, Math.round(1000 * 2 ** Math.min(attempt, 9) * (0.8 + random() * 0.4))); }
 export function isPermanent(error: unknown) {
   const e = error as { code?: string; status?: number };
@@ -47,7 +52,12 @@ export class SyncEngine {
     const raw = owner ? this.storage.get(`account:${owner}`) : null;
     const data: AccountData = raw ? migrateImperialSnapshot(JSON.parse(raw)) as AccountData : fresh();
     if (data.version !== 2 || !Array.isArray(data.queue) || !data.days || !data.health) throw new Error('Offline storage needs recovery. Local data has been preserved.');
-    data.workoutReceipts ??= []; data.entries ??= {}; data.lifts ??= {}; data.volumeLog ??= []; data.liftSessions ??= []; data.lastRecords ??= [];
+    data.workoutReceipts ??= []; data.entries ??= {}; data.customExercises ??= []; data.lifts ??= {}; data.volumeLog ??= []; data.liftSessions ??= []; data.lastRecords ??= [];
+    // A session in progress when the app updated was written before sets had a kind, a duration
+    // or a distance. Reading it back through the normalizer is what stops a warm-up quietly
+    // becoming a working set — and a set without a `kind` failing validation on the next edit.
+    if (data.workout) data.workout = { ...data.workout, sets: data.workout.sets.map(normalizeSet) };
+    for (const pending of data.workout?.pendingWorkouts ?? []) pending.workout.sets = pending.workout.sets.map(normalizeSet);
     this.lastAckAt = null; this.generation++; this.revision++; this.owner = owner; this.data = data; this.storageError = null; this.changed();
   }
   commit(data: AccountData) {

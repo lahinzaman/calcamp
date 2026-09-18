@@ -8,43 +8,68 @@ import { haptic } from '../../theme/haptics';
 import { MAX_EXERCISE_NOTE } from '../../store/workoutStore';
 import { ExercisePickerSheet } from './ExercisePickerSheet';
 import { sessionVolume } from './history';
+import { isHardSet, SET_KIND_LABELS, SET_KIND_MARKS, SET_KINDS, SET_SHAPES, trackingTypeOf } from './setShape';
 import * as draftOps from './editDraft';
-import type { CompletedWorkout, WorkoutSet } from '../../types/workout';
+import type { CompletedWorkout, TrackingType, WorkoutSet } from '../../types/workout';
 
-const number = (value: string) => value.trim() ? Number(value) : null;
-const text = (value: number | null) => value === null ? '' : String(value);
+// A column the exercise does not have is simply absent from `fields`, so both of these have to
+// cope with undefined rather than assuming every set carries every measurement.
+const number = (value: string | undefined) => value?.trim() ? Number(value) : null;
+const text = (value: number | null | undefined) => value === null || value === undefined ? '' : String(value);
 const when = (ms: number) => new Date(ms).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
-function SetRow({ entry, index, onChange, onRemove }: {
-  entry: WorkoutSet; index: number; onChange: (edit: draftOps.SetEdit) => void; onRemove: () => void;
+function SetRow({ entry, index, trackingType, onChange, onRemove }: {
+  entry: WorkoutSet; index: number; trackingType: TrackingType;
+  onChange: (edit: draftOps.SetEdit) => void; onRemove: () => void;
 }) {
-  const [fields, setFields] = useState({ weightLbs: text(entry.weightLbs), reps: text(entry.reps), rpe: text(entry.rpe) });
-  const edit: draftOps.SetEdit = { weightLbs: number(fields.weightLbs), reps: number(fields.reps), rpe: number(fields.rpe), isWarmup: entry.isWarmup };
-  const problem = draftOps.validateSetEdit(edit);
+  const shape = SET_SHAPES[trackingType];
+  const columns = ([
+    { key: 'weightLbs', need: shape.weight, name: 'Weight lbs', label: 'lbs', keyboard: 'decimal-pad' as const },
+    { key: 'reps', need: shape.reps, name: 'Reps', label: 'Reps', keyboard: 'number-pad' as const },
+    { key: 'durationSeconds', need: shape.duration, name: 'Seconds', label: 'Secs', keyboard: 'number-pad' as const },
+    { key: 'distanceMeters', need: shape.distance, name: 'Metres', label: 'Metres', keyboard: 'decimal-pad' as const },
+    { key: 'rpe', need: 'optional' as const, name: 'RPE', label: 'RPE', keyboard: 'decimal-pad' as const },
+  ] as const).filter(column => column.need !== 'none');
+  const [fields, setFields] = useState<Record<string, string>>(
+    () => Object.fromEntries(columns.map(column => [column.key, text(entry[column.key])])));
+  const [kindOpen, setKindOpen] = useState(false);
+  const edit: draftOps.SetEdit = {
+    weightLbs: number(fields.weightLbs), reps: number(fields.reps), rpe: number(fields.rpe),
+    durationSeconds: number(fields.durationSeconds), distanceMeters: number(fields.distanceMeters), kind: entry.kind,
+  };
+  const problem = draftOps.validateSetEdit(edit, trackingType);
   // Typed text stays visible while it is being typed; only a valid row reaches the draft.
-  const update = (key: keyof typeof fields, value: string) => {
+  const update = (key: string, value: string) => {
     const next = { ...fields, [key]: value };
     setFields(next);
-    const candidate = { weightLbs: number(next.weightLbs), reps: number(next.reps), rpe: number(next.rpe), isWarmup: entry.isWarmup };
-    if (!draftOps.validateSetEdit(candidate)) onChange(candidate);
+    const candidate: draftOps.SetEdit = {
+      weightLbs: number(next.weightLbs), reps: number(next.reps), rpe: number(next.rpe),
+      durationSeconds: number(next.durationSeconds), distanceMeters: number(next.distanceMeters), kind: entry.kind,
+    };
+    if (!draftOps.validateSetEdit(candidate, trackingType)) onChange(candidate);
   };
   return <View className="mb-2 rounded-xl bg-background px-2 py-3">
     <View className="flex-row items-center gap-2">
-      <Text className="w-6 text-center font-bold">{entry.isWarmup ? 'W' : index + 1}</Text>
-      {(['weightLbs', 'reps', 'rpe'] as const).map(key => <View key={key} style={{ flex: 1 }}>
-        <Text className="mb-1 text-xs">{key === 'weightLbs' ? 'lbs' : key === 'reps' ? 'Reps' : 'RPE'}</Text>
-        <TextInput accessibilityLabel={`${key === 'weightLbs' ? 'Weight lbs' : key === 'reps' ? 'Reps' : 'RPE'} set ${index + 1}`}
-          value={fields[key]} onChangeText={value => update(key, value)} placeholder="—" selectTextOnFocus
-          keyboardType={key === 'reps' ? 'number-pad' : 'decimal-pad'}
+      <Pressable accessibilityRole="button" accessibilityLabel={`Set ${index + 1} type, ${SET_KIND_LABELS[entry.kind]}`}
+        onPress={() => setKindOpen(open => !open)} weight="subtle" className="mt-4 h-10 w-7 items-center justify-center">
+        <Text className="text-center font-bold">{SET_KIND_MARKS[entry.kind] || index + 1}</Text></Pressable>
+      {columns.map(column => <View key={column.key} style={{ flex: 1 }}>
+        <Text className="mb-1 text-xs">{column.label}</Text>
+        <TextInput accessibilityLabel={`${column.name} set ${index + 1}`}
+          value={fields[column.key] ?? ''} onChangeText={value => update(column.key, value)} placeholder="—" selectTextOnFocus
+          keyboardType={column.keyboard}
           className="min-h-12 rounded-lg border border-border bg-surface px-1 py-2 text-center font-semibold text-ink" />
       </View>)}
-      <Pressable accessibilityRole="switch" accessibilityState={{ checked: entry.isWarmup }} weight="subtle"
-        accessibilityLabel={`Warm-up set ${index + 1}`} onPress={() => onChange({ ...edit, isWarmup: !entry.isWarmup })}
-        className={`mt-4 min-h-12 justify-center rounded-lg px-2 ${entry.isWarmup ? 'bg-accent' : 'bg-raised'}`}>
-        <Text className="text-xs font-semibold">W</Text></Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel={`Remove set ${index + 1}`} onPress={onRemove}
         weight="subtle" className="mt-4 min-h-12 justify-center px-2"><Text className="text-lg">×</Text></Pressable>
     </View>
+    {kindOpen && <View className="mt-2 flex-row flex-wrap">
+      {SET_KINDS.map(kind => <Pressable key={kind} accessibilityRole="radio" accessibilityState={{ checked: entry.kind === kind }}
+        accessibilityLabel={`${SET_KIND_LABELS[kind]} set ${index + 1}`} weight="subtle"
+        onPress={() => { onChange({ ...edit, kind }); setKindOpen(false); }}
+        className={`mb-2 mr-2 min-h-11 justify-center rounded-full px-4 ${entry.kind === kind ? 'bg-accent' : 'bg-raised'}`}>
+        <Text className="text-sm font-semibold">{SET_KIND_LABELS[kind]}</Text></Pressable>)}
+    </View>}
     {problem && <Text accessibilityRole="alert" className="mt-1 pl-1 text-xs">{problem}</Text>}
   </View>;
 }
@@ -88,7 +113,7 @@ export function SessionEditor({ workout, onSave, onDelete, onClose }: {
         <Text className="text-sm">{when(draft.session.startedAtMs)}</Text>
         <Text className="mb-4 mt-1 text-3xl font-bold">Edit this session</Text>
         <Field label="Session name" value={name} onChangeText={setName} maxLength={80} placeholder="Upper A" />
-        <Text className="mb-5 text-sm">{Math.round(volume).toLocaleString()} lbs moved · {draft.sets.filter(entry => !entry.isWarmup).length} hard sets.
+        <Text className="mb-5 text-sm">{Math.round(volume).toLocaleString()} lbs moved · {draft.sets.filter(isHardSet).length} hard sets.
           {' '}Changing a set here updates your bests, your volume trend and the previous column.</Text>
 
         {draft.exercises.map(slot => {
@@ -100,7 +125,7 @@ export function SessionEditor({ workout, onSave, onDelete, onClose }: {
                 onPress={() => apply(current => draftOps.removeExercise(current, slot.id))}
                 className="min-h-11 justify-center rounded-full bg-raised px-4"><Text className="text-sm font-semibold">Remove</Text></Pressable>
             </View>
-            {sets.map((entry, index) => <SetRow key={entry.id} entry={entry} index={index}
+            {sets.map((entry, index) => <SetRow key={entry.id} entry={entry} index={index} trackingType={trackingTypeOf(slot.exercise)}
               onChange={edit => apply(current => draftOps.editSet(current, entry.id, edit))}
               onRemove={() => apply(current => draftOps.removeSet(current, entry.id))} />)}
             <Pressable accessibilityRole="button" accessibilityLabel={`Add a set to ${slot.exercise.name}`}

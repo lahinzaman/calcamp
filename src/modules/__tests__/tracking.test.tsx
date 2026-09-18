@@ -91,7 +91,7 @@ test('workout screen mounts an active session, estimates 1RM, and completes a se
   store.startSession({ id: 'session', name: 'Upper A' });
   store.addExercise({ id: 'row', exercise: { id: 'lift', name: 'High-Pronated Grip Row' }, defaultRestSeconds: 90 });
   store.addSet({ id: 'set', sessionExerciseId: 'row' });
-  await act(async () => { rendered = create(<ActiveWorkoutScreen previousSets={{ lift: [{ weightLbs: 90, reps: 5 }] }} />); });
+  await act(async () => { rendered = create(<ActiveWorkoutScreen previousSets={{ lift: [{ weightLbs: 90, reps: 5, durationSeconds: null, distanceMeters: null }] }} />); });
   assert.ok(textContent().includes('90 × 5'));
   await act(async () => findLabel('Weight lbs set 1').props.onChangeText('100'));
   await act(async () => findLabel('Reps set 1').props.onChangeText('5'));
@@ -110,11 +110,13 @@ test('a session takes an exercise the routine never mentioned, and a swap does n
   store.addSet({ id: 'set', sessionExerciseId: 'row' });
   await act(async () => { rendered = create(<ActiveWorkoutScreen />); });
 
-  // A warm-up is logged like any other set but is numbered W and stays out of hard-set volume.
+  // A warm-up is logged like any other set but is marked W and stays out of hard-set volume.
+  await act(async () => findLabel('Set 1 type, Working').props.onPress());
   await act(async () => findLabel('Warm-up set 1').props.onPress());
-  assert.equal(workoutStore.getState().sets[0].isWarmup, true);
-  await act(async () => findLabel('Warm-up set 1').props.onPress());
-  assert.equal(workoutStore.getState().sets[0].isWarmup, false);
+  assert.equal(workoutStore.getState().sets[0].kind, 'warmup');
+  await act(async () => findLabel('Set 1 type, Warm-up').props.onPress());
+  await act(async () => findLabel('Working set 1').props.onPress());
+  assert.equal(workoutStore.getState().sets[0].kind, 'normal');
 
   // The note is behind one tap so it never sits between you and the set you are logging.
   await act(async () => findLabel('Add a note for High-Pronated Grip Row').props.onPress());
@@ -345,7 +347,7 @@ const FINISHED = {
   session: { id: 'past-1', name: 'Upper A', startedAtMs: 1_700_000_000_000 - 3_600_000 },
   endedAtMs: 1_700_000_000_000,
   exercises: [{ id: 'slot', exercise: { id: 'bench', name: 'Bench Press' }, defaultRestSeconds: 120, note: 'seat 4' }],
-  sets: [{ id: 'one', sessionExerciseId: 'slot', weightLbs: 315, reps: 5, rpe: 8, isWarmup: false,
+  sets: [{ id: 'one', sessionExerciseId: 'slot', weightLbs: 315, reps: 5, rpe: 8, kind: 'normal' as const, durationSeconds: null, distanceMeters: null,
     restSeconds: 120, estimatedOneRepMaxLbs: 354.4, completedAtMs: 1_700_000_000_000 - 900_000 }],
 };
 

@@ -1,6 +1,7 @@
 import { MAX_EXERCISE_NOTE } from '../../store/workoutStore';
 import { estimateBrzyckiOneRepMax } from './oneRepMax';
-import type { CompletedWorkout, ExerciseDefinition, WorkoutSet } from '../../types/workout';
+import { missingFor, outOfRange, supportsOneRepMax, trackingTypeOf } from './setShape';
+import type { CompletedWorkout, ExerciseDefinition, SetKind, WorkoutSet } from '../../types/workout';
 
 /**
  * Editing a session that has already finished. The live store cannot be reused for this: it
@@ -11,22 +12,28 @@ import type { CompletedWorkout, ExerciseDefinition, WorkoutSet } from '../../typ
  * Only completed sets are kept when a session is saved, so every row here is a logged set:
  * there is no "waiting to be done" state left to represent.
  */
-export interface SetEdit { weightLbs: number | null; reps: number | null; rpe: number | null; isWarmup: boolean }
+export interface SetEdit {
+  weightLbs: number | null; reps: number | null; rpe: number | null;
+  durationSeconds: number | null; distanceMeters: number | null; kind: SetKind;
+}
+const trackingFor = (draft: CompletedWorkout, sessionExerciseId: string) =>
+  trackingTypeOf(draft.exercises.find(entry => entry.id === sessionExerciseId)?.exercise);
 
 const newId = () => `edit-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
-export function validateSetEdit(edit: SetEdit): string | null {
-  if (edit.weightLbs === null || !Number.isFinite(edit.weightLbs) || edit.weightLbs < 0) return 'Enter a weight of 0 lbs or more.';
-  if (edit.reps === null || !Number.isInteger(edit.reps) || edit.reps < 1 || edit.reps > 1000) return 'Enter whole reps from 1 to 1000.';
-  if (edit.rpe !== null && (!Number.isFinite(edit.rpe) || edit.rpe < 1 || edit.rpe > 10)) return 'RPE runs from 1 to 10, or leave it empty.';
-  return null;
+/** Every row here is a set that was logged, so what the exercise measures has to be present. */
+export function validateSetEdit(edit: SetEdit, trackingType = trackingTypeOf(undefined)): string | null {
+  return outOfRange(edit) ?? missingFor(edit, trackingType);
 }
 
 export function editSet(draft: CompletedWorkout, setId: string, edit: SetEdit): CompletedWorkout {
-  const problem = validateSetEdit(edit);
+  const original = draft.sets.find(entry => entry.id === setId);
+  if (!original) throw new Error('Unknown set.');
+  const trackingType = trackingFor(draft, original.sessionExerciseId);
+  const problem = validateSetEdit(edit, trackingType);
   if (problem) throw new RangeError(problem);
   return { ...draft, sets: draft.sets.map(entry => entry.id === setId
-    ? { ...entry, ...edit, estimatedOneRepMaxLbs: estimateBrzyckiOneRepMax(edit.weightLbs, edit.reps) }
+    ? { ...entry, ...edit, estimatedOneRepMaxLbs: supportsOneRepMax(trackingType) ? estimateBrzyckiOneRepMax(edit.weightLbs, edit.reps) : null }
     : entry) };
 }
 
@@ -43,7 +50,8 @@ export function addSet(draft: CompletedWorkout, sessionExerciseId: string): Comp
   const entry: WorkoutSet = {
     id: newId(), sessionExerciseId,
     weightLbs: previous?.weightLbs ?? null, reps: previous?.reps ?? null, rpe: null,
-    isWarmup: previous?.isWarmup ?? false, restSeconds: slot.defaultRestSeconds,
+    durationSeconds: previous?.durationSeconds ?? null, distanceMeters: previous?.distanceMeters ?? null,
+    kind: previous?.kind ?? 'normal', restSeconds: slot.defaultRestSeconds,
     estimatedOneRepMaxLbs: previous?.estimatedOneRepMaxLbs ?? null,
     // A set added afterwards is dated to the session it belongs to, not to today.
     completedAtMs: previous?.completedAtMs ?? draft.endedAtMs,
@@ -89,7 +97,7 @@ export function validateDraft(draft: CompletedWorkout): string | null {
   if (!draft.session.name.trim()) return 'Name this session before saving.';
   if (!draft.exercises.length) return 'A session needs at least one exercise. Delete it instead if it should not be there.';
   for (const entry of draft.sets) {
-    const problem = validateSetEdit(entry);
+    const problem = validateSetEdit(entry, trackingFor(draft, entry.sessionExerciseId));
     if (problem) return problem;
   }
   const orphan = draft.sets.find(entry => !draft.exercises.some(slot => slot.id === entry.sessionExerciseId));

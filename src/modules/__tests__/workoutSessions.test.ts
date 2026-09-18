@@ -12,7 +12,7 @@ function session(id: string, endedAtMs: number, sets: { weightLbs: number; reps:
     exercises: [{ id: `${id}-slot`, exercise: { id: 'bench', name: 'Bench Press' }, defaultRestSeconds: 120 }],
     sets: sets.map((set, index) => ({
       id: `${id}-set-${index}`, sessionExerciseId: `${id}-slot`, weightLbs: set.weightLbs, reps: set.reps,
-      rpe: null, isWarmup: false, restSeconds: 120, estimatedOneRepMaxLbs: set.weightLbs, completedAtMs: endedAtMs - 60_000,
+      rpe: null, kind: 'normal' as const, durationSeconds: null, distanceMeters: null, restSeconds: 120, estimatedOneRepMaxLbs: set.weightLbs, completedAtMs: endedAtMs - 60_000,
     })),
   };
 }
@@ -33,7 +33,8 @@ test('correcting a set that was logged too heavy actually lowers the personal be
   const rebuilt = rebuildHistory(archive);
   assert.equal(rebuilt.lifts.bench.bestWeightLbs, 185, 'rebuilding from the baseline drops it to the real best');
   assert.equal(rebuilt.lifts.bench.sessions, 2, 'an edit is not a second session');
-  assert.deepEqual(rebuilt.lifts.bench.lastSets, [{ weightLbs: 135, reps: 5 }], 'and the previous column shows the correction');
+  assert.deepEqual(rebuilt.lifts.bench.lastSets, [{ weightLbs: 135, reps: 5, durationSeconds: null, distanceMeters: null }],
+    'and the previous column shows the correction');
 });
 
 test('a session that predates the archive still counts, and one evicted from it is not forgotten', () => {

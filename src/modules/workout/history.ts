@@ -1,8 +1,17 @@
-import type { CompletedWorkout } from '../../types/workout';
+import { isHardSet, setVolumeLbs, supportsOneRepMax, trackingTypeOf } from './setShape';
+import type { CompletedWorkout, WorkoutSet } from '../../types/workout';
+/**
+ * One set as history remembers it. Every field is nullable because a plank has no reps and a
+ * carry has no weight; the exercise's tracking type decides which of them mean anything.
+ */
+export interface RecordedSet {
+  weightLbs: number | null; reps: number | null;
+  durationSeconds: number | null; distanceMeters: number | null;
+}
 export interface LiftRecord {
   exerciseId: string;
   /** Working sets from the most recent session, in order, for the "previous" column. */
-  lastSets: { weightLbs: number; reps: number }[];
+  lastSets: RecordedSet[];
   lastPerformedMs: number;
   bestOneRepMaxLbs: number;
   bestWeightLbs: number;
@@ -16,7 +25,26 @@ export type LiftHistory = Record<string, LiftRecord>;
  * day's total belonged to the session that changed.
  */
 export interface SessionVolumePoint { date: string; value: number; sessionId?: string }
-const working = (workout: CompletedWorkout) => workout.sets.filter(set => set.completedAtMs !== null && !set.isWarmup && set.weightLbs !== null && set.reps !== null);
+/**
+ * The sets a lift's history is built from: completed, not a warm-up, and carrying external load
+ * across reps. A plank or a carry is real work, but it has no weight × reps to compare, so it
+ * is left out of bests and volume rather than counted as zero.
+ */
+const exerciseOf = (workout: CompletedWorkout, set: WorkoutSet) =>
+  workout.exercises.find(entry => entry.id === set.sessionExerciseId);
+/** Everything that counted as work, whatever it was measured in. Warm-ups are not work. */
+const hardSets = (workout: CompletedWorkout) => workout.sets.filter(set => set.completedAtMs !== null && isHardSet(set));
+/**
+ * The subset that bests can be computed from: external load across reps. A plank is real work
+ * and belongs in `lastSets`, but it has no weight to be a record and no 1RM to estimate, so it
+ * is left out of those rather than counted as zero.
+ */
+const working = (workout: CompletedWorkout) => hardSets(workout).filter(set =>
+  set.weightLbs !== null && set.reps !== null
+  && supportsOneRepMax(trackingTypeOf(exerciseOf(workout, set)?.exercise)));
+const recorded = (set: WorkoutSet): RecordedSet => ({
+  weightLbs: set.weightLbs, reps: set.reps, durationSeconds: set.durationSeconds, distanceMeters: set.distanceMeters,
+});
 export function dateKeyOf(ms: number) {
   const date = new Date(ms);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -45,17 +73,20 @@ export function detectRecords(history: LiftHistory, workout: CompletedWorkout): 
 export function recordWorkout(history: LiftHistory, workout: CompletedWorkout): LiftHistory {
   const next: LiftHistory = { ...history };
   for (const exercise of workout.exercises) {
-    const sets = working(workout).filter(set => set.sessionExerciseId === exercise.id);
-    if (!sets.length) continue;
+    // Everything you did shows up as "last time", including the sets that have no weight.
+    const all = hardSets(workout).filter(set => set.sessionExerciseId === exercise.id);
+    if (!all.length) continue;
+    const loaded = working(workout).filter(set => set.sessionExerciseId === exercise.id);
     const id = exercise.exercise.id;
     const previous = next[id];
-    const volume = sets.reduce((sum, set) => sum + set.weightLbs! * set.reps!, 0);
+    const volume = loaded.reduce((sum, set) => sum + set.weightLbs! * set.reps!, 0);
     next[id] = {
       exerciseId: id,
-      lastSets: sets.map(set => ({ weightLbs: set.weightLbs!, reps: set.reps! })),
+      lastSets: all.map(recorded),
       lastPerformedMs: workout.endedAtMs,
-      bestOneRepMaxLbs: Math.max(previous?.bestOneRepMaxLbs ?? 0, ...sets.map(set => set.estimatedOneRepMaxLbs ?? 0)),
-      bestWeightLbs: Math.max(previous?.bestWeightLbs ?? 0, ...sets.map(set => set.weightLbs!)),
+      // Bests stay where they were when a session had nothing loaded to compare against.
+      bestOneRepMaxLbs: Math.max(previous?.bestOneRepMaxLbs ?? 0, ...loaded.map(set => set.estimatedOneRepMaxLbs ?? 0)),
+      bestWeightLbs: Math.max(previous?.bestWeightLbs ?? 0, ...loaded.map(set => set.weightLbs!)),
       bestSessionVolumeLbs: Math.max(previous?.bestSessionVolumeLbs ?? 0, volume),
       sessions: (previous?.sessions ?? 0) + 1,
     };
@@ -64,8 +95,12 @@ export function recordWorkout(history: LiftHistory, workout: CompletedWorkout): 
 }
 /** Next-session suggestion: add reps inside the range first, then weight once the top is held. */
 export function overloadSuggestion(record: LiftRecord | undefined, repRange: [number, number] = [6, 12]) {
-  if (!record?.lastSets.length) return null;
-  const top = record.lastSets.reduce((best, set) => set.weightLbs > best.weightLbs || (set.weightLbs === best.weightLbs && set.reps > best.reps) ? set : best);
+  // Only a loaded, rep-based set has a next weight to suggest. Adding 5 lbs to a plank is not
+  // advice, so an exercise measured any other way gets none rather than a nonsense number.
+  const loaded = (record?.lastSets ?? []).filter((set): set is RecordedSet & { weightLbs: number; reps: number } =>
+    set.weightLbs !== null && set.reps !== null);
+  if (!loaded.length) return null;
+  const top = loaded.reduce((best, set) => set.weightLbs > best.weightLbs || (set.weightLbs === best.weightLbs && set.reps > best.reps) ? set : best);
   if (top.reps >= repRange[1]) {
     const step = top.weightLbs >= 200 ? 10 : top.weightLbs >= 80 ? 5 : 2.5;
     return { weightLbs: top.weightLbs + step, reps: repRange[0], reason: `You held ${top.reps} reps at ${top.weightLbs} lbs — add weight and reset the reps.` };
@@ -73,5 +108,6 @@ export function overloadSuggestion(record: LiftRecord | undefined, repRange: [nu
   return { weightLbs: top.weightLbs, reps: top.reps + 1, reason: `Last time you managed ${top.reps} reps at ${top.weightLbs} lbs — try one more.` };
 }
 export function sessionVolume(workout: CompletedWorkout) {
-  return working(workout).reduce((sum, set) => sum + set.weightLbs! * set.reps!, 0);
+  return workout.sets.reduce((sum, set) =>
+    sum + setVolumeLbs(set, trackingTypeOf(exerciseOf(workout, set)?.exercise)), 0);
 }

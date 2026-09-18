@@ -7,7 +7,7 @@ import type { LiftHistory, LiftRecord } from '../workout/history';
 
 const idOf = (name: string) => EXERCISE_CATALOG.find(exercise => exercise.name === name)!.id;
 const record = (over: Partial<LiftRecord> & { exerciseId: string }): LiftRecord => ({
-  lastSets: [{ weightLbs: 225, reps: 5 }], lastPerformedMs: 1_000, bestOneRepMaxLbs: 250,
+  lastSets: [{ weightLbs: 225, reps: 5, durationSeconds: null, distanceMeters: null }], lastPerformedMs: 1_000, bestOneRepMaxLbs: 250,
   bestWeightLbs: 225, bestSessionVolumeLbs: 5000, sessions: 3, ...over,
 });
 

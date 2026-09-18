@@ -415,3 +415,124 @@ test('the exercise-notes migration and schema.sql agree', async () => {
   }
   assert.ok(schema.includes('alter table public.workout_exercise_notes enable row level security'));
 });
+
+const SET_TYPES_MIGRATION = '20260918120000_phase18_set_types_and_measures.sql';
+
+/** The deployed shape: sets still carry is_warmup and know nothing of time or distance. */
+test('Phase 18 migration retires is_warmup into set_type without losing what it recorded', async (t) => {
+  const db = new PGlite();
+  const aliceWorkout = '30000000-0000-4000-8000-000000000001';
+  const row = '10000000-0000-4000-8000-000000000001';
+  try {
+    await db.exec(`
+      create role anon;
+      create role authenticated;
+      create role service_role bypassrls;
+      create schema auth;
+      create table auth.users (id uuid primary key);
+      create function auth.uid() returns uuid language sql stable as
+        $$select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid$$;
+      grant usage on schema auth to anon, authenticated, service_role;
+      grant execute on function auth.uid() to anon, authenticated, service_role;
+    `);
+    await db.exec(await readFile(new URL('../schema.sql', import.meta.url), 'utf8'));
+    // Put the database back the way it is deployed, then migrate it forward.
+    await db.exec(`
+      drop trigger set_measurements on public.sets;
+      drop function public.validate_set_measurements();
+      alter table public.sets drop constraint sets_completed_has_a_measurement;
+      alter table public.sets drop column set_type, drop column duration_seconds, drop column distance_m;
+      alter table public.exercises drop column tracking_type;
+      alter table public.sets add column is_warmup boolean not null default false;
+      alter table public.sets add constraint sets_check
+        check (not is_completed or (weight_kg is not null and reps is not null));
+      create or replace function public.update_workout_volume() returns trigger
+      language plpgsql security definer set search_path = '' as $$
+      declare old_volume numeric := 0; new_volume numeric := 0;
+      begin
+        if tg_op <> 'INSERT' and old.is_completed and not old.is_warmup then
+          old_volume := old.weight_kg * old.reps;
+        end if;
+        if tg_op <> 'DELETE' and new.is_completed and not new.is_warmup then
+          new_volume := new.weight_kg * new.reps;
+        end if;
+        if tg_op = 'UPDATE' and old.workout_id = new.workout_id then
+          update public.workouts set volume_kg_reps = volume_kg_reps + new_volume - old_volume where id = new.workout_id;
+        else
+          if tg_op <> 'INSERT' then
+            update public.workouts set volume_kg_reps = volume_kg_reps - old_volume where id = old.workout_id;
+          end if;
+          if tg_op <> 'DELETE' then
+            update public.workouts set volume_kg_reps = volume_kg_reps + new_volume where id = new.workout_id;
+          end if;
+        end if;
+        return null;
+      end;
+      $$;
+    `);
+    await db.exec(`
+      insert into auth.users (id) values ('${alice}');
+      insert into public.users (id) values ('${alice}');
+      insert into public.workouts (id, user_id, workout_date) values ('${aliceWorkout}', '${alice}', '2026-09-18');
+      insert into public.sets (workout_id, exercise_id, exercise_position, set_position, weight_kg, reps, is_completed, is_warmup)
+        values ('${aliceWorkout}', '${row}', 1, 1, 60, 5, true, true),
+               ('${aliceWorkout}', '${row}', 1, 2, 100, 5, true, false);
+    `);
+    const volume = async () => Number((await db.query<{ volume_kg_reps: string }>(
+      `select volume_kg_reps from public.workouts where id = '${aliceWorkout}'`)).rows[0].volume_kg_reps);
+    assert.equal(await volume(), 500, 'only the working set counted before the migration');
+    await db.exec(await readFile(new URL(`../migrations/${SET_TYPES_MIGRATION}`, import.meta.url), 'utf8'));
+
+    await t.test('a warm-up stays a warm-up, and the rest become ordinary working sets', async () => {
+      const kinds = await db.query<{ set_position: number; set_type: string }>(
+        'select set_position, set_type from public.sets order by set_position');
+      assert.deepEqual(kinds.rows, [{ set_position: 1, set_type: 'warmup' }, { set_position: 2, set_type: 'normal' }]);
+      assert.equal(await volume(), 500, 'and the volume it had is the volume it keeps');
+    });
+
+    await t.test('a set with no weight at all no longer makes the session volume null', async () => {
+      const pullUp = '40000000-0000-4000-8000-0000000000a1';
+      const plank = '40000000-0000-4000-8000-0000000000a2';
+      const carry = '40000000-0000-4000-8000-0000000000a3';
+      await db.exec(`insert into public.exercises (id, name, movement_pattern, equipment, primary_muscle, tracking_type) values
+        ('${pullUp}', 'Pull-Up', 'vertical_pull', 'bodyweight', 'lats', 'bodyweight_reps'),
+        ('${plank}', 'Plank', 'anti_extension', 'bodyweight', 'abdominals', 'duration'),
+        ('${carry}', 'Farmer Carry', 'carry', 'dumbbell', 'forearms', 'distance_duration')`);
+      const add = (exercise: string, position: number, columns: string, values: string) =>
+        db.exec(`insert into public.sets (workout_id, exercise_id, exercise_position, set_position, is_completed, ${columns})
+          values ('${aliceWorkout}', '${exercise}', ${position}, 1, true, ${values})`);
+      await add(pullUp, 2, 'reps', '12');
+      assert.equal(await volume(), 500, 'a bodyweight set adds no external load, and breaks nothing');
+      await add(plank, 3, 'duration_seconds', '90');
+      assert.equal(await volume(), 500, 'and neither does a ninety-second plank');
+      await add(carry, 4, 'distance_m, duration_seconds', '40, 30');
+      assert.equal(await volume(), 500);
+
+      const refused = async (work: Promise<unknown>) => assert.rejects(work, (error: unknown) => {
+        assert.equal((error as { code?: string }).code, '23514');
+        return true;
+      });
+      // Measured by nothing is not a completed set, whatever the exercise.
+      await refused(add(pullUp, 5, 'rpe', '8'));
+      // And a measurement the exercise does not have is wrong data, not a detail to ignore:
+      // a plank cannot be five reps, and a bench press cannot be ninety seconds.
+      await refused(add(plank, 6, 'reps', '5'));
+      await refused(add(row, 7, 'duration_seconds', '90'));
+      await refused(add(row, 8, 'reps', '5'));
+    });
+  } finally { await db.close(); }
+});
+
+test('the set-types migration and schema.sql agree, and neither still carries is_warmup', async () => {
+  const migration = await readFile(new URL(`../migrations/${SET_TYPES_MIGRATION}`, import.meta.url), 'utf8');
+  const schema = await readFile(new URL('../schema.sql', import.meta.url), 'utf8');
+  for (const column of ['set_type', 'duration_seconds', 'distance_m', 'tracking_type']) {
+    assert.ok(schema.includes(column), `schema.sql is missing ${column}`);
+    assert.ok(migration.includes(column), `the migration is missing ${column}`);
+  }
+  assert.ok(!schema.includes('is_warmup'), 'a fresh database must not resurrect the column the migration drops');
+  assert.ok(migration.includes('drop column is_warmup'));
+  // Both must count a drop set and refuse to let a NULL weight poison the running total.
+  assert.ok(schema.includes("set_type <> 'warmup'") && migration.includes("set_type <> 'warmup'"));
+  assert.ok(schema.includes('coalesce(new.weight_kg, 0)') && migration.includes('coalesce(new.weight_kg, 0)'));
+});

@@ -13,6 +13,7 @@ import type { LiftHistory, SessionVolumePoint } from './history';
 import { sessionVolume } from './history';
 import { bigThree } from './bigThree';
 import { byNewest, readArchive } from './sessions';
+import { isHardSet } from './setShape';
 import { SessionEditor } from './SessionEditor';
 import type { CompletedWorkout } from '../../types/workout';
 const WEEK = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -136,7 +137,7 @@ export default function WorkoutHistoryScreen() {
             <Text className="flex-1 font-bold" numberOfLines={1}>{entry.session.name}</Text>
             <Text className="text-sm">{dayLabel(new Date(entry.endedAtMs).toISOString().slice(0, 10))}</Text>
           </View>
-          <Text className="mt-2 text-sm">{entry.exercises.length} exercise{entry.exercises.length === 1 ? '' : 's'} · {entry.sets.filter(set => !set.isWarmup).length} hard sets · {Math.round(sessionVolume(entry)).toLocaleString()} lbs</Text>
+          <Text className="mt-2 text-sm">{entry.exercises.length} exercise{entry.exercises.length === 1 ? '' : 's'} · {entry.sets.filter(isHardSet).length} hard sets · {Math.round(sessionVolume(entry)).toLocaleString()} lbs</Text>
           {entry.exercises.some(slot => slot.note) && <Text className="mt-2 text-sm" numberOfLines={2}>“{entry.exercises.find(slot => slot.note)!.note}”</Text>}
           {entry.editedAtMs && <Text className="mt-2 text-xs">Edited {dayLabel(new Date(entry.editedAtMs).toISOString().slice(0, 10))}</Text>}
         </Pressable>)}

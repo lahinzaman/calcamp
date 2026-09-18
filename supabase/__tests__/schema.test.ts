@@ -147,9 +147,15 @@ test('fresh Supabase schema: permissions, nutrition constraints, and workout int
       await fails(`update public.workouts set volume_kg_reps = 999 where id = '${aliceWorkout}'`, '42501');
       await db.exec('update public.sets set reps = 6');
       assert.equal(await volume(), 600);
-      await db.exec('update public.sets set is_warmup = true');
+      // A warm-up is logged but is not volume. A drop set and a set to failure are both work.
+      await db.exec("update public.sets set set_type = 'warmup'");
       assert.equal(await volume(), 0);
-      await db.exec('update public.sets set is_warmup = false, is_completed = false');
+      await db.exec("update public.sets set set_type = 'drop'");
+      assert.equal(await volume(), 600);
+      await db.exec("update public.sets set set_type = 'failure'");
+      assert.equal(await volume(), 600);
+      await fails("update public.sets set set_type = 'nonsense'");
+      await db.exec("update public.sets set set_type = 'normal', is_completed = false");
       assert.equal(await volume(), 0);
       assert.equal((await db.query<{ estimated_1rm_kg: null }>('select estimated_1rm_kg from public.sets')).rows[0].estimated_1rm_kg, null);
       await db.exec('update public.sets set is_completed = true');

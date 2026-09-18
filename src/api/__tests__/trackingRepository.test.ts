@@ -25,7 +25,7 @@ test('real supabase-js sends owner-scoped, duplicate-safe writes and omits gener
   const repo = createTrackingRepository(client); const user = await repo.userId();
   const workout: CompletedWorkout = { session: { id: 'local-123', name: 'Upper A', startedAtMs: 1_000 }, endedAtMs: 61_000,
     exercises: [{ id: 'first', exercise: { id: '10000000-0000-4000-8000-000000000001', name: 'Row' }, defaultRestSeconds: 90 }],
-    sets: [{ id: 'set', sessionExerciseId: 'first', weightLbs: 100, reps: 5, rpe: 8, isWarmup: false, restSeconds: 90, estimatedOneRepMaxLbs: 112.5, completedAtMs: 30_000 }] };
+    sets: [{ id: 'set', sessionExerciseId: 'first', weightLbs: 100, reps: 5, rpe: 8, kind: 'normal' as const, durationSeconds: null, distanceMeters: null, restSeconds: 90, estimatedOneRepMaxLbs: 112.5, completedAtMs: 30_000 }] };
   await assert.rejects(repo.saveWorkout(user, workout), /Transient failure/);
   assert.equal(finished, false);
   const firstId = (requests.find(r => r.table === 'workouts' && r.method === 'POST')!.body as Record<string, unknown>).id;

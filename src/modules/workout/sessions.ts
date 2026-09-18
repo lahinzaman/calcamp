@@ -1,5 +1,6 @@
 import { durableStorage } from '../sync/storage';
 import { dateKeyOf, detectRecords, recordWorkout, sessionVolume, type LiftHistory, type PersonalRecord, type SessionVolumePoint } from './history';
+import { normalizeSet } from './setShape';
 import type { CompletedWorkout } from '../../types/workout';
 
 /**
@@ -29,7 +30,9 @@ export function readArchive(owner: string): SessionArchive {
     if (!raw) return empty();
     const parsed = JSON.parse(raw) as Partial<SessionArchive>;
     if (!Array.isArray(parsed.sessions)) return empty();
-    return { baseline: parsed.baseline ?? {}, sessions: parsed.sessions };
+    // Sessions outlive app updates, so every archived set comes back through the normalizer
+    // that fills in a kind, a duration and a distance for sets stored before those existed.
+    return { baseline: parsed.baseline ?? {}, sessions: parsed.sessions.map(entry => ({ ...entry, sets: entry.sets.map(normalizeSet) })) };
   } catch { return empty(); }
 }
 export function writeArchive(owner: string, archive: SessionArchive) {

@@ -12,6 +12,8 @@ import { syncBridge } from './bridge';
 import { rememberFood } from '../foods/savedFoods';
 import { dateKeyOf, detectRecords, recordWorkout, sessionVolume } from '../workout/history';
 import { archiveSession, readArchive, rebuildHistory, removeSession, replaceSession, writeArchive } from '../workout/sessions';
+import { registerCustomExercises } from '../workout/catalog';
+import { toCatalogExercise, validateCustomExercise, type CustomExercise } from '../../api/customExercises';
 import type { CompletedWorkout } from '../../types/workout';
 import type { FoodEntry } from '../../types/foodEntry';
 
@@ -55,6 +57,12 @@ export const syncEngine = new SyncEngine(durableStorage, async (owner, job) => {
     return repository.applyNutritionMutation(owner, job.id, job.data);
   }
   if (job.kind === 'workout-delete') { await repository.deleteWorkout(owner, job.data.sessionId); return; }
+  if (job.kind === 'custom-exercise' || job.kind === 'custom-exercise-archive') {
+    const api = await import('../../api/customExercises');
+    if (job.kind === 'custom-exercise') await api.saveCustomExercise(owner, job.data);
+    else await api.archiveCustomExercise(owner, job.data.id);
+    return;
+  }
   await repository.saveWorkout(owner, job.data);
 }, () => {
   const state = syncEngine;
@@ -66,6 +74,9 @@ function applySnapshot() {
   if (!syncEngine.owner) return;
   applying = true;
   try {
+    // Routines, history and personal records all turn a stored exercise ID back into a name.
+    // Registering here is what makes a custom lift resolve in every one of them.
+    registerCustomExercises((syncEngine.data.customExercises ?? []).map(entry => toCatalogExercise(entry, syncEngine.owner!)));
     const date = localDateKey(new Date()); const snapshot = syncEngine.data.days[date];
     const entries = syncEngine.data.entries?.[date] ?? [];
     if (snapshot) nutritionStore.setState({ ...snapshot, entries, cloudOwnerId: syncEngine.owner, syncStatus: 'idle', syncError: null });
@@ -134,6 +145,39 @@ export function activateSync(owner: string | null) {
   };
   syncBridge.drain = drainSync; syncBridge.refresh = refreshDiary;
   useSyncStatus.setState({ ready: true });
+}
+
+/**
+ * Saves an exercise the user made up. Written to the device first and queued for the account,
+ * so one invented mid-session in a basement gym is usable for that session, not the next one.
+ */
+export function saveOwnExercise(exercise: CustomExercise) {
+  const owner = syncEngine.owner;
+  if (!owner) throw new Error('Sign in to create your own exercises.');
+  validateCustomExercise(exercise);
+  const saved = syncEngine.data.customExercises ?? [];
+  if (saved.some(entry => entry.id !== exercise.id && entry.name.trim().toLowerCase() === exercise.name.trim().toLowerCase())) {
+    throw new Error('You already have an exercise with that name.');
+  }
+  const next = saved.some(entry => entry.id === exercise.id)
+    ? saved.map(entry => entry.id === exercise.id ? exercise : entry) : [...saved, exercise];
+  syncEngine.queue({ kind: 'custom-exercise', data: exercise }, `custom-exercise:${exercise.id}:${Date.now()}`, { customExercises: next });
+  registerCustomExercises(next.map(entry => toCatalogExercise(entry, owner)));
+  void syncEngine.drain();
+  return toCatalogExercise(exercise, owner);
+}
+
+/**
+ * Hides an exercise from the picker. Never a delete: sets point at exercises, so removing one
+ * would either be refused by the database or take the history that used it with it.
+ */
+export function archiveOwnExercise(id: string) {
+  const owner = syncEngine.owner;
+  if (!owner) throw new Error('Sign in to change your own exercises.');
+  const next = (syncEngine.data.customExercises ?? []).filter(entry => entry.id !== id);
+  syncEngine.queue({ kind: 'custom-exercise-archive', data: { id } }, `custom-exercise-archive:${id}:${Date.now()}`, { customExercises: next });
+  registerCustomExercises(next.map(entry => toCatalogExercise(entry, owner)));
+  void syncEngine.drain();
 }
 
 /**

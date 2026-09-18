@@ -13,22 +13,22 @@ function finished(): CompletedWorkout {
       { id: 'slot-2', exercise: { id: 'row', name: 'Barbell Row' }, defaultRestSeconds: 90 },
     ],
     sets: [
-      { id: 'a', sessionExerciseId: 'slot-1', weightLbs: 135, reps: 8, rpe: 7, isWarmup: false, restSeconds: 120, estimatedOneRepMaxLbs: 167.2, completedAtMs: END - 1_800_000 },
-      { id: 'b', sessionExerciseId: 'slot-1', weightLbs: 155, reps: 5, rpe: 9, isWarmup: false, restSeconds: 120, estimatedOneRepMaxLbs: 174.4, completedAtMs: END - 1_500_000 },
-      { id: 'c', sessionExerciseId: 'slot-2', weightLbs: 95, reps: 10, rpe: 8, isWarmup: false, restSeconds: 90, estimatedOneRepMaxLbs: 126.7, completedAtMs: END - 900_000 },
+      { id: 'a', sessionExerciseId: 'slot-1', weightLbs: 135, reps: 8, rpe: 7, kind: 'normal' as const, durationSeconds: null, distanceMeters: null, restSeconds: 120, estimatedOneRepMaxLbs: 167.2, completedAtMs: END - 1_800_000 },
+      { id: 'b', sessionExerciseId: 'slot-1', weightLbs: 155, reps: 5, rpe: 9, kind: 'normal' as const, durationSeconds: null, distanceMeters: null, restSeconds: 120, estimatedOneRepMaxLbs: 174.4, completedAtMs: END - 1_500_000 },
+      { id: 'c', sessionExerciseId: 'slot-2', weightLbs: 95, reps: 10, rpe: 8, kind: 'normal' as const, durationSeconds: null, distanceMeters: null, restSeconds: 90, estimatedOneRepMaxLbs: 126.7, completedAtMs: END - 900_000 },
     ],
   };
 }
 
 test('a corrected set re-derives its estimated max rather than keeping the old one', () => {
-  const edited = draft.editSet(finished(), 'b', { weightLbs: 225, reps: 5, rpe: 9, isWarmup: false });
+  const edited = draft.editSet(finished(), 'b', { weightLbs: 225, reps: 5, rpe: 9, kind: 'normal' as const, durationSeconds: null, distanceMeters: null });
   const set = edited.sets.find(entry => entry.id === 'b')!;
   assert.equal(set.weightLbs, 225);
   assert.equal(set.estimatedOneRepMaxLbs, 253.125, 'the stored estimate belonged to the number that was wrong');
   assert.equal(edited.sets.find(entry => entry.id === 'a')!.weightLbs, 135, 'and the sets either side are untouched');
-  assert.throws(() => draft.editSet(finished(), 'b', { weightLbs: 100, reps: 0, rpe: null, isWarmup: false }), /whole reps/);
-  assert.throws(() => draft.editSet(finished(), 'b', { weightLbs: -1, reps: 5, rpe: null, isWarmup: false }), /0 lbs or more/);
-  assert.throws(() => draft.editSet(finished(), 'b', { weightLbs: 100, reps: 5, rpe: 11, isWarmup: false }), /RPE/);
+  assert.throws(() => draft.editSet(finished(), 'b', { weightLbs: 100, reps: 0, rpe: null, kind: 'normal' as const, durationSeconds: null, distanceMeters: null }), /whole reps/);
+  assert.throws(() => draft.editSet(finished(), 'b', { weightLbs: -1, reps: 5, rpe: null, kind: 'normal' as const, durationSeconds: null, distanceMeters: null }), /0 lbs or more/);
+  assert.throws(() => draft.editSet(finished(), 'b', { weightLbs: 100, reps: 5, rpe: 11, kind: 'normal' as const, durationSeconds: null, distanceMeters: null }), /RPE/);
 });
 
 test('a set added afterwards copies the one before it and is dated to that session, not to today', () => {

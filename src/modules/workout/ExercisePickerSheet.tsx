@@ -3,7 +3,10 @@ import { Modal, View } from 'react-native';
 import { Text } from '../../theme/primitives';
 import { SafeAreaView } from '../../theme/SafeArea';
 import { Action } from '../../components/FormControls';
+import { archiveOwnExercise, saveOwnExercise } from '../sync/runtime';
+import { fromCatalogExercise, type CustomExercise } from '../../api/customExercises';
 import { ExercisePicker } from './ExercisePicker';
+import { CustomExerciseSheet } from './CustomExerciseSheet';
 import { exerciseById, type CatalogExercise } from './catalog';
 
 /**
@@ -21,6 +24,8 @@ export function ExercisePickerSheet({ title, subtitle, confirmLabel, warning, on
   onClose: () => void;
 }) {
   const [picked, setPicked] = useState<string | null>(null);
+  // `true` is a new exercise; an object is one of yours reopened.
+  const [creating, setCreating] = useState<true | CustomExercise | null>(null);
   const chosen = picked ? exerciseById(picked) : undefined;
   return <Modal visible presentationStyle="pageSheet" animationType="slide" onRequestClose={onClose}>
     <SafeAreaView className="flex-1 bg-background">
@@ -29,7 +34,8 @@ export function ExercisePickerSheet({ title, subtitle, confirmLabel, warning, on
         <Text className="mt-1 text-sm">{subtitle}</Text>
         {warning && <Text accessibilityRole="alert" className="mt-3 rounded-2xl bg-raised p-3 text-sm">{warning}</Text>}
       </View>
-      <ExercisePicker selectedIds={picked ? [picked] : []}
+      <ExercisePicker selectedIds={picked ? [picked] : []} onCreate={() => setCreating(true)}
+        onEdit={exercise => setCreating(fromCatalogExercise(exercise))}
         onToggle={id => setPicked(current => current === id ? null : id)} onClose={onClose}
         footer={<>
           <Action label={chosen ? confirmLabel(chosen) : 'Pick an exercise'} disabled={!chosen}
@@ -37,5 +43,9 @@ export function ExercisePickerSheet({ title, subtitle, confirmLabel, warning, on
           <Action secondary label="Cancel" onPress={onClose} />
         </>} />
     </SafeAreaView>
+    {/* Created here, selected here: the exercise you just invented is the one you wanted. */}
+    {creating && <CustomExerciseSheet existing={creating === true ? undefined : creating}
+      onClose={() => setCreating(null)} onArchive={archiveOwnExercise}
+      onSave={exercise => { const saved = saveOwnExercise(exercise); setPicked(saved.id); return saved; }} />}
   </Modal>;
 }

@@ -3,6 +3,8 @@ import type { TrackingRepository } from '../api/trackingRepository';
 import { useStore } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 
+import { missingFor, outOfRange, SET_KINDS, shapeOf, trackingTypeOf } from '../modules/workout/setShape';
+import { assignSuperset, clearSuperset, nextAfterSet, prune, restsAfter } from '../modules/workout/supersets';
 import type {
   CompletedWorkout,
   ExerciseDefinition,
@@ -45,6 +47,9 @@ export interface WorkoutActions {
   replaceExercise: (sessionExerciseId: string, exercise: ExerciseDefinition, defaultRestSeconds?: number) => void;
   /** An empty or blank note removes it rather than storing whitespace. */
   setExerciseNote: (sessionExerciseId: string, note: string) => void;
+  /** Pairs two or more exercises so they are done back to back, with the rest after the round. */
+  groupSuperset: (sessionExerciseIds: string[], supersetId?: string) => void;
+  ungroupSuperset: (supersetId: string) => void;
   reorderExercises: (sessionExerciseIds: string[]) => void;
   setActiveExercise: (sessionExerciseId: string) => void;
   addSet: (set: SetInput) => void;
@@ -96,15 +101,18 @@ function validateTimestamp(timestamp: number, session: WorkoutSession) {
   if (timestamp < session.startedAtMs) throw new RangeError('Timestamp precedes the session start.');
 }
 
-function validateSet(set: WorkoutSet) {
-  if (set.weightLbs !== null) nonnegative(set.weightLbs, 'Weight');
-  if (set.reps !== null && (!Number.isInteger(set.reps) || set.reps < 1 || set.reps > 1000)) {
-    throw new RangeError('Reps must be an integer from 1 through 1000.');
-  }
-  if (set.rpe !== null && (!Number.isFinite(set.rpe) || set.rpe < 1 || set.rpe > 10)) {
-    throw new RangeError('RPE must be between 1 and 10.');
-  }
+function validateSet(set: WorkoutSet, exercise?: SessionExercise) {
+  const problem = outOfRange(set);
+  if (problem) throw new RangeError(problem);
+  // A measurement the exercise does not have must stay empty, or a plank could carry a rep
+  // count that nothing would ever show and the weekly volume would quietly count it.
+  const shape = shapeOf(exercise?.exercise);
+  if (shape.weight === 'none' && set.weightLbs !== null) throw new RangeError('This exercise is not measured in weight.');
+  if (shape.reps === 'none' && set.reps !== null) throw new RangeError('This exercise is not measured in reps.');
+  if (shape.duration === 'none' && set.durationSeconds !== null) throw new RangeError('This exercise is not measured in time.');
+  if (shape.distance === 'none' && set.distanceMeters !== null) throw new RangeError('This exercise is not measured in distance.');
   if (set.estimatedOneRepMaxLbs !== null) nonnegative(set.estimatedOneRepMaxLbs, 'Estimated 1RM');
+  if (!SET_KINDS.includes(set.kind)) throw new RangeError('Choose a valid set type.');
   validateRestDuration(set.restSeconds);
 }
 
@@ -170,7 +178,7 @@ export function createWorkoutStore(options: { now?: () => number; repository?: T
     },
     removeExercise: (id) => {
       const state = get();
-      const exerciseSequence = state.exerciseSequence.filter((exercise) => exercise.id !== id);
+      const exerciseSequence = prune(state.exerciseSequence.filter((exercise) => exercise.id !== id));
       const removedSetIds = new Set(state.sets.filter((entry) => entry.sessionExerciseId === id).map((entry) => entry.id));
       set({
         exerciseSequence,
@@ -188,8 +196,10 @@ export function createWorkoutStore(options: { now?: () => number; repository?: T
       if (!current) throw new Error('Unknown exercise instance.');
       const rest = defaultRestSeconds ?? current.defaultRestSeconds;
       validateRestDuration(rest);
-      // The note described the lift being replaced, so it goes with it.
-      const next: SessionExercise = { id, exercise: { ...exercise }, defaultRestSeconds: rest };
+      // The note described the lift being replaced, so it goes with it. Its place in a superset
+      // is about the slot, not the lift, so that stays.
+      const next: SessionExercise = { id, exercise: { ...exercise }, defaultRestSeconds: rest,
+        ...(current.supersetId ? { supersetId: current.supersetId } : {}) };
       const removedSetIds = new Set(state.sets.filter((entry) => entry.sessionExerciseId === id).map((entry) => entry.id));
       set({
         exerciseSequence: state.exerciseSequence.map((entry) => entry.id === id ? next : entry),
@@ -209,6 +219,18 @@ export function createWorkoutStore(options: { now?: () => number; repository?: T
       const { note: _previous, ...rest } = current;
       set({ exerciseSequence: state.exerciseSequence.map((entry) => entry.id === id
         ? (trimmed ? { ...rest, note: trimmed } : rest) : entry) });
+    },
+    groupSuperset: (ids, supersetId) => {
+      const state = get();
+      requireSession(state);
+      const id = supersetId ?? `superset-${now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      requireId(id);
+      set({ exerciseSequence: assignSuperset(state.exerciseSequence, ids, id) });
+    },
+    ungroupSuperset: (supersetId) => {
+      const state = get();
+      requireSession(state);
+      set({ exerciseSequence: clearSuperset(state.exerciseSequence, supersetId) });
     },
     reorderExercises: (ids) => {
       const state = get();
@@ -236,12 +258,14 @@ export function createWorkoutStore(options: { now?: () => number; repository?: T
         weightLbs: input.weightLbs ?? null,
         reps: input.reps ?? null,
         rpe: input.rpe ?? null,
-        isWarmup: input.isWarmup ?? false,
+        durationSeconds: input.durationSeconds ?? null,
+        distanceMeters: input.distanceMeters ?? null,
+        kind: input.kind ?? 'normal',
         restSeconds: input.restSeconds ?? exercise.defaultRestSeconds,
         estimatedOneRepMaxLbs: input.estimatedOneRepMaxLbs ?? null,
         completedAtMs: null,
       };
-      validateSet(entry);
+      validateSet(entry, exercise);
       set({ sets: [...state.sets, entry] });
     },
     updateSet: (id, update) => {
@@ -249,19 +273,21 @@ export function createWorkoutStore(options: { now?: () => number; repository?: T
       const original = state.sets.find((entry) => entry.id === id);
       if (!original) throw new Error('Unknown set.');
       // Ignore optional undefined values; preserve identity and completion fields.
+      const exercise = state.exerciseSequence.find((entry) => entry.id === original.sessionExerciseId);
       const next: WorkoutSet = {
         ...original,
         weightLbs: update.weightLbs === undefined ? original.weightLbs : update.weightLbs,
         reps: update.reps === undefined ? original.reps : update.reps,
         rpe: update.rpe === undefined ? original.rpe : update.rpe,
-        isWarmup: update.isWarmup ?? original.isWarmup,
+        durationSeconds: update.durationSeconds === undefined ? original.durationSeconds : update.durationSeconds,
+        distanceMeters: update.distanceMeters === undefined ? original.distanceMeters : update.distanceMeters,
+        kind: update.kind ?? original.kind,
         restSeconds: update.restSeconds ?? original.restSeconds,
         estimatedOneRepMaxLbs: update.estimatedOneRepMaxLbs === undefined ? original.estimatedOneRepMaxLbs : update.estimatedOneRepMaxLbs,
       };
-      validateSet(next);
-      if (next.completedAtMs !== null && (next.weightLbs === null || next.reps === null)) {
-        throw new Error('Completed sets require weight and reps.');
-      }
+      validateSet(next, exercise);
+      const missing = next.completedAtMs === null ? null : missingFor(next, trackingTypeOf(exercise?.exercise));
+      if (missing) throw new Error(missing);
       set({ sets: state.sets.map((entry) => entry.id === id ? next : entry) });
     },
     removeSet: (id) => set((state) => ({
@@ -274,10 +300,18 @@ export function createWorkoutStore(options: { now?: () => number; repository?: T
       const entry = state.sets.find((candidate) => candidate.id === id);
       if (!entry) throw new Error('Unknown set.');
       if (entry.completedAtMs !== null) return;
-      if (entry.weightLbs === null || entry.reps === null) throw new Error('Enter weight and reps before completing a set.');
+      const exercise = state.exerciseSequence.find((candidate) => candidate.id === entry.sessionExerciseId);
+      const missing = missingFor(entry, trackingTypeOf(exercise?.exercise));
+      if (missing) throw new Error(missing);
+      const sets = state.sets.map((candidate) => candidate.id === id ? { ...candidate, completedAtMs } : candidate);
+      // Resting between the halves of a superset would make it two straight exercises with
+      // extra steps, so the timer waits for the round to finish.
+      const rests = restsAfter(state.exerciseSequence, sets, id);
+      const next = rests ? null : nextAfterSet(state.exerciseSequence, sets, id);
       set({
-        sets: state.sets.map((candidate) => candidate.id === id ? { ...candidate, completedAtMs } : candidate),
-        restTimer: makeTimer(entry.restSeconds, completedAtMs, id),
+        sets,
+        restTimer: rests ? makeTimer(entry.restSeconds, completedAtMs, id) : state.restTimer,
+        activeExerciseId: next ?? state.activeExerciseId,
       });
     },
     startRestTimer: (durationSeconds, startedAtMs = now()) => {

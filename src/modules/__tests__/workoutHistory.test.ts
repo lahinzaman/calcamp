@@ -4,7 +4,7 @@ import { detectRecords, overloadSuggestion, recordWorkout, sessionVolume, dateKe
 import type { CompletedWorkout } from '../../types/workout';
 
 const set = (over: Partial<CompletedWorkout['sets'][number]> = {}) => ({
-  id: 's1', sessionExerciseId: 'e1', weightLbs: 135, reps: 8, rpe: 8, isWarmup: false,
+  id: 's1', sessionExerciseId: 'e1', weightLbs: 135, reps: 8, rpe: 8, kind: 'normal' as const, durationSeconds: null, distanceMeters: null,
   restSeconds: 120, estimatedOneRepMaxLbs: 167, completedAtMs: 1000, ...over,
 });
 const workout = (sets: CompletedWorkout['sets']): CompletedWorkout => ({
@@ -14,7 +14,7 @@ const workout = (sets: CompletedWorkout['sets']): CompletedWorkout => ({
 });
 
 test('recording a session keeps working sets only and accumulates bests', () => {
-  const first = recordWorkout({}, workout([set(), set({ id: 's2', weightLbs: 145, reps: 6, estimatedOneRepMaxLbs: 170 }), set({ id: 'w', isWarmup: true, weightLbs: 45 }), set({ id: 'x', completedAtMs: null })]));
+  const first = recordWorkout({}, workout([set(), set({ id: 's2', weightLbs: 145, reps: 6, estimatedOneRepMaxLbs: 170 }), set({ id: 'w', kind: 'warmup' as const, durationSeconds: null, distanceMeters: null, weightLbs: 45 }), set({ id: 'x', completedAtMs: null })]));
   assert.equal(first.bench.lastSets.length, 2);
   assert.equal(first.bench.bestWeightLbs, 145);
   assert.equal(first.bench.bestOneRepMaxLbs, 170);
@@ -23,7 +23,7 @@ test('recording a session keeps working sets only and accumulates bests', () => 
   const second = recordWorkout(first, workout([set({ weightLbs: 100, reps: 5, estimatedOneRepMaxLbs: 112 })]));
   assert.equal(second.bench.bestWeightLbs, 145);
   assert.equal(second.bench.sessions, 2);
-  assert.deepEqual(second.bench.lastSets, [{ weightLbs: 100, reps: 5 }]);
+  assert.deepEqual(second.bench.lastSets, [{ weightLbs: 100, reps: 5, durationSeconds: null, distanceMeters: null }]);
 });
 
 test('personal records compare against history before the session, so a repeat is not a record', () => {
@@ -37,17 +37,17 @@ test('personal records compare against history before the session, so a repeat i
 });
 
 test('overload adds reps inside the range, then weight once the top is held', () => {
-  const low = overloadSuggestion({ exerciseId: 'bench', lastSets: [{ weightLbs: 135, reps: 8 }], lastPerformedMs: 0, bestOneRepMaxLbs: 0, bestWeightLbs: 135, bestSessionVolumeLbs: 0, sessions: 1 });
+  const low = overloadSuggestion({ exerciseId: 'bench', lastSets: [{ weightLbs: 135, reps: 8, durationSeconds: null, distanceMeters: null }], lastPerformedMs: 0, bestOneRepMaxLbs: 0, bestWeightLbs: 135, bestSessionVolumeLbs: 0, sessions: 1 });
   assert.deepEqual([low!.weightLbs, low!.reps], [135, 9]);
-  const top = overloadSuggestion({ exerciseId: 'bench', lastSets: [{ weightLbs: 135, reps: 12 }], lastPerformedMs: 0, bestOneRepMaxLbs: 0, bestWeightLbs: 135, bestSessionVolumeLbs: 0, sessions: 1 });
+  const top = overloadSuggestion({ exerciseId: 'bench', lastSets: [{ weightLbs: 135, reps: 12, durationSeconds: null, distanceMeters: null }], lastPerformedMs: 0, bestOneRepMaxLbs: 0, bestWeightLbs: 135, bestSessionVolumeLbs: 0, sessions: 1 });
   assert.deepEqual([top!.weightLbs, top!.reps], [140, 6]);
-  const heavy = overloadSuggestion({ exerciseId: 'squat', lastSets: [{ weightLbs: 225, reps: 12 }], lastPerformedMs: 0, bestOneRepMaxLbs: 0, bestWeightLbs: 225, bestSessionVolumeLbs: 0, sessions: 1 });
+  const heavy = overloadSuggestion({ exerciseId: 'squat', lastSets: [{ weightLbs: 225, reps: 12, durationSeconds: null, distanceMeters: null }], lastPerformedMs: 0, bestOneRepMaxLbs: 0, bestWeightLbs: 225, bestSessionVolumeLbs: 0, sessions: 1 });
   assert.equal(heavy!.weightLbs, 235);
   assert.equal(overloadSuggestion(undefined), null);
 });
 
 test('session volume counts completed working sets only', () => {
-  assert.equal(sessionVolume(workout([set(), set({ id: 'w', isWarmup: true, weightLbs: 45, reps: 10 })])), 135 * 8);
+  assert.equal(sessionVolume(workout([set(), set({ id: 'w', kind: 'warmup' as const, durationSeconds: null, distanceMeters: null, weightLbs: 45, reps: 10 })])), 135 * 8);
   assert.equal(dateKeyOf(Date.UTC(2026, 8, 11, 12)).length, 10);
 });
 
@@ -75,7 +75,7 @@ test('a cancelled session reaches neither history nor the upload queue', () => {
   store.startSession({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa01', name: 'Push A' });
   store.addExercise({ id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb01', exercise: { id: 'cccccccc-cccc-4ccc-8ccc-cccccccccc01', name: 'Bench' }, defaultRestSeconds: 120 });
   store.addSet({ id: 'dddddddd-dddd-4ddd-8ddd-dddddddddd01', sessionExerciseId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb01' });
-  store.updateSet('dddddddd-dddd-4ddd-8ddd-dddddddddd01', { weightLbs: 185, reps: 5 });
+  store.updateSet('dddddddd-dddd-4ddd-8ddd-dddddddddd01', { weightLbs: 185, reps: 5, durationSeconds: null, distanceMeters: null });
   store.completeSet('dddddddd-dddd-4ddd-8ddd-dddddddddd01');
   assert.equal(workoutStore.getState().sets.length, 1);
 

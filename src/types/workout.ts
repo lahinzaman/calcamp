@@ -1,3 +1,17 @@
+/**
+ * How a set of this exercise is measured. Not every lift is weight times reps: a plank is
+ * seconds, a farmer carry is metres and seconds, a pull-up is reps with whatever you are
+ * carrying added. Absent means `weight_reps`, which is what every exercise was before this.
+ */
+export type TrackingType = 'weight_reps' | 'bodyweight_reps' | 'duration' | 'distance_duration';
+
+/**
+ * What kind of set this was. A warm-up is logged but never counted as hard volume; a drop set
+ * and a set taken to failure are both working sets and do count, but they are worth marking so
+ * a heavy top set and the drop after it are not read as the same effort next week.
+ */
+export type SetKind = 'normal' | 'warmup' | 'drop' | 'failure';
+
 /** Each mechanical variant is a distinct catalog ID, even when names are similar. */
 export interface ExerciseDefinition {
   id: string;
@@ -9,6 +23,9 @@ export interface ExerciseDefinition {
   bodyPosition?: string;
   laterality?: 'bilateral' | 'unilateral' | 'alternating';
   variationNotes?: string;
+  trackingType?: TrackingType;
+  /** Set on exercises the user created. Absent on the shared catalogue. */
+  ownerUserId?: string;
 }
 
 export interface WorkoutSession {
@@ -28,6 +45,11 @@ export interface SessionExercise {
    * different note in a different session.
    */
   note?: string;
+  /**
+   * Exercises sharing a superset ID are done back to back, and only the last of them starts a
+   * rest timer. Absent means the exercise stands on its own, which is nearly all of them.
+   */
+  supersetId?: string;
 }
 
 export interface WorkoutSet {
@@ -36,7 +58,11 @@ export interface WorkoutSet {
   weightLbs: number | null;
   reps: number | null;
   rpe: number | null;
-  isWarmup: boolean;
+  /** Seconds held or worked, for a plank or a carry. */
+  durationSeconds: number | null;
+  /** Metres covered, for a carry or a run. */
+  distanceMeters: number | null;
+  kind: SetKind;
   restSeconds: number;
   /** Supplied by the lifting module using Brzycki; the store does not infer it. */
   estimatedOneRepMaxLbs: number | null;

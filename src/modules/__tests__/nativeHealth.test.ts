@@ -2,14 +2,29 @@ import assert from 'node:assert/strict';
 import { mock, test } from 'node:test';
 let iosAvailable = true; let iosWriteStatus = 2; let iosRequestStatus: number | Error = 1;
 const calls: { kind: string; value: unknown }[] = [];
+/** Roughly a year of walking: what an unfiltered lifetime step query comes back with. */
+const ALL_TIME_STEPS = 2_147_000;
+/** Forces the unfiltered answer through, to check what readToday does with an absurd reading. */
+let unfilteredSteps = false;
 const kitCalls: { kind: string; value: unknown }[] = [];
 mock.module('@kingstinct/react-native-healthkit', { namedExports: {
   isHealthDataAvailableAsync: async () => { if (!iosAvailable) throw new Error('Health data is not available on this device'); return true; },
   requestAuthorization: async (toRequest: unknown) => { kitCalls.push({ kind: 'permissions', value: toRequest }); return true; },
   authorizationStatusFor: () => iosWriteStatus,
   getRequestStatusForAuthorization: async () => { if (iosRequestStatus instanceof Error) throw iosRequestStatus; return iosRequestStatus; },
-  queryStatisticsForQuantity: async (identifier: string) => ({ sumQuantity: { quantity: identifier.includes('StepCount') ? 8000 : 150 } }),
-  queryWorkoutSamples: async () => [],
+  /**
+   * Behaves the way HealthKit does: a query with no date predicate is not an error, it is a
+   * query over everything ever recorded. The old mock ignored its options entirely, which is
+   * why a filter written in the wrong shape looked fine here and returned two million steps on
+   * a real device. ALL_TIME_STEPS is what an unfiltered query returns.
+   */
+  queryStatisticsForQuantity: async (identifier: string, _statistics: unknown, options?: { filter?: { date?: { startDate?: Date; endDate?: Date } } }) => {
+    kitCalls.push({ kind: 'statistics', value: { identifier, options } });
+    const windowed = !unfilteredSteps && !!options?.filter?.date?.startDate && !!options?.filter?.date?.endDate;
+    if (identifier.includes('StepCount')) return { sumQuantity: { quantity: windowed ? 8000 : ALL_TIME_STEPS } };
+    return { sumQuantity: { quantity: windowed ? 150 : 90_000 } };
+  },
+  queryWorkoutSamples: async (options: unknown) => { kitCalls.push({ kind: 'workouts', value: options }); return []; },
   saveWorkoutSample: async (...value: unknown[]) => { kitCalls.push({ kind: 'workout', value }); },
   saveQuantitySample: async (identifier: string, unit: string, amount: number, start: Date, end: Date, metadata: unknown) => {
     kitCalls.push({ kind: 'quantity', value: { identifier, unit, amount, metadata } }); },
@@ -174,4 +189,58 @@ test('the app can tell, before asking, whether iOS will show its permission shee
   iosRequestStatus = new Error('status unavailable');
   assert.equal(await adapter.permissionPrompt!(), 'unknown');
   iosRequestStatus = 1;
+});
+
+test('a day’s steps are a day’s steps, not every step ever recorded', async () => {
+  kitCalls.length = 0;
+  const { getHealthAdapter } = await import('../health/healthAdapter.ios');
+  const adapter = await getHealthAdapter();
+  const summary = await adapter.readToday(new Date(2026, 8, 18, 12));
+
+  assert.equal(summary.steps, 8000, 'the query has to be bounded to today, or it sums everything');
+  assert.notEqual(summary.steps, ALL_TIME_STEPS);
+  assert.equal(summary.activeEnergyKcal, 150);
+
+  // The dates belong under filter.date; written flat they are silently not a predicate at all.
+  const stats = kitCalls.filter(call => call.kind === 'statistics');
+  assert.equal(stats.length, 2);
+  for (const call of stats) {
+    const options = (call.value as { options?: { filter?: { date?: { startDate?: Date; endDate?: Date } } } }).options;
+    assert.ok(options?.filter?.date?.startDate instanceof Date, 'a start date, under filter.date');
+    assert.ok(options?.filter?.date?.endDate instanceof Date, 'and an end date beside it');
+    assert.equal(options!.filter!.date!.startDate!.getHours(), 0, 'the window opens at local midnight');
+  }
+
+  // Reading workouts needs the same shape, plus the limit the library requires.
+  await adapter.readWorkouts!(new Date(2026, 8, 18, 12));
+  const query = kitCalls.find(call => call.kind === 'workouts')!.value as { filter?: { date?: unknown }; limit?: number };
+  assert.ok(query.filter?.date, 'the workout window is a date predicate too');
+  assert.equal(query.limit, -1, 'and a limit, which is not optional');
+});
+
+test('a step count nothing could have walked is reported as unknown, not uploaded', async () => {
+  const { getHealthAdapter } = await import('../health/healthAdapter.ios');
+  const adapter = await getHealthAdapter();
+  unfilteredSteps = true;
+  try {
+    // Simulates the bug's symptom reaching readToday by any route: the column this uploads to
+    // rejects anything over 250,000, and the sync queue treats that rejection as permanent.
+    const summary = await adapter.readToday(new Date(2026, 8, 18, 12));
+    assert.equal(summary.steps, null, 'an implausible reading is absent, not a number on the screen');
+  } finally { unfilteredSteps = false; }
+});
+
+test('deleting a meal from the diary addresses a real metadata predicate', async () => {
+  kitCalls.length = 0;
+  const { getHealthAdapter } = await import('../health/healthAdapter.ios');
+  const adapter = await getHealthAdapter();
+  await adapter.deleteMeal!('meal-1');
+  const deletes = kitCalls.filter(call => call.kind === 'delete');
+  assert.equal(deletes.length, 4, 'energy and all three macros');
+  // A predicate is a key, an operator and a value. An object keyed by the metadata name matches
+  // nothing, and deleteObjects reports that as zero deleted rather than as an error.
+  const filter = (deletes[0].value as { filter: { metadata?: { withMetadataKey?: string; value?: string; operatorType?: number } } }).filter;
+  assert.equal(filter.metadata?.withMetadataKey, 'HKSyncIdentifier');
+  assert.equal(filter.metadata?.value, 'rulocked:meal:meal-1');
+  assert.equal(filter.metadata?.operatorType, 4, 'equalTo');
 });

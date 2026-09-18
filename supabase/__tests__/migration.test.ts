@@ -536,3 +536,87 @@ test('the set-types migration and schema.sql agree, and neither still carries is
   assert.ok(schema.includes("set_type <> 'warmup'") && migration.includes("set_type <> 'warmup'"));
   assert.ok(schema.includes('coalesce(new.weight_kg, 0)') && migration.includes('coalesce(new.weight_kg, 0)'));
 });
+
+const TRACKING_BACKFILL = '20260918170000_phase19_backfill_catalogue_tracking_types.sql';
+
+/**
+ * The bug this migration repairs: phase 18 gave every catalogue row the default 'weight_reps',
+ * so the database refused a push-up for having no weight. A session's sets upsert in one
+ * statement, so one bodyweight exercise failed the whole workout with a 23514 — which the sync
+ * queue treats as permanent. Workouts containing any of 45 exercises were never stored.
+ */
+test('Phase 19 backfill lets a bodyweight set, a plank and a carry be saved at all', async (t) => {
+  const db = new PGlite();
+  const aliceWorkout = '30000000-0000-4000-8000-000000000001';
+  try {
+    await db.exec(`
+      create role anon;
+      create role authenticated;
+      create role service_role bypassrls;
+      create schema auth;
+      create table auth.users (id uuid primary key);
+      create function auth.uid() returns uuid language sql stable as
+        $$select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid$$;
+      grant usage on schema auth to anon, authenticated, service_role;
+      grant execute on function auth.uid() to anon, authenticated, service_role;
+    `);
+    await db.exec(await readFile(new URL('../schema.sql', import.meta.url), 'utf8'));
+    const { EXERCISE_CATALOG } = await import('../../src/modules/workout/catalog');
+    const idOf = (name: string) => EXERCISE_CATALOG.find(exercise => exercise.name === name)!.id;
+
+    await t.test('a fresh database already knows how each catalogue lift is measured', async () => {
+      const rows = await db.query<{ id: string; tracking_type: string }>(
+        'select id, tracking_type from public.exercises where owner_user_id is null');
+      const stored = new Map(rows.rows.map(row => [row.id, row.tracking_type]));
+      const wrong = EXERCISE_CATALOG.filter(exercise => stored.get(exercise.id) !== exercise.trackingType);
+      assert.deepEqual(wrong.map(exercise => `${exercise.name}: db=${stored.get(exercise.id)} app=${exercise.trackingType}`), [],
+        'every catalogue exercise must be measured the same way in both places');
+    });
+
+    await t.test('the sets that used to fail the whole workout now save', async () => {
+      await db.exec(`
+        insert into auth.users (id) values ('${alice}');
+        insert into public.users (id) values ('${alice}');
+        insert into public.workouts (id, user_id, workout_date) values ('${aliceWorkout}', '${alice}', '2026-09-18');
+      `);
+      await db.exec('reset role');
+      await db.query("select set_config('request.jwt.claim.sub', $1, false)", [alice]);
+      await db.exec('set role authenticated');
+      const add = (exercise: string, position: number, columns: string, values: string) =>
+        db.exec(`insert into public.sets (workout_id, exercise_id, exercise_position, set_position, is_completed, ${columns})
+          values ('${aliceWorkout}', '${exercise}', ${position}, 1, true, ${values})`);
+      await add(idOf('Push-Up'), 1, 'reps', '20');
+      await add(idOf('Pull-Up'), 2, 'reps', '8');
+      await add(idOf('Plank'), 3, 'duration_seconds', '90');
+      await add(idOf('Farmer Carry'), 4, 'distance_m, duration_seconds', '40, 30');
+      // A weighted pull-up still counts its added load, and only its added load.
+      await add(idOf('Weighted Pull-Up'), 5, 'reps, weight_kg', '5, 20');
+      const volume = Number((await db.query<{ volume_kg_reps: string }>(
+        `select volume_kg_reps from public.workouts where id = '${aliceWorkout}'`)).rows[0].volume_kg_reps);
+      assert.equal(volume, 100, 'only the 20 kg hung off the belt is external load');
+    });
+  } finally { await db.close(); }
+});
+
+test('the backfill migration and schema.sql assign identical tracking types', async () => {
+  const migration = await readFile(new URL(`../migrations/${TRACKING_BACKFILL}`, import.meta.url), 'utf8');
+  const schema = await readFile(new URL('../schema.sql', import.meta.url), 'utf8');
+  const assignments = (sql: string) => {
+    const out = new Map<string, string>();
+    for (const block of sql.matchAll(/set tracking_type = '(\w+)' where owner_user_id is null and id in \(([^)]+)\)/g)) {
+      for (const id of block[2].matchAll(/'([0-9a-f-]{36})'/g)) out.set(id[1], block[1]);
+    }
+    return out;
+  };
+  const fromMigration = assignments(migration);
+  const fromSchema = assignments(schema);
+  assert.ok(fromMigration.size >= 45, 'the backfill must cover every exercise that is not weight-and-reps');
+  assert.deepEqual([...fromMigration].sort(), [...fromSchema].sort(),
+    'a migrated database and a fresh one must measure every lift the same way');
+
+  const { EXERCISE_CATALOG } = await import('../../src/modules/workout/catalog');
+  for (const exercise of EXERCISE_CATALOG) {
+    const expected = exercise.trackingType === 'weight_reps' ? undefined : exercise.trackingType;
+    assert.equal(fromMigration.get(exercise.id), expected, `${exercise.name} disagrees with the app`);
+  }
+});

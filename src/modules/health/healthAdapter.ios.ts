@@ -10,6 +10,12 @@ import { localDay, type HealthAdapter, type HealthWorkout } from './types';
  * never learn that any of this moved.
  */
 type Kit = typeof import('@kingstinct/react-native-healthkit');
+/** Type-only, so it is erased at build time and pulls no HealthKit code into other platforms. */
+type UnitFor<T extends QuantityIdentifier> = import('@kingstinct/react-native-healthkit').UnitForIdentifier<T>;
+type QuantityIdentifier = 'HKQuantityTypeIdentifierStepCount' | 'HKQuantityTypeIdentifierActiveEnergyBurned';
+/** Inlined rather than imported: the enum's values are part of this library's wire format, and
+ *  importing it eagerly would pull HealthKit into the bundle on platforms that have none. */
+const ComparisonPredicateOperator = { equalTo: 4 } as const;
 
 /** Everything written, so a single list drives the permission request and the write checks. */
 const SHARE = ['HKQuantityTypeIdentifierDietaryEnergyConsumed', 'HKQuantityTypeIdentifierDietaryProtein',
@@ -84,12 +90,23 @@ export async function getHealthAdapter(): Promise<HealthAdapter> {
       throw Object.assign(new Error('Health write permission is unavailable. Review access in Apple Health, then retry the queued export.'), { code: 'HEALTH_PERMISSION' });
     }
   }
-  const total = async (identifier: 'HKQuantityTypeIdentifierStepCount' | 'HKQuantityTypeIdentifierActiveEnergyBurned', unit: string, day: { start: string; end: string }) => {
+  const total = async <T extends QuantityIdentifier>(identifier: T, unit: UnitFor<T>, day: { start: string; end: string }) => {
+    // The dates belong under `filter.date`, not at the top of the filter. Written flat they are
+    // not a predicate this library recognises, so it dropped them and summed every sample ever
+    // recorded — which is how a day's step count came back as two million. Nothing caught it
+    // because the options were cast to `never`; they are typed now, so the shape is checked.
     const result = await kit.queryStatisticsForQuantity(identifier, ['cumulativeSum'],
-      { filter: { startDate: new Date(day.start), endDate: new Date(day.end) }, unit } as never);
+      { filter: { date: { startDate: new Date(day.start), endDate: new Date(day.end) } }, unit });
     const sum = (result as { sumQuantity?: { quantity?: number } })?.sumQuantity?.quantity;
     return typeof sum === 'number' && Number.isFinite(sum) ? sum : null;
   };
+  /**
+   * A day's steps cannot plausibly exceed this. HealthKit itself imposes no such bound, and the
+   * column this is uploaded to rejects anything above 250,000 — a rejection the sync queue reads
+   * as permanent and stops retrying. Refusing to believe an absurd reading here keeps one bad
+   * number from blocking the day's backup, and keeps it off the screen.
+   */
+  const PLAUSIBLE_DAILY_STEPS = 200_000;
 
   return {
     async permissionPrompt() {
@@ -114,12 +131,20 @@ export async function getHealthAdapter(): Promise<HealthAdapter> {
         total('HKQuantityTypeIdentifierStepCount', 'count', day),
         total('HKQuantityTypeIdentifierActiveEnergyBurned', 'kcal', day),
       ]));
-      return { date: day.date, steps: steps === null ? null : Math.max(0, Math.floor(steps)), activeEnergyKcal: energy };
+      const counted = steps === null ? null : Math.max(0, Math.floor(steps));
+      return {
+        date: day.date,
+        // Reported as unknown rather than as a number nothing could have walked.
+        steps: counted !== null && counted > PLAUSIBLE_DAILY_STEPS ? null : counted,
+        activeEnergyKcal: energy,
+      };
     },
     async readWorkouts(now) {
+      // Same filter shape as above, and `limit` is required — a non-positive value means all.
       const samples = await named('queryWorkoutSamples', () => kit.queryWorkoutSamples({
-        filter: { startDate: new Date(now.getTime() - 7 * 86400_000), endDate: now },
-      } as never));
+        filter: { date: { startDate: new Date(now.getTime() - 7 * 86400_000), endDate: now } },
+        limit: -1,
+      }));
       const unique = new Map<string, HealthWorkout>();
       for (const sample of samples as unknown as readonly Record<string, unknown>[]) {
         const metadata = (sample.metadata ?? {}) as Record<string, unknown>;
@@ -159,7 +184,12 @@ export async function getHealthAdapter(): Promise<HealthAdapter> {
     /** Now possible, where the old library had no delete at all: a meal removed from the diary
      *  can be removed from Health instead of being left behind or overwritten with a zero. */
     async deleteMeal(id: string) {
-      const filter = { metadata: { HKSyncIdentifier: `rulocked:meal:${id}` } } as never;
+      // A metadata predicate is a key, an operator and a value — not an object keyed by the
+      // metadata name. Written the latter way it matched nothing, so a meal deleted from the
+      // diary was left behind in Apple Health and the failure was swallowed as "already gone".
+      const filter = {
+        metadata: { withMetadataKey: 'HKSyncIdentifier', operatorType: ComparisonPredicateOperator.equalTo, value: `rulocked:meal:${id}` },
+      };
       for (const identifier of ['HKQuantityTypeIdentifierDietaryEnergyConsumed', ...MACROS.map(([type]) => type)] as const) {
         try { await kit.deleteObjects(identifier, filter); } catch { /* Already gone, or never written. */ }
       }

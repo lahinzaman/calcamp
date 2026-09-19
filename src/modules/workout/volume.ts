@@ -33,6 +33,12 @@ export interface RoutineExercise {
    * Absent on routines saved before supersets existed, and on the exercises you do on their own.
    */
   supersetId?: string;
+  /**
+   * A standing note about this lift — the seat height, the bench number, the cue that works.
+   * It seeds each session's own note, which then belongs to that session: editing it mid-workout
+   * records what happened that day and leaves the standing note alone.
+   */
+  note?: string;
 }
 export interface ScheduledRoutine { exercises: RoutineExercise[]; timesPerWeek: number }
 export interface MuscleVolume {

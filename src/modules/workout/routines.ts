@@ -1,5 +1,6 @@
 import { exerciseById } from './catalog';
 import { SUPERSET_LIMIT } from './supersets';
+import { MAX_EXERCISE_NOTE } from '../../types/workout';
 import type { RoutineExercise } from './volume';
 export type { RoutineExercise };
 export interface WorkoutRoutine {
@@ -30,6 +31,10 @@ export function validateRoutine(routine: WorkoutRoutine) {
       if (!Number.isInteger(entry.repLow) || !Number.isInteger(entry.repHigh) || entry.repLow < 1 || entry.repHigh > 100 || entry.repLow > entry.repHigh) throw new Error('Enter a rep range from low to high, up to 100.');
       if (entry.supersetId !== undefined && (typeof entry.supersetId !== 'string' || !entry.supersetId.trim() || entry.supersetId.length > 64)) {
         throw new Error('A superset has an invalid identifier.');
+      }
+      // The same bound the session note carries, because this is what fills it.
+      if (entry.note !== undefined && (typeof entry.note !== 'string' || entry.note.trim().length > MAX_EXERCISE_NOTE)) {
+        throw new Error(`A note is at most ${MAX_EXERCISE_NOTE} characters.`);
       }
     }
     for (const group of routineSupersets(routine.exercises)) {
@@ -152,4 +157,17 @@ export function replaceRoutineExercise(entries: readonly RoutineExercise[], exer
   if (entries.some(entry => entry.exerciseId === replacementId)) throw new Error('That exercise is already in this routine.');
   if (!exerciseById(replacementId)) throw new Error('That exercise is not in the catalogue.');
   return entries.map(entry => entry.exerciseId === exerciseId ? { ...entry, exerciseId: replacementId } : entry);
+}
+
+
+/** An empty or blank note removes it rather than storing whitespace, as in a live session. */
+export function setRoutineNote(entries: readonly RoutineExercise[], exerciseId: string, note: string): RoutineExercise[] {
+  const trimmed = note.trim();
+  if (trimmed.length > MAX_EXERCISE_NOTE) throw new RangeError(`A note is at most ${MAX_EXERCISE_NOTE} characters.`);
+  if (!entries.some(entry => entry.exerciseId === exerciseId)) throw new Error('That exercise is not in this routine.');
+  return entries.map(entry => {
+    if (entry.exerciseId !== exerciseId) return entry;
+    const { note: _previous, ...rest } = entry;
+    return trimmed ? { ...rest, note: trimmed } : rest;
+  });
 }

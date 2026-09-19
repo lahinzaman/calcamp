@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, ScrollView, View } from 'react-native';
 import { SafeAreaView } from '../../theme/SafeArea';
-import { Text } from '../../theme/primitives';
+import { Text, TextInput } from '../../theme/primitives';
 import { Pressable } from '../../theme/Pressable';
 import { Action, Choice, Field } from '../../components/FormControls';
+import { MAX_EXERCISE_NOTE } from '../../types/workout';
 import { ProgressBar } from '../../theme/motion';
 import { haptic } from '../../theme/haptics';
 import { useT } from '../../i18n';
@@ -16,8 +17,8 @@ import { ExercisePickerSheet } from './ExercisePickerSheet';
 import { archiveOwnExercise, saveOwnExercise } from '../sync/runtime';
 import { fromCatalogExercise, type CustomExercise } from '../../api/customExercises';
 import { canMoveRoutineExercise, clearRoutineSuperset, defaultRoutineExercise, groupRoutineSuperset,
-  moveRoutineExercise, pruneRoutineSupersets, replaceRoutineExercise, routineSupersets, validateRoutine,
-  REST_CHOICES, type WorkoutRoutine } from './routines';
+  moveRoutineExercise, pruneRoutineSupersets, replaceRoutineExercise, routineSupersets, setRoutineNote,
+  validateRoutine, REST_CHOICES, type WorkoutRoutine } from './routines';
 import { supersetLabel, SUPERSET_LIMIT } from './supersets';
 import { EXPERIENCE_LEVELS, EXPERIENCE_NOTES, MUSCLE_LABELS, WEEKLY_SET_TARGETS, volumeAdvice, weeklyVolume, type ExperienceLevel, type RoutineExercise } from './volume';
 import { readExperience, writeExperience } from './experience';
@@ -159,6 +160,12 @@ export function RoutineBuilder({ onClose, onSave, existing }: { onClose: () => v
             </View>
             <View className="mt-3 flex-row flex-wrap">{REST_CHOICES.map(value => <Choice key={value} label={restLabel(value)}
               selected={entry.restSeconds === value} onPress={() => update(entry.exerciseId, { restSeconds: value })} />)}</View>
+            {/* A standing note. It fills in each time you run this routine, where it becomes that
+                session's own note — so changing it mid-workout records that day, not the plan. */}
+            <TextInput accessibilityLabel={`Note for ${exercise?.name ?? 'exercise'}`} value={entry.note ?? ''}
+              onChangeText={value => apply(current => setRoutineNote(current, entry.exerciseId, value))}
+              multiline maxLength={MAX_EXERCISE_NOTE} placeholder="Seat 4, pin 7, left side lagging…"
+              className="mt-3 min-h-12 rounded-xl border border-border bg-background px-3 py-2 text-sm text-ink" />
           </View>;
         })}
         <Action secondary label="Add more exercises" onPress={() => setStep('pick')} />

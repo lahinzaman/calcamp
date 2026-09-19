@@ -12,6 +12,9 @@ export type TrackingType = 'weight_reps' | 'bodyweight_reps' | 'duration' | 'dis
  */
 export type SetKind = 'normal' | 'warmup' | 'drop' | 'failure';
 
+/** The longest note that still reads as a note rather than a diary entry. */
+export const MAX_EXERCISE_NOTE = 280;
+
 /** Each mechanical variant is a distinct catalog ID, even when names are similar. */
 export interface ExerciseDefinition {
   id: string;

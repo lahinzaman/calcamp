@@ -5,6 +5,8 @@ import { createStore } from 'zustand/vanilla';
 
 import { missingFor, outOfRange, SET_KINDS, shapeOf, trackingTypeOf } from '../modules/workout/setShape';
 import { assignSuperset, clearSuperset, nextAfterSet, prune, restsAfter } from '../modules/workout/supersets';
+import { MAX_EXERCISE_NOTE } from '../types/workout';
+export { MAX_EXERCISE_NOTE };
 import type {
   CompletedWorkout,
   ExerciseDefinition,
@@ -31,9 +33,6 @@ export interface WorkoutState {
 export type SetInput = Pick<WorkoutSet, 'id' | 'sessionExerciseId'> &
   Partial<Omit<WorkoutSet, 'id' | 'sessionExerciseId' | 'completedAtMs'>>;
 export type SetUpdate = Partial<Omit<WorkoutSet, 'id' | 'sessionExerciseId' | 'completedAtMs'>>;
-
-/** The longest note that still reads as a note rather than a diary entry. */
-export const MAX_EXERCISE_NOTE = 280;
 
 export interface WorkoutActions {
   startSession: (session: { id: string; name: string; startedAtMs?: number }) => void;

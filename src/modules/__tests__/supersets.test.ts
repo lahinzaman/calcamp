@@ -228,3 +228,53 @@ test('replacing an exercise in a routine keeps the plan that belonged to the slo
   assert.throws(() => replaceRoutineExercise(tuned, lift(0), 'not-a-catalogue-id'), /not in the catalogue/);
   assert.deepEqual(replaceRoutineExercise(tuned, lift(0), lift(0)), tuned, 'swapping for itself changes nothing');
 });
+
+// --- A standing note on the template, which each session starts from.
+import { setRoutineNote } from '../workout/routines';
+import { MAX_EXERCISE_NOTE } from '../../types/workout';
+
+test('a routine note is trimmed, bounded, and cleared by blanking it', () => {
+  const entries = [0, 1].map(index => plan(lift(index)));
+  const noted = setRoutineNote(entries, lift(0), '  bench 4, pin 7  ');
+  assert.equal(noted[0].note, 'bench 4, pin 7');
+  assert.equal(noted[1].note, undefined, 'only the exercise you annotated');
+  assert.doesNotThrow(() => validateRoutine(routine(noted)));
+
+  assert.ok(!('note' in setRoutineNote(noted, lift(0), '   ')[0]), 'a blank note is removed, not stored as whitespace');
+  assert.throws(() => setRoutineNote(entries, lift(0), 'x'.repeat(MAX_EXERCISE_NOTE + 1)), RangeError);
+  assert.throws(() => setRoutineNote(entries, 'not-here', 'hi'), /not in this routine/);
+  // The same bound a session note carries, since this is what fills it.
+  assert.throws(() => validateRoutine(routine([{ ...entries[0], note: 'x'.repeat(MAX_EXERCISE_NOTE + 1) }, entries[1]])), /at most 280/);
+
+  // A note survives a swap and a reorder, because it describes the slot's place in the plan.
+  const swapped = replaceRoutineExercise(noted, lift(0), lift(9));
+  assert.equal(swapped[0].note, 'bench 4, pin 7');
+  assert.equal(moveRoutineExercise(noted, lift(0), 1)[1].note, 'bench 4, pin 7');
+});
+
+test('starting a routine fills each exercise note in, and editing it does not rewrite the template', () => {
+  const store = createWorkoutStore({ now: () => 1_000 });
+  const entries = setRoutineNote([0, 1].map(index => plan(lift(index))), lift(0), 'bench 4, pin 7');
+  const actions = () => store.getState();
+  actions().startSession({ id: 'session', name: 'Push A' });
+
+  // What ActiveWorkoutScreen does when it builds a session from a routine.
+  entries.forEach((entry, index) => {
+    actions().addExercise({
+      id: `slot-${index}`, exercise: EXERCISE_CATALOG.find(e => e.id === entry.exerciseId)!,
+      defaultRestSeconds: entry.restSeconds, ...(entry.note ? { note: entry.note } : {}),
+    });
+  });
+  assert.equal(store.getState().exerciseSequence[0].note, 'bench 4, pin 7', 'the standing note arrives filled in');
+  assert.equal(store.getState().exerciseSequence[1].note, undefined);
+
+  // Today's note is today's: the routine it came from is untouched.
+  actions().setExerciseNote('slot-0', 'shoulder felt off, dropped to pin 5');
+  assert.equal(store.getState().exerciseSequence[0].note, 'shoulder felt off, dropped to pin 5');
+  assert.equal(entries[0].note, 'bench 4, pin 7', 'the template still says what it said');
+
+  // And it reaches the saved session, which is what puts it in front of you next time.
+  actions().addSet({ id: 'set-1', sessionExerciseId: 'slot-0', weightLbs: 100, reps: 5 });
+  actions().completeSet('set-1', 2_000);
+  assert.equal(actions().finishSession(3_000).exercises[0].note, 'shoulder felt off, dropped to pin 5');
+});

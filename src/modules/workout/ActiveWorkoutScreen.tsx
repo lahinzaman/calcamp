@@ -200,7 +200,9 @@ export default function ActiveWorkoutScreen({ previousSets = {} }: { previousSet
       const exercise = exerciseById(entry.exerciseId);
       if (!exercise) continue;
       const id = localId();
-      actions.addExercise({ id, exercise, defaultRestSeconds: entry.restSeconds });
+      // The routine's standing note seeds this session's; editing it here records today, and
+      // leaves the template alone.
+      actions.addExercise({ id, exercise, defaultRestSeconds: entry.restSeconds, ...(entry.note ? { note: entry.note } : {}) });
       if (entry.supersetId) instances.set(entry.supersetId, [...(instances.get(entry.supersetId) ?? []), id]);
       for (let set = 0; set < entry.sets; set++) actions.addSet({ id: localId(), sessionExerciseId: id });
     }

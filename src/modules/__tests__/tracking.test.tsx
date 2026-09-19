@@ -413,4 +413,9 @@ test('editing a routine outside a session offers everything the live logger does
   await act(async () => findLabel(`Move ${second.name} earlier`).props.onPress());
   assert.equal(findLabel(`Move ${second.name} earlier`).props.disabled, true, 'it is now first');
   assert.equal(findLabel(`Move ${first.name} earlier`).props.disabled, false, 'and the other is not');
+
+  // A standing note lives on the template, ready to fill in each time the routine is run.
+  await act(async () => findLabel(`Note for ${first.name}`).props.onChangeText('  seat 4  '));
+  assert.equal(findLabel(`Note for ${first.name}`).props.value, 'seat 4');
+  assert.equal(findLabel(`Note for ${second.name}`).props.value, '', 'and only on the one you wrote it on');
 });

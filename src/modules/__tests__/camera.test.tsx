@@ -84,3 +84,102 @@ test('a browser that cannot hand out a camera says so instead of showing black',
   assert.equal(webCameraProblem(), null);
   delete scope.isSecureContext;
 });
+
+/** The Camera element the scanner renders, with whatever props it was given this render. */
+const cameraProps = () => view!.root.findByType('Camera' as React.ElementType).props as {
+  barcodeScannerSettings?: { barcodeTypes: string[] };
+  onBarcodeScanned?: (result: unknown) => void;
+  onCameraReady?: () => void;
+};
+
+const read = async (data: string) => act(async () => cameraProps().onBarcodeScanned?.({
+  type: 'ean13', data, bounds: { origin: { x: 10, y: 10 }, size: { width: 120, height: 70 } } }));
+
+test('a code is accepted only once two frames agree on it', async () => {
+  const seen: string[] = [];
+  await act(async () => { view = create(<CameraScanner mode="barcode" busy={false}
+    onBarcode={code => seen.push(code)} onCapture={() => {}} onClose={() => {}} onManual={() => {}} />); });
+
+  // One frame is not enough: a single decode can be wrong at an angle or across a curved can,
+  // and accepting it outright is how a real, different product gets looked up confidently.
+  await read('012000161155');
+  assert.deepEqual(seen, []);
+  await read('012000161155');
+  assert.deepEqual(seen, ['012000161155']);
+});
+
+test('frames that disagree never accumulate into an acceptance', async () => {
+  const seen: string[] = [];
+  await act(async () => { view = create(<CameraScanner mode="barcode" busy={false}
+    onBarcode={code => seen.push(code)} onCapture={() => {}} onClose={() => {}} onManual={() => {}} />); });
+  // Both are valid codes; neither is read twice, so neither is what is in front of the camera.
+  await read('012000161155');
+  await read('036000291452');
+  await read('012000161155');
+  assert.deepEqual(seen, [], 'agreement has to be consecutive, not merely eventual');
+  await read('012000161155');
+  assert.deepEqual(seen, ['012000161155']);
+});
+
+test('a frame that fails its own check digit is ignored rather than looked up', async () => {
+  const seen: string[] = [];
+  await act(async () => { view = create(<CameraScanner mode="barcode" busy={false}
+    onBarcode={code => seen.push(code)} onCapture={() => {}} onClose={() => {}} onManual={() => {}} />); });
+
+  // A misread almost always breaks the check digit — that is the whole point of carrying one.
+  // Twice over, so it is not merely the agreement rule swallowing it.
+  await read('012000161156');
+  await read('012000161156');
+  assert.deepEqual(seen, [], 'a corrupt read is dropped and scanning simply continues');
+
+  // Nothing about the scanner is stuck afterwards: a good code still goes through.
+  await read('012000161155');
+  await read('012000161155');
+  assert.deepEqual(seen, ['012000161155']);
+});
+
+test('only the symbologies a food package carries are scanned for', async () => {
+  await act(async () => { view = create(<CameraScanner mode="barcode" busy={false}
+    onBarcode={() => {}} onCapture={() => {}} onClose={() => {}} onManual={() => {}} />); });
+  await act(async () => cameraProps().onCameraReady?.());
+  const types = cameraProps().barcodeScannerSettings!.barcodeTypes;
+  // code128 is a logistics symbology printed on shipping labels, never a food GTIN. Scanning
+  // for it only added ways to decode something that was not the product code.
+  assert.ok(!types.includes('code128'));
+  assert.deepEqual(types, ['ean13', 'ean8', 'upc_a', 'upc_e']);
+});
+
+test('the full set of barcode types is requested once the session is actually running', async () => {
+  await act(async () => { view = create(<CameraScanner mode="barcode" busy={false}
+    onBarcode={() => {}} onCapture={() => {}} onClose={() => {}} onManual={() => {}} />); });
+
+  // expo-camera filters the types it will scan for against the metadata output's
+  // availableMetadataObjectTypes, which is empty until the output is attached to a running
+  // session. Asking for everything up front is how that filter keeps nothing at all, and the
+  // native side only reconfigures when the requested set *changes* — so it never recovers.
+  const before = cameraProps().barcodeScannerSettings!.barcodeTypes;
+  await act(async () => cameraProps().onCameraReady?.());
+  const after = cameraProps().barcodeScannerSettings!.barcodeTypes;
+
+  assert.notDeepEqual(before, after, 'the set has to change after ready, or nothing reconfigures');
+  assert.deepEqual(after, ['ean13', 'ean8', 'upc_a', 'upc_e']);
+  for (const type of before) assert.ok(after.includes(type), 'the initial set stays scannable throughout');
+});
+
+test('a preview that scans nothing says so instead of pulsing forever', async () => {
+  await act(async () => { view = create(<CameraScanner mode="barcode" busy={false} scanTimeoutMs={40}
+    onBarcode={() => {}} onCapture={() => {}} onClose={() => {}} onManual={() => {}} />); });
+  await act(async () => cameraProps().onCameraReady?.());
+  assert.ok(!JSON.stringify(view!.toJSON()).includes('Nothing is scanning'));
+
+  // A live preview that has detected nothing for the whole window is scanning being
+  // unavailable, which used to be indistinguishable from "hold it steadier" and had no way out.
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 80)); });
+  assert.ok(JSON.stringify(view!.toJSON()).includes('Nothing is scanning'));
+  assert.ok(JSON.stringify(view!.toJSON()).includes('type the number printed under it'),
+    'and it points at the way through rather than just reporting failure');
+
+  // A scan landing afterwards clears it: the scanner was slow, not dead.
+  await act(async () => cameraProps().onBarcodeScanned?.({ type: 'ean13', data: '012000161155' }));
+  assert.ok(!JSON.stringify(view!.toJSON()).includes('Nothing is scanning'));
+});

@@ -62,9 +62,13 @@ export function QuickLogModal({action,onClose}:{action:QuickAction;onClose:()=>v
         // The serving the package leads with, with the macros published for that serving —
         // never another serving's figures shown against this one.
         const serving=food.servings[food.selected]??food.servings[0];
-        const grams=serving.metricUnit==='g'&&serving.metricAmount?serving.metricAmount:ozToGrams(1);
-        fill({grams,macros:serving.macros},food.brand?`${food.brand} ${food.name}`:food.name,
-          `${food.source} · ${serving.description}`);
+        // The weight these macros are *for*. A serving measured in ml (a drink) or in nothing at
+        // all has no gram weight, and the old fallback pinned its macros to one ounce — so the
+        // figures were right as shown and wrong the moment the portion was changed, because
+        // every later scaling divided by 28 g that the serving never weighed.
+        const known=serving.metricUnit==='g'&&serving.metricAmount?serving.metricAmount:null;
+        fill({grams:known??ozToGrams(1),macros:serving.macros},food.brand?`${food.brand} ${food.name}`:food.name,
+          `${food.source} · ${serving.description}${known?'':' · this serving has no published weight, so adjust the portion by eye'}`);
       }
     }
     catch(cause){if(alive.current){scan.reset();

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppState, Linking, Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
+import { CameraView, useCameraPermissions, type BarcodeScanningResult, type BarcodeType } from 'expo-camera';
 import Animated, { FadeIn, FadeOut, ReduceMotion, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from '../../theme/SafeArea';
 import { Text } from '../../theme/primitives';
@@ -10,10 +10,50 @@ import { Action } from '../../components/FormControls';
 import { TIMING } from '../../theme/motion';
 import { haptic } from '../../theme/haptics';
 import { t as translate } from '../../i18n';
+import { breadcrumb } from '../telemetry/events';
+import { normalizeBarcode } from './gtin';
 
 export type ScannerMode = 'photo' | 'barcode' | 'label';
 /** A preview that has not started by now is not going to without being told why. */
 const READY_TIMEOUT_MS = 6000;
+/**
+ * A running preview that has detected nothing for this long is not going to. Distinct from
+ * READY_TIMEOUT_MS, which only catches a preview that never starts: scanning can be dead while
+ * the preview is perfectly alive, and that used to leave a pulsing reticle and no way forward.
+ */
+const SCAN_TIMEOUT_MS = 12_000;
+/**
+ * Hoisted, and applied in two stages on purpose.
+ *
+ * expo-camera adds its AVCaptureMetadataOutput and then immediately reads
+ * `availableMetadataObjectTypes` to filter what it will scan for. That list is only populated
+ * once the output is attached to a running session — read too early it is empty, so the filter
+ * keeps nothing and `metadataObjectTypes` is set to []. Nothing is scanned after that, silently,
+ * and the only thing that retries is a *change* to the requested types.
+ *
+ * So the full set is requested once the camera reports ready. That is a real change to the type
+ * set arriving while the session is live, which makes the library configure the output again
+ * against a populated list. Passing the same array identity every render would not do it: the
+ * native side short-circuits when the set is unchanged.
+ */
+/**
+ * The symbologies a retail food package actually carries. `code128` used to be in here and is
+ * not: it is a variable-length logistics symbology used on shipping labels, no food GTIN is
+ * printed in it, and scanning for it alongside EAN/UPC only adds ways to decode something that
+ * is not the product code.
+ */
+const SCAN_TYPES: BarcodeType[] = ['ean13', 'ean8', 'upc_a', 'upc_e'];
+const INITIAL_SCAN_SETTINGS: { barcodeTypes: BarcodeType[] } = { barcodeTypes: ['ean13'] };
+const READY_SCAN_SETTINGS: { barcodeTypes: BarcodeType[] } = { barcodeTypes: SCAN_TYPES };
+/**
+ * How many frames must agree before a code is accepted.
+ *
+ * A single frame can decode wrongly — at an angle, under glare, across a curved can — and the
+ * old behaviour accepted the first result outright, played a success haptic and looked it up.
+ * A misread that happens to carry a valid check digit is a different real product, confidently
+ * wrong. Two agreeing reads cost a fraction of a second and remove nearly all of that.
+ */
+const AGREEING_READS = 2;
 /**
  * Browsers hand out a camera only in a secure context. Reaching a dev server over a LAN
  * address is the usual way to end up here, and it looks identical to a broken camera.
@@ -47,7 +87,7 @@ function Reticle({ scanning }: { scanning: boolean }) {
 }
 
 export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, onClose, onManual, notice,
-  angles = 0, maxAngles = 1, onDone }: {
+  angles = 0, maxAngles = 1, onDone, scanTimeoutMs = SCAN_TIMEOUT_MS }: {
   mode: ScannerMode; busy: boolean; notice?: string | null;
   onBarcode: (code: string) => void; onCapture: (base64: string) => void; onClose: () => void; onManual: () => void;
   /** Label reading works from a file, not base64: text recognition takes a URI. */
@@ -56,6 +96,9 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, 
   angles?: number; maxAngles?: number;
   /** Finish collecting and estimate from what has been taken so far. */
   onDone?: () => void;
+  /** How long a live preview may detect nothing before saying so. A prop so a test can wait
+   *  a realistic moment rather than twelve real seconds. */
+  scanTimeoutMs?: number;
 }) {
   const [permission, requestPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
@@ -69,8 +112,13 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, 
   // backgrounded left the camera unmounted on a screen that never recovered.
   const [foreground, setForeground] = useState(AppState.currentState !== 'background');
   const [stalled, setStalled] = useState(false);
+  /** Set once anything has been detected, which is what stops the "nothing is scanning" notice. */
+  const [detected, setDetected] = useState(false);
+  const [scannerDead, setScannerDead] = useState(false);
   const clearing = useRef<ReturnType<typeof setTimeout> | null>(null);
   const locked = useRef(false);
+  /** The code seen so far and how many frames agreed on it. Reset whenever a different one lands. */
+  const agreeing = useRef<{ code: string; count: number }>({ code: '', count: 0 });
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => setForeground(state !== 'background'));
     return () => { subscription.remove(); if (clearing.current) clearTimeout(clearing.current); };
@@ -80,16 +128,43 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, 
     const timer = setTimeout(() => setStalled(true), READY_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [permission?.granted, ready]);
+  // A preview that runs while nothing is ever detected is the shape of barcode scanning being
+  // unavailable in this build. It used to look identical to "keep holding it steadier".
+  useEffect(() => {
+    if (mode !== 'barcode' || !ready || detected) return;
+    const timer = setTimeout(() => {
+      setScannerDead(true);
+      breadcrumb('barcode.scanner', { outcome: 'unavailable', source: 'camera' });
+    }, scanTimeoutMs);
+    return () => clearTimeout(timer);
+  }, [mode, ready, detected, scanTimeoutMs]);
 
   const scanned = (result: BarcodeScanningResult) => {
+    if (!detected) { setDetected(true); breadcrumb('barcode.scanner', { outcome: 'ok', source: 'camera' }); }
+    setScannerDead(false);
     if (busy || locked.current) return;
+
+    // A misread nearly always fails the code's own check digit — that is what the digit is for.
+    // Checking it here, rather than later in the lookup, means a bad frame is simply ignored and
+    // scanning continues, instead of being accepted with a success haptic and looked up.
+    const code = result.data?.trim() ?? '';
+    if (!normalizeBarcode(code)) { breadcrumb('barcode.scanner', { outcome: 'stale', source: 'camera' }); return; }
+
+    // Highlight as soon as a plausible code is seen, so it is clear the frame is being read.
     setHighlight(toHighlight(result));
     if (clearing.current) clearTimeout(clearing.current);
     // A barcode that leaves the frame should stop being highlighted.
     clearing.current = setTimeout(() => setHighlight(null), 700);
+
+    agreeing.current = agreeing.current.code === code
+      ? { code, count: agreeing.current.count + 1 }
+      : { code, count: 1 };
+    if (agreeing.current.count < AGREEING_READS) return;
+
+    agreeing.current = { code: '', count: 0 };
     locked.current = true;
     haptic('success');
-    onBarcode(result.data);
+    onBarcode(code);
     setTimeout(() => { locked.current = false; }, 1200);
   };
   const capture = async () => {
@@ -110,6 +185,7 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, 
   const full = collecting && angles >= maxAngles;
   const stalledMessage = webCameraProblem()
     ?? 'The preview has not started. Close and reopen the scanner, or enter this item by hand.';
+  const deadMessage = 'Nothing is scanning. Hold the barcode flat and fill the frame — or tap below to type the number printed under it.';
 
   if (!permission?.granted) {
     return <SafeAreaView className="flex-1 justify-center bg-background p-6">
@@ -127,7 +203,7 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, 
   return <View style={styles.root}>
     {foreground && <CameraView ref={camera} style={StyleSheet.absoluteFill} facing="back" enableTorch={torch}
       onCameraReady={() => setReady(true)} onMountError={() => setError('The camera could not start. Enter this item by hand.')}
-      barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128'] }}
+      barcodeScannerSettings={ready ? READY_SCAN_SETTINGS : INITIAL_SCAN_SETTINGS}
       onBarcodeScanned={mode === 'barcode' ? scanned : undefined} />}
 
     {mode === 'barcode' && !highlight && <Reticle scanning={!busy} />}
@@ -156,7 +232,8 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, 
       </View>
 
       <View style={styles.bottomBar}>
-        {(notice || error || stalled) && <View style={styles.noticePill}><Text style={styles.chromeText}>{error ?? notice ?? stalledMessage}</Text></View>}
+        {(notice || error || stalled || scannerDead) && <View style={styles.noticePill}>
+          <Text style={styles.chromeText}>{error ?? notice ?? (stalled ? stalledMessage : deadMessage)}</Text></View>}
         {collecting && angles > 0 && <View style={styles.angleRow}>
           {Array.from({ length: maxAngles }, (_, index) => <View key={index} style={[styles.angleDot, index < angles && styles.angleDotFilled]} />)}
         </View>}

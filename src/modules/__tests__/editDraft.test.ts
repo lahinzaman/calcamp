@@ -75,3 +75,24 @@ test('a session cannot be saved into a state the store or the schema would rejec
   const orphaned = { ...finished(), exercises: finished().exercises.slice(0, 1) };
   assert.match(draft.validateDraft(orphaned) ?? '', /no longer here/);
 });
+
+test('a finished session can be reordered, and a set logged against the wrong lift re-labelled', () => {
+  const moved = draft.moveExercise(finished(), 'slot-2', -1);
+  assert.deepEqual(moved.exercises.map(entry => entry.id), ['slot-2', 'slot-1']);
+  assert.deepEqual(moved.sets.map(entry => entry.id), ['a', 'b', 'c'], 'the sets themselves are untouched');
+  assert.deepEqual(draft.moveExercise(finished(), 'slot-1', -1).exercises.map(entry => entry.id), ['slot-1', 'slot-2'],
+    'already first is a no-op, not an error');
+  assert.throws(() => draft.moveExercise(finished(), 'nope', 1), /Unknown exercise/);
+
+  // Unlike a swap mid-session, this keeps the sets: the work happened, it was filed wrong.
+  const relabelled = draft.replaceExercise(finished(), 'slot-1', { id: 'incline', name: 'Incline Bench Press' });
+  assert.equal(relabelled.exercises[0].exercise.name, 'Incline Bench Press');
+  assert.equal(relabelled.sets.filter(entry => entry.sessionExerciseId === 'slot-1').length, 2);
+  assert.deepEqual(relabelled.sets.map(entry => entry.weightLbs), [135, 155, 95], 'every number survives the correction');
+  assert.equal(draft.validateDraft(relabelled), null);
+
+  // A lift measured differently cannot inherit sets the database would reject.
+  assert.throws(() => draft.replaceExercise(finished(), 'slot-1',
+    { id: 'plank', name: 'Plank', trackingType: 'duration' }), /measured differently/);
+  assert.throws(() => draft.replaceExercise(finished(), 'nope', { id: 'x', name: 'X' }), /Unknown exercise/);
+});

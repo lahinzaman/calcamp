@@ -81,3 +81,29 @@ test('barcode normalization rejects unknown macros and displays Imperial food po
   assert.equal(food.servings[food.selected].macros.proteinG,5);
   assert.equal(servingLabel({amount:100,unit:'g',label:'100 g'}),'3.53 oz');assert.equal(servingLabel({amount:1,unit:'cup',label:'1 cup'}),'1 cup');
 });
+
+test('the survey asks which days you train rather than assuming four of them', async () => {
+  const { useOnboardingStore } = await import('../../store/onboardingStore');
+  const { visibleQuestions, answered } = await import('../onboarding/questions');
+  useOnboardingStore.getState().reset();
+
+  assert.deepEqual(useOnboardingStore.getState().draft.training_days, [],
+    'no day is pre-selected, so nobody inherits a schedule they never chose');
+
+  // And the question cannot be skipped past: an empty split is not an answer.
+  useOnboardingStore.getState().patch({ is_advanced_track: true });
+  const draft = useOnboardingStore.getState().draft;
+  const split = visibleQuestions(draft).find(question => question.id === 'split')!;
+  assert.ok(split, 'the split question is asked on the advanced track');
+  assert.equal(answered(split, draft), false);
+  assert.match(split.problem!(draft) ?? '', /at least one training day/);
+
+  const picked = { ...draft, ...split.write(draft, [1, 4] as never) };
+  assert.deepEqual(picked.training_days, [1, 4]);
+  assert.equal(answered(split, picked), true);
+  assert.equal(split.problem!(picked), null);
+
+  // Keeping it simple skips the question entirely; an empty split is right there.
+  const simple = { ...draft, is_advanced_track: false };
+  assert.equal(visibleQuestions(simple).some(question => question.id === 'split'), false);
+});

@@ -90,6 +90,7 @@ export function SessionEditor({ workout, onSave, onDelete, onClose }: {
   const [name, setName] = useState(workout.session.name);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [replacing, setReplacing] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const apply = (change: (current: CompletedWorkout) => CompletedWorkout) => {
     try { setDraft(change); setError(null); }
@@ -116,14 +117,26 @@ export function SessionEditor({ workout, onSave, onDelete, onClose }: {
         <Text className="mb-5 text-sm">{Math.round(volume).toLocaleString()} lbs moved · {draft.sets.filter(isHardSet).length} hard sets.
           {' '}Changing a set here updates your bests, your volume trend and the previous column.</Text>
 
-        {draft.exercises.map(slot => {
+        {draft.exercises.map((slot, index) => {
           const sets = draft.sets.filter(entry => entry.sessionExerciseId === slot.id);
           return <View key={slot.id} className="mb-4 rounded-3xl border border-border bg-surface p-4">
-            <View className="mb-2 flex-row items-center gap-3">
+            <View className="mb-2 flex-row items-center gap-2">
               <Text className="flex-1 text-lg font-bold">{slot.exercise.name}</Text>
+              {([['earlier', -1], ['later', 1]] as const).map(([word, delta]) => {
+                const possible = delta === -1 ? index > 0 : index < draft.exercises.length - 1;
+                return <Pressable key={word} accessibilityRole="button" disabled={!possible}
+                  accessibilityLabel={`Move ${slot.exercise.name} ${word}`} weight="subtle"
+                  style={possible ? undefined : { opacity: .3 }}
+                  onPress={() => { apply(current => draftOps.moveExercise(current, slot.id, delta)); haptic('selection'); }}
+                  className="h-11 w-11 items-center justify-center rounded-full bg-raised">
+                  <Text className="text-lg font-bold">{delta === -1 ? '↑' : '↓'}</Text></Pressable>;
+              })}
+              <Pressable accessibilityRole="button" accessibilityLabel={`Replace ${slot.exercise.name}`} weight="subtle"
+                onPress={() => setReplacing(slot.id)}
+                className="min-h-11 justify-center rounded-full bg-raised px-3"><Text className="text-sm font-semibold">Replace</Text></Pressable>
               <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${slot.exercise.name}`} tone="warning" weight="subtle"
                 onPress={() => apply(current => draftOps.removeExercise(current, slot.id))}
-                className="min-h-11 justify-center rounded-full bg-raised px-4"><Text className="text-sm font-semibold">Remove</Text></Pressable>
+                className="min-h-11 justify-center rounded-full bg-raised px-3"><Text className="text-sm font-semibold">Remove</Text></Pressable>
             </View>
             {sets.map((entry, index) => <SetRow key={entry.id} entry={entry} index={index} trackingType={trackingTypeOf(slot.exercise)}
               onChange={edit => apply(current => draftOps.editSet(current, entry.id, edit))}
@@ -160,5 +173,10 @@ export function SessionEditor({ workout, onSave, onDelete, onClose }: {
     {adding && <ExercisePickerSheet title="Add an exercise" subtitle="Something you did in this session but never logged."
       confirmLabel={exercise => `Add ${exercise.name}`} onClose={() => setAdding(false)}
       onChoose={exercise => apply(current => draftOps.addExercise(current, exercise))} />}
+    {replacing && <ExercisePickerSheet
+      title="Replace this exercise"
+      subtitle="For sets logged against the wrong lift. Unlike a swap mid-session, the sets stay — they are what is being re-labelled."
+      confirmLabel={exercise => `Swap in ${exercise.name}`} onClose={() => setReplacing(null)}
+      onChoose={exercise => apply(current => draftOps.replaceExercise(current, replacing, exercise))} />}
   </Modal>;
 }

@@ -12,10 +12,12 @@ import { exerciseById } from './catalog';
 import { ExerciseHelp } from './ExerciseHelp';
 import { ExercisePicker } from './ExercisePicker';
 import { CustomExerciseSheet } from './CustomExerciseSheet';
+import { ExercisePickerSheet } from './ExercisePickerSheet';
 import { archiveOwnExercise, saveOwnExercise } from '../sync/runtime';
 import { fromCatalogExercise, type CustomExercise } from '../../api/customExercises';
-import { clearRoutineSuperset, defaultRoutineExercise, groupRoutineSuperset, pruneRoutineSupersets,
-  routineSupersets, validateRoutine, REST_CHOICES, type WorkoutRoutine } from './routines';
+import { canMoveRoutineExercise, clearRoutineSuperset, defaultRoutineExercise, groupRoutineSuperset,
+  moveRoutineExercise, pruneRoutineSupersets, replaceRoutineExercise, routineSupersets, validateRoutine,
+  REST_CHOICES, type WorkoutRoutine } from './routines';
 import { supersetLabel, SUPERSET_LIMIT } from './supersets';
 import { EXPERIENCE_LEVELS, EXPERIENCE_NOTES, MUSCLE_LABELS, WEEKLY_SET_TARGETS, volumeAdvice, weeklyVolume, type ExperienceLevel, type RoutineExercise } from './volume';
 import { readExperience, writeExperience } from './experience';
@@ -48,6 +50,12 @@ export function RoutineBuilder({ onClose, onSave, existing }: { onClose: () => v
   const [error, setError] = useState<string | null>(null); const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState<true | CustomExercise | null>(null);
   const [pairing, setPairing] = useState<string[]>([]);
+  /** The slot being swapped, if any. The plan stays; only the lift filling it changes. */
+  const [replacing, setReplacing] = useState<string | null>(null);
+  const apply = (change: (current: RoutineExercise[]) => RoutineExercise[]) => {
+    try { setEntries(current => change(current)); setError(null); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'That change could not be applied.'); haptic('error'); }
+  };
   const ids = entries.map(entry => entry.exerciseId);
   const [low, high] = WEEKLY_SET_TARGETS[experience];
   const volume = useMemo(() => weeklyVolume([{ exercises: entries, timesPerWeek }], experience), [entries, timesPerWeek, experience]);
@@ -120,8 +128,26 @@ export function RoutineBuilder({ onClose, onSave, existing }: { onClose: () => v
                   {entry.supersetId ? ` · superset ${supersetLabel(groups.findIndex(group => group.id === entry.supersetId))}` : ''}</Text></View>
               {exercise && <ExerciseHelp exercise={exercise} />}
               <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${exercise?.name ?? 'exercise'}`} tone="warning" weight="subtle"
-                onPress={() => setEntries(current => pruneRoutineSupersets(current.filter(item => item.exerciseId !== entry.exerciseId)))}
+                onPress={() => apply(current => pruneRoutineSupersets(current.filter(item => item.exerciseId !== entry.exerciseId)))}
                 className="h-10 w-10 items-center justify-center rounded-full bg-raised"><Text>×</Text></Pressable>
+            </View>
+            {/* Up and down rather than drag, as in the live session: a drag handle inside a
+                scrolling sheet fights the scroll, and these work with a screen reader. Moving a
+                supersetted exercise past its partner reorders the pair; past anything else it
+                takes the pair with it, so a reorder can never split a group. */}
+            <View className="mb-3 flex-row items-center gap-2">
+              {([['earlier', -1], ['later', 1]] as const).map(([word, delta]) => {
+                const possible = canMoveRoutineExercise(entries, entry.exerciseId, delta);
+                return <Pressable key={word} accessibilityRole="button" disabled={!possible}
+                  accessibilityLabel={`Move ${exercise?.name ?? 'exercise'} ${word}`}
+                  onPress={() => { apply(current => moveRoutineExercise(current, entry.exerciseId, delta)); haptic('selection'); }}
+                  weight="subtle" style={possible ? undefined : { opacity: .3 }}
+                  className="h-11 w-11 items-center justify-center rounded-full bg-raised">
+                  <Text className="text-lg font-bold">{delta === -1 ? '↑' : '↓'}</Text></Pressable>;
+              })}
+              <Pressable accessibilityRole="button" accessibilityLabel={`Replace ${exercise?.name ?? 'exercise'}`}
+                onPress={() => setReplacing(entry.exerciseId)} weight="subtle"
+                className="min-h-11 justify-center rounded-full bg-raised px-4"><Text className="text-sm font-semibold">Replace</Text></Pressable>
             </View>
             <View className="flex-row gap-3">
               <Stepper label="Sets" value={entry.sets} min={1} max={20} onChange={sets => update(entry.exerciseId, { sets })} />
@@ -186,5 +212,10 @@ export function RoutineBuilder({ onClose, onSave, existing }: { onClose: () => v
         <Action secondary label={t('common.cancel')} onPress={onClose} />
       </ScrollView>
     </KeyboardAvoidingView></SafeAreaView>
+    {replacing && <ExercisePickerSheet
+      title="Replace this exercise"
+      subtitle={`${exerciseById(replacing)?.name ?? 'This exercise'} keeps its sets, rest, rep range and its place in the routine.`}
+      confirmLabel={exercise => `Swap in ${exercise.name}`} onClose={() => setReplacing(null)}
+      onChoose={exercise => apply(current => replaceRoutineExercise(current, replacing, exercise.id))} />}
   </Modal>;
 }

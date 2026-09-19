@@ -45,6 +45,7 @@ const { default: DiningHallScreen } = require('../dining/DiningHallScreen') as t
 const { default: ActiveWorkoutScreen } = require('../workout/ActiveWorkoutScreen') as typeof import('../workout/ActiveWorkoutScreen');
 const { default: WorkoutHistoryScreen } = require('../workout/WorkoutHistoryScreen') as typeof import('../workout/WorkoutHistoryScreen');
 const { SessionEditor } = require('../workout/SessionEditor') as typeof import('../workout/SessionEditor');
+const { RoutineBuilder } = require('../workout/RoutineBuilder') as typeof import('../workout/RoutineBuilder');
 const { useFoodVision } = require('../vision/useFoodVision') as typeof import('../vision/useFoodVision');
 const { nutritionStore } = require('../../store/nutritionStore') as typeof import('../../store/nutritionStore');
 const { workoutStore } = require('../../store/workoutStore') as typeof import('../../store/workoutStore');
@@ -383,4 +384,33 @@ test('a finished session can be corrected, and emptying it is refused rather tha
   assert.equal(deleted, false);
   await pressText('Yes, delete it');
   assert.equal(deleted, true);
+});
+
+test('editing a routine outside a session offers everything the live logger does', async () => {
+  const { EXERCISE_CATALOG } = require('../workout/catalog') as typeof import('../workout/catalog');
+  const [first, second, third] = EXERCISE_CATALOG;
+  const routine = {
+    id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', name: 'Push A', timesPerWeek: 2,
+    exerciseIds: [first.id, second.id, third.id],
+    exercises: [first, second, third].map(exercise => ({ exerciseId: exercise.id, sets: 3, restSeconds: 120, repLow: 6, repHigh: 12 })),
+  };
+  await act(async () => { rendered = create(<RoutineBuilder existing={routine} onClose={() => {}} onSave={async () => {}} />); });
+
+  // Every capability the in-session editor has, on a routine nobody is currently running.
+  assert.ok(findLabel(`Move ${second.name} earlier`), 'reorder');
+  assert.ok(findLabel(`Move ${second.name} later`));
+  assert.ok(findLabel(`Replace ${second.name}`), 'replace');
+  assert.ok(findLabel(`Remove ${second.name}`), 'remove');
+  assert.ok(textContent().includes('Add more exercises'), 'add');
+  assert.ok(textContent().includes('SUPERSETS'), 'supersets');
+
+  // The ends are disabled rather than absent, so the row does not reflow as you move things.
+  assert.equal(findLabel(`Move ${first.name} earlier`).props.disabled, true);
+  assert.equal(findLabel(`Move ${third.name} later`).props.disabled, true);
+  assert.equal(findLabel(`Move ${first.name} later`).props.disabled, false);
+
+  // And reordering actually reorders: the second exercise moves above the first.
+  await act(async () => findLabel(`Move ${second.name} earlier`).props.onPress());
+  assert.equal(findLabel(`Move ${second.name} earlier`).props.disabled, true, 'it is now first');
+  assert.equal(findLabel(`Move ${first.name} earlier`).props.disabled, false, 'and the other is not');
 });

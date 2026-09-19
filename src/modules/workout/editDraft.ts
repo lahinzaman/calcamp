@@ -105,3 +105,35 @@ export function validateDraft(draft: CompletedWorkout): string | null {
   if (!draft.sets.length) return 'A session needs at least one set. Delete it instead if it should not be there.';
   return null;
 }
+
+/** Moves an exercise one place earlier or later within a finished session. */
+export function moveExercise(draft: CompletedWorkout, sessionExerciseId: string, delta: -1 | 1): CompletedWorkout {
+  const index = draft.exercises.findIndex(entry => entry.id === sessionExerciseId);
+  if (index < 0) throw new Error('Unknown exercise.');
+  const target = index + delta;
+  if (target < 0 || target >= draft.exercises.length) return draft;
+  const exercises = [...draft.exercises];
+  [exercises[index], exercises[target]] = [exercises[target], exercises[index]];
+  return { ...draft, exercises };
+}
+
+/**
+ * Swaps the lift a slot's sets are attributed to, keeping every one of them.
+ *
+ * The opposite of replacing mid-session, and deliberately so. Live, a swap means the rack was
+ * busy and you are about to do something else, so the old lift's numbers cannot follow it.
+ * Here it means the sets were logged against the wrong exercise — the work happened, it was
+ * just filed wrong — so correcting the label has to keep what it is labelling.
+ */
+export function replaceExercise(draft: CompletedWorkout, sessionExerciseId: string, exercise: ExerciseDefinition): CompletedWorkout {
+  const slot = draft.exercises.find(entry => entry.id === sessionExerciseId);
+  if (!slot) throw new Error('Unknown exercise.');
+  const moved = { ...draft, exercises: draft.exercises.map(entry => entry.id === sessionExerciseId
+    ? { ...entry, exercise: { ...exercise } } : entry) };
+  // The sets have to be measured the way the new exercise is, or the database will refuse them.
+  const problem = draft.sets.filter(entry => entry.sessionExerciseId === sessionExerciseId)
+    .map(entry => validateSetEdit(entry, trackingTypeOf(exercise)))
+    .find(Boolean);
+  if (problem) throw new RangeError(`${exercise.name} is measured differently: ${problem.toLowerCase()} Remove these sets, or add it as a separate exercise instead.`);
+  return moved;
+}

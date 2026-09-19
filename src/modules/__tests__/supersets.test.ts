@@ -175,3 +175,56 @@ test('starting a routine re-keys its pairings onto the session’s own exercises
   assert.equal(store.getState().restTimer, null, 'no rest between the halves');
   assert.equal(store.getState().activeExerciseId, 'slot-1');
 });
+
+// --- Editing a routine outside a session: reorder and replace, alongside pairing.
+import { canMoveRoutineExercise, moveRoutineExercise, replaceRoutineExercise } from '../workout/routines';
+
+test('reordering a routine can never split a superset', () => {
+  const entries = [0, 1, 2, 3].map(index => plan(lift(index)));
+  const paired = groupRoutineSuperset(entries, [lift(1), lift(2)], 'g1');
+  const order = (list: RoutineExercise[]) => list.map(entry => EXERCISE_CATALOG.findIndex(e => e.id === entry.exerciseId));
+  assert.deepEqual(order(paired), [0, 1, 2, 3]);
+
+  // Moving an ungrouped exercise past a pair jumps the whole pair, not into the middle of it.
+  const jumped = moveRoutineExercise(paired, lift(0), 1);
+  assert.deepEqual(order(jumped), [1, 2, 0, 3]);
+  assert.doesNotThrow(() => validateRoutine(routine(jumped)));
+
+  // Moving a member against its partner reorders the pair itself.
+  const swapped = moveRoutineExercise(paired, lift(2), -1);
+  assert.deepEqual(order(swapped), [0, 2, 1, 3]);
+  assert.equal(swapped[1].supersetId, swapped[2].supersetId, 'both are still in it');
+  assert.doesNotThrow(() => validateRoutine(routine(swapped)));
+
+  // Moving the member whose neighbour is outside the pair takes the partner along.
+  const together = moveRoutineExercise(paired, lift(2), 1);
+  assert.deepEqual(order(together), [0, 3, 1, 2]);
+  assert.equal(together[2].supersetId, together[3].supersetId, 'the pair arrives intact');
+  assert.doesNotThrow(() => validateRoutine(routine(together)));
+
+  // The ends are a no-op, which is what disables the button rather than erroring.
+  assert.deepEqual(order(moveRoutineExercise(paired, lift(0), -1)), [0, 1, 2, 3]);
+  assert.equal(canMoveRoutineExercise(paired, lift(0), -1), false);
+  assert.equal(canMoveRoutineExercise(paired, lift(0), 1), true);
+  assert.equal(canMoveRoutineExercise(paired, lift(3), 1), false);
+  assert.throws(() => moveRoutineExercise(paired, 'not-here', 1), /not in this routine/);
+});
+
+test('replacing an exercise in a routine keeps the plan that belonged to the slot', () => {
+  const entries = groupRoutineSuperset([0, 1, 2].map(index => plan(lift(index))), [lift(0), lift(1)], 'g1');
+  const tuned = entries.map(entry => entry.exerciseId === lift(0) ? { ...entry, sets: 5, restSeconds: 180, repLow: 3, repHigh: 5 } : entry);
+
+  const swapped = replaceRoutineExercise(tuned, lift(0), lift(9));
+  const slot = swapped[0];
+  assert.equal(slot.exerciseId, lift(9));
+  assert.deepEqual([slot.sets, slot.restSeconds, slot.repLow, slot.repHigh], [5, 180, 3, 5],
+    'sets, rest and rep range belong to the slot, not to the lift that was filling it');
+  assert.equal(slot.supersetId, 'g1', 'and so does its place in the pairing');
+  assert.doesNotThrow(() => validateRoutine(routine(swapped)));
+
+  // A routine holds distinct exercises; swapping onto one already here would merge two slots.
+  assert.throws(() => replaceRoutineExercise(tuned, lift(0), lift(1)), /already in this routine/);
+  assert.throws(() => replaceRoutineExercise(tuned, 'not-here', lift(9)), /not in this routine/);
+  assert.throws(() => replaceRoutineExercise(tuned, lift(0), 'not-a-catalogue-id'), /not in the catalogue/);
+  assert.deepEqual(replaceRoutineExercise(tuned, lift(0), lift(0)), tuned, 'swapping for itself changes nothing');
+});

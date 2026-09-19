@@ -93,3 +93,63 @@ export function routineSupersets(entries: readonly RoutineExercise[]): { id: str
   }
   return [...seen].map(([id, exerciseIds]) => ({ id, exerciseIds }));
 }
+
+/**
+ * Consecutive runs of the same superset. Validation holds members contiguous, so a run is the
+ * group — and treating a group as one block is what lets a reorder move it without splitting it.
+ */
+function blocksOf(entries: readonly RoutineExercise[]): RoutineExercise[][] {
+  const blocks: RoutineExercise[][] = [];
+  for (const entry of entries) {
+    const last = blocks.at(-1);
+    if (last && entry.supersetId && last[0].supersetId === entry.supersetId) last.push(entry);
+    else blocks.push([entry]);
+  }
+  return blocks;
+}
+
+/**
+ * Moves an exercise one place earlier or later. Two behaviours, because a superset makes them
+ * different questions: moving against a partner reorders the pair itself, while moving past
+ * anything else takes the whole group along. Neither can leave a group split, so a routine
+ * cannot be reordered into a state its own validation would reject.
+ */
+export function moveRoutineExercise(entries: readonly RoutineExercise[], exerciseId: string, delta: -1 | 1): RoutineExercise[] {
+  const index = entries.findIndex(entry => entry.exerciseId === exerciseId);
+  if (index < 0) throw new Error('That exercise is not in this routine.');
+  const entry = entries[index];
+  const neighbour = entries[index + delta];
+  if (neighbour && entry.supersetId && neighbour.supersetId === entry.supersetId) {
+    const next = [...entries];
+    [next[index], next[index + delta]] = [next[index + delta], next[index]];
+    return next;
+  }
+  const blocks = blocksOf(entries);
+  const at = blocks.findIndex(block => block.some(item => item.exerciseId === exerciseId));
+  const target = at + delta;
+  // Already at the end; a no-op rather than an error, because the button is simply disabled.
+  if (target < 0 || target >= blocks.length) return [...entries];
+  const next = [...blocks];
+  [next[at], next[target]] = [next[target], next[at]];
+  return next.flat();
+}
+
+/** Whether a move would do anything, which is what greys the button out. */
+export function canMoveRoutineExercise(entries: readonly RoutineExercise[], exerciseId: string, delta: -1 | 1): boolean {
+  const moved = moveRoutineExercise(entries, exerciseId, delta);
+  return moved.some((entry, index) => entry.exerciseId !== entries[index].exerciseId);
+}
+
+/**
+ * Swaps the lift in a slot, keeping its sets, rest, rep range and its place in any superset —
+ * the plan belongs to the slot, not to the exercise that happens to be filling it.
+ */
+export function replaceRoutineExercise(entries: readonly RoutineExercise[], exerciseId: string, replacementId: string): RoutineExercise[] {
+  if (exerciseId === replacementId) return [...entries];
+  if (!entries.some(entry => entry.exerciseId === exerciseId)) throw new Error('That exercise is not in this routine.');
+  // A routine holds distinct exercises, so swapping onto one already here would collapse two
+  // slots into one and lose the other's sets.
+  if (entries.some(entry => entry.exerciseId === replacementId)) throw new Error('That exercise is already in this routine.');
+  if (!exerciseById(replacementId)) throw new Error('That exercise is not in the catalogue.');
+  return entries.map(entry => entry.exerciseId === exerciseId ? { ...entry, exerciseId: replacementId } : entry);
+}

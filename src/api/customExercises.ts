@@ -1,4 +1,5 @@
 import { getSupabase } from './supabase';
+import { isUuid } from '../modules/sync/engine';
 import { PATTERN_LABELS } from '../modules/workout/search';
 import { MUSCLE_LABELS } from '../modules/workout/volume';
 import { TRACKING_TYPES } from '../modules/workout/setShape';
@@ -28,7 +29,8 @@ export const EQUIPMENT_CHOICES = ['barbell', 'dumbbell', 'cable', 'machine', 'bo
 export const MAX_CUSTOM_NAME = 80;
 
 export function validateCustomExercise(exercise: CustomExercise) {
-  if (!/^[0-9a-f-]{36}$/i.test(exercise.id)) throw new Error('This exercise has an invalid identifier.');
+  // A `uuid` column, so close enough is not enough: see validateRoutine.
+  if (!isUuid(exercise.id)) throw new Error('This exercise has an invalid identifier.');
   const name = exercise.name.trim();
   if (!name || name.length > MAX_CUSTOM_NAME) throw new Error(`Name your exercise, in 1 to ${MAX_CUSTOM_NAME} characters.`);
   if (!MUSCLE_LABELS[exercise.primaryMuscle]) throw new Error('Choose the muscle this exercise trains.');

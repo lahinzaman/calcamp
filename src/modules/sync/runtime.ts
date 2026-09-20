@@ -6,7 +6,7 @@ import { getTrackingRepository, type DailyTotals } from '../../api/trackingRepos
 import { getSupabase } from '../../api/supabase';
 import { emptyMacros } from '../../types/nutrition';
 import { durableStorage } from './storage';
-import { SyncEngine } from './engine';
+import { repairIdentifiers, SyncEngine } from './engine';
 import { healthStore } from '../health/useHealthSync';
 import { syncBridge } from './bridge';
 import { rememberFood } from '../foods/savedFoods';
@@ -107,6 +107,7 @@ export function activateSync(owner: string | null) {
   nutritionStore.getState().reset(); workoutStore.getState().reset(); healthStore.getState().reset();
   syncEngine.activate(owner); durableStorage.set('active-sync-owner', owner ?? '');
   if (!owner) { useSyncStatus.setState({ ready: false, queued: 0, blocked: 0, error: null }); return; }
+  repairStrandedRecords();
   applySnapshot();
   if (syncEngine.data.health.enabled) healthStore.setState({ ...(syncEngine.data.health.summary?.date === localDateKey(new Date()) ? syncEngine.data.health.summary : {}), initialized: true, refreshedAt: syncEngine.data.health.lastBatchAt });
   syncBridge.nutrition = (next, previous) => {
@@ -145,6 +146,30 @@ export function activateSync(owner: string | null) {
   };
   syncBridge.drain = drainSync; syncBridge.refresh = refreshDiary;
   useSyncStatus.setState({ ready: true });
+}
+
+/**
+ * Gives a proper UUID to anything saved with an ID that never was one, and sends it.
+ *
+ * Routines and custom exercises created before this were given a hand-assembled ID that Postgres
+ * rejected permanently, so they existed on one device and nowhere else. Repairing on activation
+ * is what finally uploads them — without it, the fix only helps routines made from now on and
+ * everything already built stays stranded.
+ */
+function repairStrandedRecords() {
+  const owner = syncEngine.owner;
+  if (!owner) return;
+  try {
+    const repaired = repairIdentifiers(syncEngine.data, randomUUID);
+    if (!repaired.routines.length && !repaired.exercises.length) return;
+    syncEngine.commit(repaired.data);
+    registerCustomExercises((repaired.data.customExercises ?? []).map(entry => toCatalogExercise(entry, owner)));
+    for (const exercise of repaired.exercises) {
+      syncEngine.queue({ kind: 'custom-exercise', data: exercise }, `custom-exercise:${exercise.id}:${Date.now()}`);
+    }
+    for (const routine of repaired.routines) syncEngine.queue({ kind: 'routine', data: routine }, `routine:${routine.id}`);
+    void syncEngine.drain();
+  } catch { /* A repair that cannot be written must not stop the account loading. */ }
 }
 
 /**

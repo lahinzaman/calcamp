@@ -28,6 +28,55 @@ export interface AccountData {
   health: { enabled: boolean; summary: HealthSummary | null; workouts: HealthWorkout[]; lastBatchAt: number | null; error: string | null; exported: string[] };
 }
 const fresh = (): AccountData => ({ version: 2, days: {}, entries: {}, customExercises: [], lifts: {}, volumeLog: [], liftSessions: [], lastRecords: [], workout: null, queue: [], workoutReceipts: [], health: { enabled: false, summary: null, workouts: [], lastBatchAt: null, error: null, exported: [] } });
+/**
+ * A real UUID, not merely 36 characters of hex and hyphens. Routine and exercise IDs are written
+ * to `uuid` columns, which reject anything else with a 22P02 — an error this queue classes as
+ * permanent, so the upload is blocked and never retried. Something that looks close enough here
+ * is the difference between a routine that syncs and one that only ever exists on one phone.
+ */
+export const isUuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+
+export interface RepairedIdentifiers { data: AccountData; routines: WorkoutRoutine[]; exercises: CustomExercise[] }
+/**
+ * Repairs records saved with an ID that was never a valid UUID.
+ *
+ * `globalThis.crypto` does not exist in this runtime, so an ID generator that reached for
+ * `crypto.randomUUID` fell back to a hand-assembled string with its hyphens in the wrong places.
+ * Postgres refused every one of them, permanently, so those routines and exercises lived on the
+ * device and nowhere else — lost with the app, and unrecoverable from the account.
+ *
+ * Giving them proper IDs is what lets them finally upload. Every reference is rewritten with
+ * them, and the queue entries that were stuck against the old IDs are dropped so the caller can
+ * queue them again under the new ones.
+ */
+export function repairIdentifiers(data: AccountData, newId: () => string): RepairedIdentifiers {
+  const remap = new Map<string, string>();
+  for (const exercise of data.customExercises ?? []) if (!isUuid(exercise.id)) remap.set(exercise.id, newId());
+  for (const routine of data.routines ?? []) if (!isUuid(routine.id)) remap.set(routine.id, newId());
+  if (!remap.size) return { data, routines: [], exercises: [] };
+
+  const fix = (id: string) => remap.get(id) ?? id;
+  const issued = new Set(remap.values());
+  const exercises = (data.customExercises ?? []).map(entry => ({ ...entry, id: fix(entry.id) }));
+  // A routine is rewritten when its own ID was bad *or* when it names an exercise whose was:
+  // an exercise_ids array carrying one invalid UUID fails the whole row just as surely.
+  const routines = (data.routines ?? []).map(routine => ({
+    ...routine, id: fix(routine.id),
+    exerciseIds: routine.exerciseIds.map(fix),
+    ...(routine.exercises ? { exercises: routine.exercises.map(entry => ({ ...entry, exerciseId: fix(entry.exerciseId) })) } : {}),
+  }));
+  const touched = (before: { id: string; exerciseIds?: string[] }) =>
+    remap.has(before.id) || !!before.exerciseIds?.some(id => remap.has(id));
+  // A stuck job names an ID that no longer exists; the caller re-queues under the new one.
+  const queue = data.queue.filter(job => ![...remap.keys()].some(old => job.id.includes(old)));
+  return {
+    data: { ...data, routines, customExercises: exercises, queue },
+    // Only what actually changed needs sending again.
+    routines: routines.filter((_, index) => touched((data.routines ?? [])[index])),
+    exercises: exercises.filter(entry => issued.has(entry.id)),
+  };
+}
+
 export function retryDelay(attempt: number, random = Math.random) { return Math.min(300_000, Math.round(1000 * 2 ** Math.min(attempt, 9) * (0.8 + random() * 0.4))); }
 export function isPermanent(error: unknown) {
   const e = error as { code?: string; status?: number };
@@ -68,7 +117,13 @@ export class SyncEngine {
   }
   queue(payload: SyncPayload, id: string, update: Partial<AccountData> = {}) {
     if (!this.owner) return;
-    if (this.data.queue.some(q => q.id === id) || this.data.health.exported.includes(id) || this.data.workoutReceipts.includes(id)) return;
+    // Already sent, or already waiting to be sent: do not queue it twice. The local state still
+    // has to be written, though — dropping it here is how editing a routine whose upload was
+    // stuck looked saved on screen and was gone on the next launch.
+    if (this.data.queue.some(q => q.id === id) || this.data.health.exported.includes(id) || this.data.workoutReceipts.includes(id)) {
+      if (Object.keys(update).length) this.commit({ ...this.data, ...update });
+      return;
+    }
     breadcrumb('sync.queued', { count: this.data.queue.length + 1 });
     this.commit({ ...this.data, ...update, queue: [...this.data.queue.filter(q => !(payload.kind === 'activity' && q.kind === 'activity' && q.data.date === payload.data.date && q.data.source === payload.data.source)), { ...payload, id, attempts: 0, nextAttemptAt: 0, blocked: false, error: null }] });
   }

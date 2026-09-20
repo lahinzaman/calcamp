@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { randomUUID } from 'expo-crypto';
 import { KeyboardAvoidingView, Modal, Platform, ScrollView, View } from 'react-native';
 import { Text } from '../../theme/primitives';
 import { Pressable } from '../../theme/Pressable';
@@ -12,7 +13,14 @@ import { REST_CHOICES, DEFAULT_REST_SECONDS } from './routines';
 import { EQUIPMENT_CHOICES, MAX_CUSTOM_NAME, type CustomExercise } from '../../api/customExercises';
 import type { CatalogExercise } from './catalog';
 
-const newId = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(16)}-0000-4000-8000-000000000000`.slice(0, 36);
+/**
+ * expo-crypto, not `globalThis.crypto`. There is no `crypto` global in this runtime, so that
+ * optional chain always fell through to a hand-assembled string whose hyphens sit in the wrong
+ * places. It is 36 characters of hex and hyphens, which looked close enough to pass validation,
+ * and Postgres rejected every one with a 22P02 — an error the sync queue treats as permanent.
+ * Routines and exercises made that way never left the device.
+ */
+const newId = () => randomUUID();
 const restLabel = (seconds: number) => seconds >= 60 ? `${Math.round(seconds / 60 * 10) / 10} min` : `${seconds}s`;
 /** Accessory muscles come after the ones a balanced week is judged on, which is how they read. */
 const MUSCLES = [...CORE_MUSCLES, ...Object.keys(MUSCLE_LABELS).filter(muscle => !CORE_MUSCLES.includes(muscle as never))];

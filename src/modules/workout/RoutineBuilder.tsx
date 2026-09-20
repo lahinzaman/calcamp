@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { randomUUID } from 'expo-crypto';
 import { KeyboardAvoidingView, Modal, Platform, ScrollView, View } from 'react-native';
 import { SafeAreaView } from '../../theme/SafeArea';
 import { Text, TextInput } from '../../theme/primitives';
@@ -22,7 +23,14 @@ import { canMoveRoutineExercise, clearRoutineSuperset, defaultRoutineExercise, g
 import { supersetLabel, SUPERSET_LIMIT } from './supersets';
 import { EXPERIENCE_LEVELS, EXPERIENCE_NOTES, MUSCLE_LABELS, WEEKLY_SET_TARGETS, volumeAdvice, weeklyVolume, type ExperienceLevel, type RoutineExercise } from './volume';
 import { readExperience, writeExperience } from './experience';
-const newId = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(16)}-0000-4000-8000-000000000000`.slice(0, 36);
+/**
+ * expo-crypto, not `globalThis.crypto`. There is no `crypto` global in this runtime, so that
+ * optional chain always fell through to a hand-assembled string whose hyphens sit in the wrong
+ * places. It is 36 characters of hex and hyphens, which looked close enough to pass validation,
+ * and Postgres rejected every one with a 22P02 — an error the sync queue treats as permanent.
+ * Routines and exercises made that way never left the device.
+ */
+const newId = () => randomUUID();
 const restLabel = (seconds: number) => seconds >= 60 ? `${Math.round(seconds / 60 * 10) / 10} min` : `${seconds}s`;
 
 function Stepper({ label, value, onChange, min, max, step = 1, asRest = false }: { label: string; value: number; onChange: (value: number) => void; min: number; max: number; step?: number; asRest?: boolean }) {

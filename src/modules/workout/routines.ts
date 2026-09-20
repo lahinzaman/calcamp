@@ -1,6 +1,7 @@
 import { exerciseById } from './catalog';
 import { SUPERSET_LIMIT } from './supersets';
 import { MAX_EXERCISE_NOTE } from '../../types/workout';
+import { isUuid } from '../sync/engine';
 import type { RoutineExercise } from './volume';
 export type { RoutineExercise };
 export interface WorkoutRoutine {
@@ -19,7 +20,10 @@ export function defaultRoutineExercise(exerciseId: string): RoutineExercise {
   return { exerciseId, sets: 3, restSeconds: DEFAULT_REST_SECONDS, repLow: 6, repHigh: 12 };
 }
 export function validateRoutine(routine: WorkoutRoutine) {
-  if (!/^[0-9a-f-]{36}$/i.test(routine.id) || !routine.name.trim() || routine.name.trim().length > 80) throw new Error('Name your routine (1–80 characters).');
+  // A real UUID, not merely 36 characters of hex and hyphens: this ID goes into a `uuid` column,
+  // and anything else is rejected permanently and silently stops the routine ever syncing.
+  if (!isUuid(routine.id)) throw new Error('This routine has an invalid identifier.');
+  if (!routine.name.trim() || routine.name.trim().length > 80) throw new Error('Name your routine (1–80 characters).');
   if (!routine.exerciseIds.length || routine.exerciseIds.length > 30 || new Set(routine.exerciseIds).size !== routine.exerciseIds.length || routine.exerciseIds.some(id => !exerciseById(id))) throw new Error('Choose 1–30 distinct catalog exercises.');
   if (routine.timesPerWeek !== undefined && (!Number.isInteger(routine.timesPerWeek) || routine.timesPerWeek < 1 || routine.timesPerWeek > 7)) throw new Error('A routine runs between 1 and 7 times a week.');
   if (routine.exercises) {

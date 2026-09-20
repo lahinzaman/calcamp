@@ -1,120 +1,170 @@
-> Phase 4 is implemented. See [Phase 4 setup and deployment](docs-phase-4.md) for the required database upgrade, auth flow, campus endpoints, and EAS environment/signing steps. The hosted database and cloud builds have not been changed.
+# CalCamp
 
-# RULocked
+An iOS app for people who lift and track what they eat. Nutrition logging, hypertrophy
+programming and weight-trend analysis in one place, built around a campus dining database so a
+university meal can be logged as precisely as a packaged food.
 
-Fitness, nutrition, and campus tools for Rutgers University–New Brunswick.
+Built with Expo SDK 57 and React Native 0.86 on the New Architecture, with Supabase for data and
+a small Express service for anything that needs an API key. Shipped to TestFlight through EAS.
 
-## Current scope: Phase 3
+---
 
-The foundation uses Expo SDK 57, React Native 0.86, Expo Router, strict TypeScript,
-NativeWind 4, and Tailwind CSS 3. The Dining, Workout, and Walk tabs expose the primary
-tracking screens with a shared TanStack Query provider.
+## What it does
 
-Phase 1 adds the Supabase schema, typed Zustand nutrition/workout stores, the
-Rutgers Nutrislice client, and an Express fallback proxy. Phase 2 adds adherent-day
-EMA/TDEE estimation, campus menu logging with editable portions, a typed food
-vision adapter hook, and workout logging with Brzycki 1RM and rest countdowns.
-Phase 3 wires authenticated Supabase writes, a secured food-vision proxy, HealthKit /
-Health Connect adapters, and Mapbox walking-loop generation. See [Phase 3 setup](docs-phase-3.md)
-for credentials, authentication prerequisites, persistence semantics, and device
-build requirements. Authentication UI, durable offline queues, MMKV persistence,
-and further modules remain for later phases.
+**Nutrition.** Barcode scanning that resolves through FatSecret's GTIN-13 lookup, food search
+across USDA and Open Food Facts, on-device nutrition-label OCR, photo estimation, and campus
+dining menus pulled live from Rutgers Nutrislice. Macros are normalised per serving, and an
+unreported value stays unreported rather than becoming a zero.
 
-The schema file is an initial schema for a fresh Supabase project. It has not
-been applied to a hosted database. Inspect `supabase/schema.sql` before applying
-it through a Supabase migration or SQL editor.
-After authentication, the app must insert its own `public.users` profile using
-the authenticated user ID before creating related logs; automatic signup profile
-creation is not part of this phase.
+**Training.** A 232-exercise catalogue, user-created exercises, routine templates with supersets,
+and a live session logger with rest timers, plate maths, Brzycki 1RM estimates and personal
+records. Sets can be weight × reps, bodyweight reps, a duration or a distance, because a plank
+is not three reps of anything.
 
-## Local development
+**Analysis.** Weight trend smoothing that separates real change from water and food, TDEE
+estimated from adherent days, weekly volume per muscle with direct and assisting work counted
+separately, and progress photos stored only on the device.
 
-Use Node.js 22.13 or newer, as required by Expo SDK 57.
+**Platform.** Apple Health read/write, Live Activities on the Lock Screen and Dynamic Island,
+campus geofencing, offline-first sync, and 13 languages including right-to-left layouts.
 
-```bash
-npm ci
-npm run typecheck
-npm test
-npm start -- --clear
-```
+---
 
-`npm run ios`, `npm run android`, and `npm run web` launch the existing Expo
-development workflow. Native rest ticking uses `react-native-background-timer`
-and requires a custom native/development build. Expo Go and web use a foreground
-interval. Native JavaScript exports alone do not install this native module.
+## What is interesting about the code
 
-## Source layout
+This is the part worth reading if you are evaluating the engineering rather than the feature
+list. Each of these is a decision with a reason, and the reason is in the source.
+
+### Offline-first sync with a durable outbox
+
+Every write goes to a SQLite-backed queue before it goes anywhere near the network
+(`src/modules/sync/engine.ts`). The queue distinguishes transient failures, which back off
+exponentially, from permanent ones — a constraint violation, a permissions error — which are
+*blocked* and surfaced to the user rather than retried forever. Nutrition mutations for a given
+day are ordered so a failed edit cannot be overtaken by a later one, and the snapshot plus its
+acknowledgement commit in a single SQLite write so a crash cannot replay a delta.
+
+### The database is the last line of defence, not the first
+
+`supabase/schema.sql` carries row-level security on every table, generated columns for values
+the client must never author (Brzycki 1RM, session volume), and triggers that reject data the
+app should not have produced. A completed set is validated against its exercise's tracking type,
+so the database will refuse to record a plank as five reps
+(`validate_set_measurements`). 16 migrations, each mirrored into the bootstrap schema, with
+tests asserting that a migrated database and a fresh one agree.
+
+### Measurement honesty
+
+A recurring theme, and the source of several fixed bugs. An unreported micronutrient is `null`,
+not `0`. Body mass is not external load, so an unweighted pull-up contributes nothing to pounds
+moved. A warm-up is logged but never counted as hard volume, while a drop set is. Barcodes are
+validated against their own check digit before a lookup, and two frames must agree before a scan
+is accepted, because a single frame decodes wrongly often enough to matter.
+
+### Native constraints drive the design
+
+The HealthKit integration uses `@kingstinct/react-native-healthkit` on Nitro rather than a
+legacy bridge module, because the old bridge is gone in React Native 0.86. iOS shows its
+permission sheet exactly once, so the app checks `getRequestStatusForAuthorization` before
+mounting a prompt that might silently do nothing. Every native call is bounded by a timeout —
+a permission sheet that never presents otherwise leaves a promise pending forever, which reads
+to a user as a spinner that never stops.
+
+### Tests that encode the bug they prevent
+
+421 tests across 79 files. They are not coverage theatre: most were written in response to a
+specific defect and are named after the behaviour rather than the function. The Supabase schema
+is tested against a real PostgreSQL instance in-process via PGlite, including RLS enforcement
+from the perspective of two different signed-in users.
+
+---
+
+## Architecture
 
 ```text
 src/
-  api/          # Nutrislice fetcher and validated response normalization
-  app/          # Expo Router routes and root layout
-  components/   # Tabs, shared components, Query/rest-countdown provider
-  constants/    # Existing theme constants
-  hooks/        # Existing shared presentation hooks
-  modules/      # Dining, nutrition algorithms, vision hook, workout UI
-  store/        # Typed stores with explicit cloud sync and retry state
-  types/        # Shared contracts and environment declarations
-  global.css    # Tailwind directives and existing web font variables
-backend/        # Express menu/vision proxies and separate Node TypeScript build
-supabase/       # Initial PostgreSQL schema and isolated database tests
+  api/          Supabase repositories, external food APIs, typed HTTP clients
+  app/          Expo Router routes (file-based) and the root layout
+  components/   Shared UI, charts, providers
+  modules/      Feature modules — the bulk of the code
+    workout/      Catalogue, routines, supersets, volume, session archive
+    quickActions/ Camera, barcode, GTIN normalisation, label OCR
+    sync/         Durable queue, engine, runtime bridge
+    health/       HealthKit and Health Connect adapters behind one interface
+    nutrition/    TDEE, adaptive targets, micronutrients
+    insights/     Trends, analytics, charts
+  store/        Zustand stores with explicit sync state
+  theme/        Design tokens, motion, haptics
+  types/        Shared contracts
+backend/        Express proxy — hides FatSecret and OpenAI keys from the client
+supabase/       Schema, migrations, and isolated PostgreSQL tests
 ```
 
-The `@/*` TypeScript alias resolves to `src/*`; `@/assets/*` resolves to `assets/*`.
+**Native code is never written by hand.** `ios/` and `android/` are gitignored; everything
+native is expressed as Expo config plugins in `app.json` and generated by EAS through Continuous
+Native Generation. This keeps the build reproducible and the repository free of generated Xcode
+state.
 
-## NativeWind configuration
+**The backend exists only for secrets.** Anything the client could call directly, it does.
+`backend/` proxies the six endpoints that need a server-held key or a server-side rate limit:
+`/api/account`, `/api/campus`, `/api/nutrislice`, `/api/recipe`, `/api/search-branded`,
+`/api/vision`.
 
-- `tailwind.config.js` scans all source components, loads the NativeWind preset,
-  and defines the `scarlet` color token.
-- `babel.config.js` uses `babel-preset-expo` with the NativeWind JSX import source
-  and the `nativewind/babel` preset. Expo handles React Compiler and Worklets.
-- `metro.config.js` wraps Expo's default Metro configuration with `withNativeWind`.
-- `src/app/_layout.tsx` imports the global stylesheet once at the route root.
-- `nativewind-env.d.ts` enables React Native `className` types;
-  `src/types/environment.d.ts` loads Expo's CSS and Metro declarations.
+---
 
-Use complete, statically discoverable utility strings such as
-`className="flex-1 items-center bg-scarlet"`. After changing Babel or Metro
-configuration, restart with `npm start -- --clear`.
+## Running it
 
-## Verification
+Requires Node.js 22.13+ (Expo SDK 57) and, for anything touching HealthKit, Live Activities or
+barcode scanning, a physical device — those do not exist in the simulator.
 
 ```bash
-npm run typecheck
-npm test
-npm run backend:build
-npx expo install --check
-npx expo export --platform all --output-dir dist
+npm ci
+npm run typecheck        # app and backend, both strict
+npm test                 # 421 tests, no watch mode, no network
+npm start -- --clear
 ```
 
-Exports check the JavaScript and styling pipeline for iOS, Android, and web; they
-do not replace native builds or device testing. Tests cover the stores, menu
-parsing/failures, HTTP proxy, TDEE/1RM edge cases, vision lifecycle, mounted screens,
-and schema constraints/RLS in an isolated PGlite
-PostgreSQL instance with a minimal test-only Supabase auth shim. These database
-tests do not replace checking the schema in your actual Supabase project.
-Component tests use mocked native host views with real React, stores, and Query.
-ESLint remains an unconfigured starter script.
+Verification used before every release:
 
-## Campus menu engine
+```bash
+npm run verify:native    # config plugins, permissions, OTA fingerprint, channels
+npx expo export --platform ios
+```
 
-`fetchDailyMenu(diningHall, date)` returns breakfast, lunch, and dinner together
-for one calendar date. Pass a `YYYY-MM-DD` string for an unambiguous campus day.
-Missing nutrition values stay `null`; known zero values stay zero. Errors are
-reported instead of silently returning an incomplete day.
+Database changes are applied with `npx supabase db push`. Migrations must land before the app
+build that depends on them, or the client writes columns the server does not have.
 
-See `backend/README.md` to start the fallback server and configure the optional
-`fallbackBaseUrl`. The dining screen reads `EXPO_PUBLIC_NUTRISLICE_PROXY_URL`
-as that fallback origin. See `src/store/README.md` for store actions and timer usage,
-and `src/modules/README.md` for module contracts and limitations.
+---
 
-The database nutrient registry and TypeScript `NUTRIENT_UNITS` use the same
-unit-labelled keys. Omitted micronutrients mean unreported; they are not assumed
-to be zero. Users' logs, workouts, sets, and votes are protected by row-level
-security; the exercise catalog also supports private custom mechanical variants.
+## Deployment
 
-## Setup references
+| Piece    | Where it runs | How it ships |
+|----------|---------------|--------------|
+| iOS app  | TestFlight    | `eas build --platform ios --profile production` |
+| JS-only changes | Existing binary | `eas update` — the runtime version uses a fingerprint policy, so an update only reaches a build whose native surface matches |
+| Backend  | Render        | Push to `main` |
+| Database | Supabase      | `npx supabase db push` |
 
-- [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/)
-- [NativeWind 4 installation](https://www.nativewind.dev/docs/getting-started/installation)
-- [Expo SDK 57 Reanimated setup](https://docs.expo.dev/versions/v57.0.0/sdk/reanimated/)
+---
+
+## Known limitations
+
+Stated plainly, because a README that claims everything works is not worth reading.
+
+- **Supersets are session and template only.** They are not uploaded to Supabase, so a pairing
+  is not visible from another device's history.
+- **Progress photos never leave the device.** This is deliberate — they are the most personal
+  data the app holds — but it does mean a reinstall loses them.
+- **Activity backup is opt-in and off by default.** Steps do not appear in Trends until it is
+  enabled, which is a consent decision rather than an oversight.
+- **Android is built and typechecked but not actively tested.** Health Connect has an adapter
+  behind the same interface as HealthKit; it has had far less real use.
+- **ESLint is not configured.** Type checking and tests carry the weight.
+
+---
+
+## Reference
+
+- [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/) — the versioned docs this project pins to
+- `supabase/schema.sql` — the full data model, with the reasoning in comments
+- `AGENTS.md` — conventions for anyone, human or otherwise, working in this repository

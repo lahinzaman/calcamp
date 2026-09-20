@@ -173,3 +173,4 @@ test('nutrient averages divide by the days that reported a nutrient, not the who
   assert.equal(averages.some(entry => entry.key === 'zinc_mg'), false);
   assert.deepEqual(nutrientAverages([]), []);
 });
+

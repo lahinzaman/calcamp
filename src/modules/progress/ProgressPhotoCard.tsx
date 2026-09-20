@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { Image, ScrollView, View } from 'react-native';
 import { Text } from '../../theme/primitives';
 import { Pressable } from '../../theme/Pressable';
@@ -15,6 +16,15 @@ export function ProgressPhotoCard({ index }: { index: number }) {
   const t = useT();
   const owner = useAuthStore(s => s.session?.user.id) ?? 'anonymous';
   const [days, setDays] = useState<PhotoDay[]>(() => readPhotoDays(owner));
+  /**
+   * Re-read whenever this screen comes back into view, and whenever the account changes.
+   *
+   * The initial read ran once, at mount. Trends is a tab, so it mounts when the app starts —
+   * before the session has loaded, which meant reading under 'anonymous' while every photo was
+   * being written under the real account id. With no photos found the card returned null, and
+   * having never read again it stayed that way: photos taken afterwards never appeared at all.
+   */
+  useFocusEffect(useCallback(() => { setDays(readPhotoDays(owner)); }, [owner]));
   if (!days.length) return null;
   const change = comparison(days);
   return <Card title={t('trends.progressPhotos')} index={index}>

@@ -419,3 +419,24 @@ test('editing a routine outside a session offers everything the live logger does
   assert.equal(findLabel(`Note for ${first.name}`).props.value, 'seat 4');
   assert.equal(findLabel(`Note for ${second.name}`).props.value, '', 'and only on the one you wrote it on');
 });
+
+test('the steps card names the setting that is actually stopping it', async () => {
+  const { StepsCard } = require('../insights/AnalyticsCards') as typeof import('../insights/AnalyticsCards');
+  // Steps reach Trends only through daily_activity_snapshots, which is written only when the
+  // health-backup switch is on — off by default, and nowhere near this card. Telling someone to
+  // connect Apple Health sent them back to a switch they had already turned on.
+  await act(async () => { rendered = create(<StepsCard activity={[]} index={0} backupEnabled={false} />); });
+  assert.ok(textContent().includes('Back up steps & active energy'), 'the switch is named exactly');
+  assert.ok(textContent().includes('Reminders & background activity'), 'and so is where to find it');
+
+  await act(async () => { rendered!.update(<StepsCard activity={[]} index={0} />); });
+  assert.ok(textContent().includes('Back up steps & active energy'),
+    'and it is still mentioned when the preference cannot be read');
+
+  // With data there is a chart, not an explanation.
+  await act(async () => { rendered!.update(<StepsCard index={0} backupEnabled
+    activity={[{ activity_date: '2026-09-18', steps: 8000, active_energy_kcal: 400, source: 'healthkit' },
+      { activity_date: '2026-09-19', steps: 10000, active_energy_kcal: 450, source: 'healthkit' }]} />); });
+  assert.ok(!textContent().includes('Back up steps & active energy'));
+  assert.ok(textContent().includes('9,000'), 'the average per day across the days with data');
+});

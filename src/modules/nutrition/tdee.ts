@@ -116,3 +116,44 @@ export function calculateTdee(
     tdeeKcal: valid ? estimate : null, weightChangeLbsPerDay: slope, storedEnergyChangeKcalPerDay,
   };
 }
+
+/** A week of weigh-ins is enough to smooth water and food weight out of a line. */
+export const WEIGHT_TREND_WINDOW_DAYS = 7;
+/**
+ * The smoothed weight line, from every weigh-in there is.
+ *
+ * `calculateTdee` builds its own trend from *adherent* days that also carry a calorie total,
+ * because that is what estimating expenditure requires — pair a weight with what was eaten. A
+ * chart of body weight has no such need, and tying it to that eligibility is why someone who
+ * weighed in daily for a week saw "not enough data": their days were not marked adherent, or
+ * they had not logged food, so the line had no points and the card drew nothing at all.
+ *
+ * Over a shorter window too, so the line responds within the first week rather than lagging a
+ * month behind. The dots are the weigh-ins; this is only what is drawn through them.
+ */
+export function weightTrendSeries(
+  logs: readonly TdeeDailyLog[],
+  windowDays: number = WEIGHT_TREND_WINDOW_DAYS,
+): WeightTrendPoint[] {
+  if (!Number.isInteger(windowDays) || windowDays < 2 || windowDays > 90) {
+    throw new RangeError('The weight smoothing window must be 2–90 days.');
+  }
+  const weighed = logs
+    .filter(log => log.body_weight_lbs !== null && Number.isFinite(log.body_weight_lbs) && log.body_weight_lbs! > 0)
+    .map(log => ({ log, day: dayNumber(log.log_date) }))
+    .sort((a, b) => a.day - b.day);
+  const alpha = 2 / (windowDays + 1);
+  const trend: WeightTrendPoint[] = [];
+  weighed.forEach(({ log, day }, index) => {
+    const weightLbs = log.body_weight_lbs!;
+    // Compound decay over calendar gaps, so a fortnight's break is not treated as one day.
+    const elapsedAlpha = index ? 1 - (1 - alpha) ** (day - weighed[index - 1].day) : 1;
+    trend.push({
+      date: log.log_date, weightLbs,
+      trendedWeightLbs: index
+        ? elapsedAlpha * weightLbs + (1 - elapsedAlpha) * trend[index - 1].trendedWeightLbs
+        : weightLbs,
+    });
+  });
+  return trend;
+}

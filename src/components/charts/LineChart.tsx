@@ -22,12 +22,15 @@ export function LineChart({ raw, trend, height = 190, tone = 'protein', unit = '
   const width = 320; const pad = { left: 6, right: 6, top: 12, bottom: 18 };
   const model = useMemo(() => {
     const all = [...(raw ?? []), ...trend];
-    if (trend.length < 2) return null;
+    // Two points of *anything* is a chart. Requiring two trend points meant a week of weigh-ins
+    // drew nothing at all whenever the trend was empty — the dots are the actual measurements,
+    // and they deserve to be shown whether or not a line can be drawn through them.
+    if (all.length < 2) return null;
     const values = all.map(p => p.value);
     let min = Math.min(...values); let max = Math.max(...values);
     if (max - min < 1e-6) { min -= 1; max += 1; }
     const span = max - min; min -= span * .12; max += span * .12;
-    const days = trend.map(p => Date.parse(`${p.date}T00:00:00Z`));
+    const days = all.map(p => Date.parse(`${p.date}T00:00:00Z`));
     const first = Math.min(...days); const last = Math.max(...days);
     const range = last - first || 1;
     const project = (point: Series) => ({
@@ -37,8 +40,12 @@ export function LineChart({ raw, trend, height = 190, tone = 'protein', unit = '
     return { min, max, trendPoints: trend.map(project), rawPoints: (raw ?? []).map(project) };
   }, [raw, trend, height]);
   if (!model) return <View className="rounded-2xl bg-raised p-5"><Text className="text-sm">Not enough data yet to draw a trend. Keep logging — this fills in as you go.</Text></View>;
-  const last = model.trendPoints[model.trendPoints.length - 1];
-  const latest = trend[trend.length - 1];
+  // The headline figure is the smoothed value where there is one, and the last measurement
+  // where there is not, so a chart of dots alone still says what it is showing.
+  const line = model.trendPoints.length >= 2 ? model.trendPoints : [];
+  const headline = trend.length ? trend : raw ?? [];
+  const last = line.length ? line[line.length - 1] : model.rawPoints[model.rawPoints.length - 1];
+  const latest = headline[headline.length - 1];
   return <View>
     <View className="flex-row items-baseline justify-between">
       <Text className="text-3xl font-bold">{Number(latest.value.toFixed(1))}{unit}</Text>
@@ -48,8 +55,10 @@ export function LineChart({ raw, trend, height = 190, tone = 'protein', unit = '
       {[0, .5, 1].map(fraction => <Line key={fraction} x1={pad.left} x2={width - pad.right}
         y1={pad.top + fraction * (height - pad.top - pad.bottom)} y2={pad.top + fraction * (height - pad.top - pad.bottom)}
         stroke={palette.border} strokeWidth={1} strokeDasharray="3 5" />)}
-      {model.rawPoints.map((point, i) => <Circle key={i} cx={point.x} cy={point.y} r={2.4} fill={palette.border} />)}
-      <Path d={smoothPath(model.trendPoints)} fill="none" stroke={palette[tone]} strokeWidth={2.5} strokeLinecap="round" />
+      {model.rawPoints.map((point, i) => <Circle key={i} cx={point.x} cy={point.y}
+        r={line.length ? 2.4 : 3.2} fill={line.length ? palette.border : palette[tone]} />)}
+      {/* smoothPath needs two points; with fewer, the dots above are the whole chart. */}
+      <Path d={smoothPath(line)} fill="none" stroke={palette[tone]} strokeWidth={2.5} strokeLinecap="round" />
       <Circle cx={last.x} cy={last.y} r={5} fill={palette[tone]} />
       <Circle cx={last.x} cy={last.y} r={9} fill={palette[tone]} opacity={.22} />
     </Svg>

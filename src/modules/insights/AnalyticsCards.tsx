@@ -85,10 +85,20 @@ export function BodyCompositionCard({ measurements, weightLbs, index }: { measur
   </Card>;
 }
 
-export function StepsCard({ activity, index }: { activity: readonly ActivityDay[]; index: number }) {
+export function StepsCard({ activity, index, backupEnabled }: {
+  activity: readonly ActivityDay[]; index: number;
+  /** Whether activity is being uploaded at all. Steps reach this card only through the cloud. */
+  backupEnabled?: boolean;
+}) {
   const steps = stepsSummary(activity);
+  // Connecting Health is not enough, and saying only that sent people back to a switch they had
+  // already turned on. Steps get here from daily_activity_snapshots, which is written only when
+  // the separate health-backup switch is on — off by default, and under Reminders rather than
+  // anywhere near this card. Name the actual setting.
   if (!steps) return <Card title={translate('trends.steps')} index={index}>
-    <Text>No step data has synced yet. Connect Apple Health or Health Connect in Settings and your daily steps appear here.</Text>
+    <Text>{backupEnabled === false
+      ? 'Your steps are not being backed up yet, so there is nothing here to chart. Turn on “Back up steps & active energy” in Settings › Reminders & background activity, and your daily steps start appearing here.'
+      : 'No step data has synced yet. Connect Apple Health or Health Connect in Settings, and make sure “Back up steps & active energy” is on under Reminders & background activity.'}</Text>
   </Card>;
   return <Card title={translate('trends.steps')} index={index}>
     <Text className="text-4xl font-bold">{Math.round(steps.averageSteps).toLocaleString()}</Text>

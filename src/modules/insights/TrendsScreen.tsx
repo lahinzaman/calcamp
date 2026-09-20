@@ -16,7 +16,8 @@ import {
   BodyCompositionCard, ConsistencyCard, EnergyBalanceCard, GoalProgressCard,
   Card, MacroSplitCard, NutrientAveragesCard, StepsCard, WeeklyAveragesCard,
 } from './AnalyticsCards';
-import { calculateTdee } from '../nutrition/tdee';
+import { calculateTdee, weightTrendSeries } from '../nutrition/tdee';
+import { readPreferences } from '../notifications/preferences';
 import { MilestonesCard } from '../habits/MilestonesCard';
 import { MeasurementsCard } from './MeasurementsCard';
 import { ProgressPhotoCard } from '../progress/ProgressPhotoCard';
@@ -46,7 +47,14 @@ export default function TrendsScreen() {
     try { return calculateTdee(rows, { windowDays: 28, asOfDate: today }); }
     catch { return null; }
   }, [rows, today]);
+  // Steps only reach this screen through the cloud, and only when health backup is switched on.
+  const activityBackup = useMemo(() => owner ? readPreferences(owner).uploadActivity : undefined, [owner]);
   const weights = rows.filter(r => r.body_weight_lbs !== null);
+  // Drawn from every weigh-in, not only the adherent days with a calorie total that the
+  // expenditure estimate needs — those are its requirements, not the chart's.
+  const weightTrend = useMemo(() => {
+    try { return weightTrendSeries(rows); } catch { return []; }
+  }, [rows]);
   const calories = rows.filter(r => r.calories_kcal !== null).map(r => ({ date: r.log_date, value: r.calories_kcal! }));
   const protein = rows.filter(r => r.proteinG !== null).map(r => ({ date: r.log_date, value: r.proteinG! }));
   const survey = profile?.lifestyle_survey as { goalWeightLbs?: number | null; age?: number | null; metabolicSex?: 'female' | 'male' | 'unspecified' } | null | undefined;
@@ -68,7 +76,7 @@ export default function TrendsScreen() {
         <Card title={t('trends.weightTrend')} index={1}>
           <LineChart unit=" lbs" tone="protein"
             raw={weights.map(r => ({ date: r.log_date, value: r.body_weight_lbs! }))}
-            trend={estimate?.weightTrend.map(p => ({ date: p.date, value: p.trendedWeightLbs })) ?? []}
+            trend={weightTrend.map(p => ({ date: p.date, value: p.trendedWeightLbs }))}
             caption="Dots are daily weigh-ins; the line is the smoothed trend that filters out water and food weight." />
         </Card>
         <Card title={t('trends.expenditure')} index={2}>
@@ -96,7 +104,7 @@ export default function TrendsScreen() {
         </Card>
         <MacroSplitCard rows={rows} bodyWeightLbs={latestWeight} index={7} />
         <NutrientAveragesCard rows={rows} sex={survey?.metabolicSex ?? 'unspecified'} age={survey?.age ?? null} index={8} />
-        <StepsCard activity={activity.data ?? []} index={8} />
+        <StepsCard activity={activity.data ?? []} index={8} backupEnabled={activityBackup} />
         <BodyCompositionCard measurements={measurements.data ?? []} weightLbs={latestWeight} index={9} />
         <ProgressPhotoCard index={10} />
         <WeeklyAveragesCard rows={rows} index={10} />

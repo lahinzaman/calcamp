@@ -130,11 +130,32 @@ state.
 Requires Node.js 22.13+ (Expo SDK 57) and, for anything touching HealthKit, Live Activities or
 barcode scanning, a physical device — those do not exist in the simulator.
 
+The tests and the type checker need nothing but the repository — no credentials, no network,
+no database:
+
 ```bash
 npm ci
 npm run typecheck        # app and backend, both strict
 npm test                 # 446 tests, no watch mode, no network
-npm start -- --clear
+```
+
+**Actually running the app needs your own backing services.** There is no shared instance: the
+hosted Supabase project and Express service are mine, and their origins are not published here.
+Copy `.env.example` to `.env.local`, then supply at minimum:
+
+| Variable | Where it comes from |
+|---|---|
+| `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | A Supabase project with `supabase/schema.sql` applied |
+| `EXPO_PUBLIC_BACKEND_URL` | Your own `backend/` deployment, or `http://localhost:3001` |
+
+Everything else in `.env.example` is optional and degrades gracefully — an absent key disables
+its feature with a message rather than crashing. The backend has its own `backend/.env.example`;
+the provider keys there (OpenAI, FatSecret, Google Places) are what it exists to keep off the
+client, and `SUPABASE_SERVICE_ROLE_KEY` must never appear in an `EXPO_PUBLIC_*` variable.
+
+```bash
+npm start -- --clear     # once .env.local exists
+npm run backend:dev      # the proxy, if you are using it
 ```
 
 Verification used before every release:
@@ -189,3 +210,13 @@ Stated plainly, because a README that claims everything works is not worth readi
 - [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/) — the versioned docs this project pins to
 - `supabase/schema.sql` — the full data model, with the reasoning in comments
 - `AGENTS.md` — conventions for anyone, human or otherwise, working in this repository
+- `docs-phase-*.md` — build notes kept from earlier phases. They are a record of how the project
+  got here, not current documentation, and some of what they describe has since been replaced.
+
+## Licence
+
+MIT — see [LICENSE](LICENSE). The Supabase authoring guides vendored under `.agents/skills/` are
+Supabase's own work, also MIT, with their attribution intact.
+
+Security issues go through [private vulnerability reporting](SECURITY.md) rather than a public
+issue.

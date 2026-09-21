@@ -2,6 +2,7 @@
   "name": "calcamp",
   "main": "index.js",
   "version": "1.0.0",
+  "license": "MIT",
   "dependencies": {
     "@expo/metro-runtime": "~57.0.15",
     "@expo/ui": "~57.0.16",

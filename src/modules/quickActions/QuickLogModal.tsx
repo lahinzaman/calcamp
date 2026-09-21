@@ -20,8 +20,8 @@ import { addPhotos } from '../progress/photos';
 import { useAuthStore } from '../../store/authStore';
 import { localDateKey } from '../../store/nutritionStore';
 import type { MacroTotals } from '../../types/nutrition';
-export type QuickAction = 'photo'|'barcode'|'label'|'manual'|'weight'|'quick'|'describe';
-const names:Record<QuickAction,string>={photo:'AI Photo Log',barcode:'Barcode Scanner',label:'Scan a Nutrition Label',manual:'Manual Food Log',weight:'Update Body Weight',quick:'Quick Add Calories',describe:'Describe Your Meal'};
+export type QuickAction = 'photo'|'barcode'|'label'|'manual'|'weight'|'quick'|'describe'|'treadmill';
+const names:Record<QuickAction,string>={photo:'AI Photo Log',barcode:'Barcode Scanner',label:'Scan a Nutrition Label',manual:'Manual Food Log',weight:'Update Body Weight',quick:'Quick Add Calories',describe:'Describe Your Meal',treadmill:'Treadmill Session'};
 const macroFields=[['caloriesKcal','Calories · kcal'],['proteinG','Protein · g'],['fatG','Fats · g'],['carbsG','Carbs · g']] as const;
 /** Distinguish "this build has no provider" from "the request failed" — they need different actions. */
 export function visionMessage(code: string | undefined) {

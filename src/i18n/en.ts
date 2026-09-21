@@ -239,6 +239,12 @@ export const en = {
   'camera.takePhoto': 'Take food photo',
   'camera.photographLabel': 'Photograph the label',
 
+  'camera.tapToFocus': 'Tap to focus',
+  'camera.tapToFocusHint': 'Runs a fresh focus pass and holds it steady',
+  'camera.chooseFromLibrary': 'Choose an existing photo',
+  'camera.fillFrameTreadmill': 'Fill the frame with the treadmill display',
+  'camera.readingTreadmill': 'Reading the display…',
+  'fab.treadmill': 'Scan a treadmill display',
   'weight.progressPhoto': 'Progress photo',
   'weight.photoIntro': 'A weigh-in on its own is noisy — the scale moves with water and food. A photo beside it is what actually shows change. Photos stay on this device and are never uploaded.',
   'weight.saveWithout': 'Save the weight without a photo',

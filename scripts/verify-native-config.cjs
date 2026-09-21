@@ -39,10 +39,19 @@ for (const variant of ['development', 'preview', 'production']) {
   for (const name of ['expo-sqlite', 'expo-background-task', 'expo-notifications']) assert.ok(config.plugins.some(p => (Array.isArray(p) ? p[0] : p) === name));
   if (process.env.EXPO_PUBLIC_SENTRY_DSN?.trim()) assert.ok(config.plugins.some(p => (Array.isArray(p) ? p[0] : p) === '@sentry/react-native/expo'));
   const manifest = android.manifest.manifest;
-  const permissions = manifest['uses-permission'].map(p => p.$['android:name']);
+  // A permission carrying tools:node="remove" is a directive to strip it at manifest merge, not
+  // a request for it — expo-image-picker declares RECORD_AUDIO that way when its microphone
+  // permission is disabled. Counting those as requested would fail the check below for a
+  // permission the built app does not actually ask for.
+  const permissions = manifest['uses-permission']
+    .filter(p => p.$['tools:node'] !== 'remove').map(p => p.$['android:name']);
+  const blocked = manifest['uses-permission']
+    .filter(p => p.$['tools:node'] === 'remove').map(p => p.$['android:name']);
   for (const permission of ['READ_STEPS', 'READ_ACTIVE_CALORIES_BURNED', 'WRITE_EXERCISE', 'WRITE_NUTRITION']) assert.ok(permissions.includes(`android.permission.health.${permission}`));
   assert.ok(permissions.includes('android.permission.CAMERA'));
+  // Not requested, and positively blocked, so no dependency can reintroduce it.
   assert.ok(!permissions.includes('android.permission.RECORD_AUDIO'));
+  assert.ok(blocked.includes('android.permission.RECORD_AUDIO'));
   for (const permission of ['ACCESS_BACKGROUND_LOCATION', 'POST_NOTIFICATIONS']) assert.ok(permissions.includes(`android.permission.${permission}`));
   assert.equal(manifest.application[0].$['android:usesCleartextTraffic'], String(variant === 'development'));
   assert.ok(manifest.application[0]['activity-alias'].some(a => a.$['android:name'] === 'ViewPermissionUsageActivity'));

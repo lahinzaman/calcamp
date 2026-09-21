@@ -11,6 +11,7 @@ import { haptic } from '../../theme/haptics';
 import { useT, type MessageKey } from '../../i18n';
 import { QuickLogModal, type QuickAction } from './QuickLogModal';
 import { FoodSearchModal } from '../foods/FoodSearchModal';
+import { TreadmillLogModal } from './TreadmillLogModal';
 type MenuKey = QuickAction | 'search';
 type Group = 'camera' | 'manual';
 /**
@@ -20,7 +21,7 @@ type Group = 'camera' | 'manual';
  */
 const GROUPS:[Group|MenuKey,MessageKey][]=[['camera','fab.cameraGroup'],['manual','fab.manualGroup'],['weight','fab.weight']];
 const MEMBERS:Record<Group,[MenuKey,MessageKey][]>={
-  camera:[['barcode','fab.barcode'],['label','fab.label'],['photo','fab.photo']],
+  camera:[['barcode','fab.barcode'],['label','fab.label'],['photo','fab.photo'],['treadmill','fab.treadmill']],
   manual:[['describe','fab.describe'],['search','fab.search'],['quick','fab.quick']],
 };
 const isGroup=(key:Group|MenuKey):key is Group=>key==='camera'||key==='manual';
@@ -68,6 +69,9 @@ export function QuickActions() {
       </Animated.View>
     </ThemeRoot></Modal>
     {action==='search'&&<FoodSearchModal onClose={()=>setAction(null)}/>}
-    {action&&action!=='search'&&<QuickLogModal key={action} action={action} onClose={()=>setAction(null)}/>}
+    {/* A treadmill read adds steps and a walk, not a diary entry, so it has its own screen
+        rather than a food form that would ask it for protein. */}
+    {action==='treadmill'&&<TreadmillLogModal onClose={()=>setAction(null)}/>}
+    {action&&action!=='search'&&action!=='treadmill'&&<QuickLogModal key={action} action={action} onClose={()=>setAction(null)}/>}
   </View>;
 }

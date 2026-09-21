@@ -13,6 +13,7 @@ import { rememberFood } from '../foods/savedFoods';
 import { dateKeyOf, detectRecords, recordWorkout, sessionVolume } from '../workout/history';
 import { archiveSession, readArchive, rebuildHistory, removeSession, replaceSession, writeArchive } from '../workout/sessions';
 import { registerCustomExercises } from '../workout/catalog';
+import { addSession, prune, type TreadmillSession } from '../quickActions/treadmillLog';
 import { toCatalogExercise, validateCustomExercise, type CustomExercise } from '../../api/customExercises';
 import type { CompletedWorkout } from '../../types/workout';
 import type { FoodEntry } from '../../types/foodEntry';
@@ -147,6 +148,31 @@ export function activateSync(owner: string | null) {
   syncBridge.drain = drainSync; syncBridge.refresh = refreshDiary;
   useSyncStatus.setState({ ready: true });
 }
+
+/**
+ * Records a treadmill session and sends the day's new total.
+ *
+ * The total is recomputed locally and uploaded whole, so a retry writes the same figure rather
+ * than adding the session again. Steps land in CalCamp only — an OCR reading of a console is an
+ * estimate, and Apple Health is a record of what devices measured, not of what this app guessed.
+ */
+export function recordTreadmillSession(session: TreadmillSession, date = localDateKey(new Date())) {
+  const owner = syncEngine.owner;
+  if (!owner) throw new Error('Sign in to record a treadmill session.');
+  const ledger = prune(addSession(syncEngine.data.treadmill ?? {}, date, session), date);
+  const day = ledger[date];
+  syncEngine.queue({ kind: 'activity', data: {
+    date, source: 'treadmill', steps: day.steps, activeEnergyKcal: day.calories,
+    observedAt: new Date().toISOString(),
+    distanceMeters: day.distanceMeters || null, durationSeconds: day.durationSeconds || null,
+    stepsEstimated: day.estimated,
+  } }, randomUUID(), { treadmill: ledger });
+  void syncEngine.drain();
+  return day;
+}
+
+/** The day's treadmill total as the device has it, before any upload has been acknowledged. */
+export const treadmillDay = (date = localDateKey(new Date())) => syncEngine.data.treadmill?.[date] ?? null;
 
 /**
  * Gives a proper UUID to anything saved with an ID that never was one, and sends it.

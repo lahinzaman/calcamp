@@ -13,7 +13,18 @@ import { t as translate } from '../../i18n';
 import { breadcrumb } from '../telemetry/events';
 import { normalizeBarcode } from './gtin';
 
-export type ScannerMode = 'photo' | 'barcode' | 'label';
+export type ScannerMode = 'photo' | 'barcode' | 'label' | 'treadmill';
+/**
+ * How long a tap-triggered focus stays locked before continuous focus resumes.
+ *
+ * expo-camera exposes the focus *mode* and nothing else — its iOS code never sets
+ * `focusPointOfInterest`, so focusing on the exact spot you touched is not reachable from here.
+ * What a tap can do is force a fresh autofocus pass and hold it, which is the half that helps:
+ * continuous autofocus hunts on a barcode or a label held close, and locking it once it has
+ * settled is why the shot comes out sharp. It releases on its own so a later frame is not stuck
+ * on a distance you have moved away from.
+ */
+const FOCUS_LOCK_MS = 6000;
 /** A preview that has not started by now is not going to without being told why. */
 const READY_TIMEOUT_MS = 6000;
 /**
@@ -117,11 +128,20 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, 
   const [scannerDead, setScannerDead] = useState(false);
   const clearing = useRef<ReturnType<typeof setTimeout> | null>(null);
   const locked = useRef(false);
+  /** 'on' is focus-once-then-lock; 'off' is continuous. Named by expo-camera, not by us. */
+  const [focusLocked, setFocusLocked] = useState(false);
+  const [focusRing, setFocusRing] = useState<{ x: number; y: number; token: number } | null>(null);
+  /** Both timers a tap starts: the one that engages the lock, and the one that releases it. */
+  const focusTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   /** The code seen so far and how many frames agreed on it. Reset whenever a different one lands. */
   const agreeing = useRef<{ code: string; count: number }>({ code: '', count: 0 });
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => setForeground(state !== 'background'));
-    return () => { subscription.remove(); if (clearing.current) clearTimeout(clearing.current); };
+    return () => {
+      subscription.remove();
+      if (clearing.current) clearTimeout(clearing.current);
+      for (const timer of focusTimers.current) clearTimeout(timer);
+    };
   }, []);
   useEffect(() => {
     if (!permission?.granted || ready) return;
@@ -138,6 +158,26 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, 
     }, scanTimeoutMs);
     return () => clearTimeout(timer);
   }, [mode, ready, detected, scanTimeoutMs]);
+
+  /**
+   * Runs a fresh autofocus pass and holds it. The ring is drawn where you touched so the tap is
+   * acknowledged, even though the lens focuses on the frame centre rather than that point —
+   * see FOCUS_LOCK_MS for why that is as far as expo-camera goes.
+   */
+  const refocus = (x: number, y: number) => {
+    if (!ready) return;
+    for (const timer of focusTimers.current) clearTimeout(timer);
+    setFocusRing({ x, y, token: Date.now() });
+    // Released first, then engaged a tick later. The native side acts only when the focus mode
+    // actually changes, and React would collapse an off-then-on in one commit into no change at
+    // all — so a second tap while already locked would run no new pass.
+    setFocusLocked(false);
+    focusTimers.current = [
+      setTimeout(() => setFocusLocked(true), 60),
+      setTimeout(() => { setFocusLocked(false); setFocusRing(null); }, FOCUS_LOCK_MS),
+    ];
+    haptic('selection');
+  };
 
   const scanned = (result: BarcodeScanningResult) => {
     if (!detected) { setDetected(true); breadcrumb('barcode.scanner', { outcome: 'ok', source: 'camera' }); }
@@ -167,11 +207,38 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, 
     onBarcode(code);
     setTimeout(() => { locked.current = false; }, 1200);
   };
+  /**
+   * A photo taken earlier, instead of one taken now. The label and the treadmill console are
+   * often photographed at the gym or in the shop and dealt with later, and re-taking a shot of
+   * something no longer in front of you is impossible rather than merely inconvenient.
+   *
+   * Hands back exactly what the shutter does, so every caller downstream is unchanged.
+   */
+  const pickExisting = async () => {
+    if (busy || locked.current) return;
+    locked.current = true;
+    try {
+      const picker = await import('expo-image-picker');
+      const wantsUri = mode === 'label' || mode === 'treadmill';
+      const result = await picker.launchImageLibraryAsync({
+        mediaTypes: 'images', quality: wantsUri ? 1 : .6, base64: !wantsUri, allowsMultipleSelection: false,
+      });
+      if (result.canceled || !result.assets?.length) return;
+      const asset = result.assets[0];
+      if (!asset.uri) throw new Error();
+      haptic('medium');
+      if (wantsUri) onCaptureUri?.(asset.uri);
+      else if (asset.base64) onCapture(asset.base64);
+      else throw new Error();
+    } catch { setError('That photo could not be opened. Try another, or enter this by hand.'); }
+    finally { locked.current = false; }
+  };
+
   const capture = async () => {
     if (busy || !ready || locked.current) return;
     locked.current = true;
     try {
-      const wantsUri = mode === 'label';
+      const wantsUri = mode === 'label' || mode === 'treadmill';
       const photo = await camera.current?.takePictureAsync({ base64: !wantsUri, quality: wantsUri ? 1 : .6 });
       if (!photo?.uri || (!wantsUri && !photo.base64)) throw new Error();
       haptic('medium');
@@ -204,7 +271,21 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, 
     {foreground && <CameraView ref={camera} style={StyleSheet.absoluteFill} facing="back" enableTorch={torch}
       onCameraReady={() => setReady(true)} onMountError={() => setError('The camera could not start. Enter this item by hand.')}
       barcodeScannerSettings={ready ? READY_SCAN_SETTINGS : INITIAL_SCAN_SETTINGS}
+      autofocus={focusLocked ? 'on' : 'off'}
       onBarcodeScanned={mode === 'barcode' ? scanned : undefined} />}
+
+    {/* Sits directly over the preview and under the chrome, so a tap anywhere on the image
+        refocuses while every button above it still works. */}
+    <Pressable accessibilityRole="button" accessibilityLabel={translate('camera.tapToFocus')}
+      accessibilityHint={translate('camera.tapToFocusHint')} onPress={event => {
+        const { locationX, locationY } = event.nativeEvent;
+        refocus(locationX, locationY);
+      }} tone="none" style={StyleSheet.absoluteFill} />
+
+    {focusRing && <Animated.View key={focusRing.token} pointerEvents="none"
+      entering={FadeIn.duration(TIMING.fast).reduceMotion(ReduceMotion.System)}
+      exiting={FadeOut.duration(TIMING.base).reduceMotion(ReduceMotion.System)}
+      style={[styles.focusRing, { left: focusRing.x - 38, top: focusRing.y - 38 }]} />}
 
     {mode === 'barcode' && !highlight && <Reticle scanning={!busy} />}
     {highlight && <Animated.View pointerEvents="none"
@@ -221,6 +302,7 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, 
         </Pressable>
         <View style={styles.titlePill}>
           <Text style={styles.chromeText}>{mode === 'barcode' ? (busy ? translate('camera.lookingUp') : translate('camera.pointAtBarcode'))
+            : mode === 'treadmill' ? (busy ? translate('camera.readingTreadmill') : translate('camera.fillFrameTreadmill'))
             : mode === 'label' ? (busy ? translate('camera.readingLabel') : translate('camera.fillFrameLabel'))
             : collecting ? (angles === 0 ? translate('camera.fillFramePlate') : full ? `${angles} angles — that is plenty` : `${angles} taken · add a side angle, or use these`)
             : translate('camera.fillFramePlate')}</Text>
@@ -238,7 +320,7 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, 
           {Array.from({ length: maxAngles }, (_, index) => <View key={index} style={[styles.angleDot, index < angles && styles.angleDotFilled]} />)}
         </View>}
         {mode !== 'barcode' && <Pressable accessibilityRole="button"
-          accessibilityLabel={mode === 'label' ? translate('camera.photographLabel') : angles > 0 ? 'Take another angle' : translate('camera.takePhoto')}
+          accessibilityLabel={mode === 'label' || mode === 'treadmill' ? translate('camera.photographLabel') : angles > 0 ? 'Take another angle' : translate('camera.takePhoto')}
           disabled={!ready || busy || full}
           onPress={() => { void capture(); }} style={[styles.shutter, (!ready || busy || full) && { opacity: .5 }]} weight="firm">
           <View style={styles.shutterInner} />
@@ -247,10 +329,18 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, 
           disabled={busy} onPress={onDone} style={[styles.donePill, busy && { opacity: .5 }]} weight="firm">
           <Text style={styles.doneText}>{busy ? 'Estimating…' : `Use ${angles} ${angles === 1 ? 'photo' : 'photos'}`}</Text>
         </Pressable>}
-        <Pressable accessibilityRole="button" accessibilityLabel={mode === 'barcode' ? translate('camera.typeBarcode') : translate('camera.enterManually')}
-          onPress={onManual} style={styles.manualPill} weight="firm">
-          <Text style={styles.chromeText}>{mode === 'barcode' ? translate('camera.typeBarcode') : translate('camera.enterManually')}</Text>
-        </Pressable>
+        <View style={styles.footerRow}>
+          {/* Barcodes are the one mode with nothing to pick: a still of a barcode is a photo of
+              a number, and the scanner reads the live frame, not an image. */}
+          {mode !== 'barcode' && <Pressable accessibilityRole="button" accessibilityLabel={translate('camera.chooseFromLibrary')}
+            disabled={busy} onPress={() => { void pickExisting(); }} style={[styles.manualPill, busy && { opacity: .5 }]} weight="firm">
+            <Text style={styles.chromeText}>{translate('camera.chooseFromLibrary')}</Text>
+          </Pressable>}
+          <Pressable accessibilityRole="button" accessibilityLabel={mode === 'barcode' ? translate('camera.typeBarcode') : translate('camera.enterManually')}
+            onPress={onManual} style={styles.manualPill} weight="firm">
+            <Text style={styles.chromeText}>{mode === 'barcode' ? translate('camera.typeBarcode') : translate('camera.enterManually')}</Text>
+          </Pressable>
+        </View>
       </View>
     </View>
   </View>;
@@ -266,6 +356,7 @@ const styles = StyleSheet.create({
   titlePill: { flex: 1, alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: 'rgba(0,0,0,.55)' },
   noticePill: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999, backgroundColor: 'rgba(0,0,0,.65)' },
   manualPill: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 999, backgroundColor: 'rgba(255,255,255,.16)' },
+  footerRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
   angleRow: { flexDirection: 'row', gap: 8 },
   angleDot: { height: 9, width: 9, borderRadius: 5, backgroundColor: 'rgba(255,255,255,.3)' },
   angleDotFilled: { backgroundColor: '#fff' },
@@ -274,6 +365,7 @@ const styles = StyleSheet.create({
   chromeText: { color: '#fff', fontFamily: 'GoogleSansMedium', fontSize: 15, textAlign: 'center' },
   shutter: { height: 78, width: 78, borderRadius: 39, borderWidth: 4, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   shutterInner: { height: 58, width: 58, borderRadius: 29, backgroundColor: '#fff' },
+  focusRing: { position: 'absolute', height: 76, width: 76, borderRadius: 38, borderWidth: 2, borderColor: '#FFD166' },
   reticle: { position: 'absolute', left: '12%', right: '12%', top: '32%', height: 190 },
   corner: { position: 'absolute', height: 34, width: 34, borderColor: '#fff' },
   cornerTL: { top: 0, left: 0, borderTopWidth: 4, borderLeftWidth: 4, borderTopLeftRadius: 14 },

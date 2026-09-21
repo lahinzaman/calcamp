@@ -620,3 +620,108 @@ test('the backfill migration and schema.sql assign identical tracking types', as
     assert.equal(fromMigration.get(exercise.id), expected, `${exercise.name} disagrees with the app`);
   }
 });
+
+const TREADMILL_MIGRATION = '20260921120000_phase20_treadmill_activity.sql';
+
+test('Phase 20 migration records a treadmill read without letting it pose as a measurement', async (t) => {
+  const db = new PGlite();
+  try {
+    await db.exec(`
+      create role anon;
+      create role authenticated;
+      create role service_role bypassrls;
+      create schema auth;
+      create table auth.users (id uuid primary key);
+      create function auth.uid() returns uuid language sql stable as
+        $$select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid$$;
+      grant usage on schema auth to anon, authenticated, service_role;
+      grant execute on function auth.uid() to anon, authenticated, service_role;
+    `);
+    await db.exec(await readFile(new URL('../schema.sql', import.meta.url), 'utf8'));
+    // Put the database back the way it is deployed, then migrate it forward.
+    await db.exec(`
+      alter table public.daily_activity_snapshots drop constraint activity_estimates_are_manual;
+      alter table public.daily_activity_snapshots drop column distance_m, drop column duration_seconds, drop column steps_estimated;
+      alter table public.daily_activity_snapshots drop constraint daily_activity_snapshots_source_check;
+      alter table public.daily_activity_snapshots add constraint daily_activity_snapshots_source_check
+        check (source in ('healthkit','health-connect'));
+      drop function public.save_activity_snapshot(uuid,date,text,integer,numeric,timestamptz,numeric,integer,boolean);
+      create function public.save_activity_snapshot(p_owner uuid, p_date date, p_source text, p_steps integer, p_energy numeric, p_observed_at timestamptz)
+      returns void language plpgsql security invoker set search_path = '' as $$
+      begin
+        insert into public.daily_activity_snapshots(user_id,activity_date,source,steps,active_energy_kcal,observed_at)
+        values((select auth.uid()),p_date,p_source,p_steps,p_energy,p_observed_at)
+        on conflict(user_id,activity_date,source) do update set steps=excluded.steps,active_energy_kcal=excluded.active_energy_kcal,observed_at=excluded.observed_at
+        where excluded.observed_at > public.daily_activity_snapshots.observed_at;
+      end $$;
+      grant execute on function public.save_activity_snapshot(uuid,date,text,integer,numeric,timestamptz) to authenticated;
+    `);
+    await db.exec(`
+      insert into auth.users (id) values ('${alice}');
+      insert into public.users (id) values ('${alice}');
+    `);
+    const signIn = async (user: string) => {
+      await db.exec('reset role');
+      await db.query("select set_config('request.jwt.claim.sub', $1, false)", [user]);
+      await db.exec('set role authenticated');
+    };
+    await signIn(alice);
+    // current_date and a past observation: the RPC rightly refuses a reading from the future.
+    await db.exec("select public.save_activity_snapshot('" + alice + "'::uuid, current_date, 'healthkit', 9000, 400, now() - interval '2 hours')");
+    // Back to superuser: a migration alters tables, which the signed-in role cannot do.
+    await db.exec('reset role');
+    await db.exec(await readFile(new URL(`../migrations/${TREADMILL_MIGRATION}`, import.meta.url), 'utf8'));
+    await signIn(alice);
+
+    await t.test('a health snapshot written before the migration is untouched by it', async () => {
+      const row = (await db.query<{ steps: number; steps_estimated: boolean; distance_m: string | null }>(
+        "select steps, steps_estimated, distance_m from public.daily_activity_snapshots where source = 'healthkit'")).rows[0];
+      assert.deepEqual([row.steps, row.steps_estimated, row.distance_m], [9000, false, null]);
+    });
+
+    await t.test('a treadmill read is stored beside it, not instead of it', async () => {
+      await db.exec("select public.save_activity_snapshot('" + alice + "'::uuid, current_date, 'treadmill', 4200, 250, now() - interval '1 hour', 3218.7, 1800, true)");
+      const rows = (await db.query<{ source: string; steps: number }>(
+        'select source, steps from public.daily_activity_snapshots order by source')).rows;
+      assert.deepEqual(rows, [{ source: 'healthkit', steps: 9000 }, { source: 'treadmill', steps: 4200 }]);
+    });
+
+    await t.test('a retried upload writes the same total rather than a second session', async () => {
+      // The device owns the day's figure precisely so this is safe; an accumulating write would
+      // grow the day every time the network flickered.
+      await db.exec("select public.save_activity_snapshot('" + alice + "'::uuid, current_date, 'treadmill', 4200, 250, now() - interval '30 minutes', 3218.7, 1800, true)");
+      const steps = (await db.query<{ steps: number }>(
+        "select steps from public.daily_activity_snapshots where source = 'treadmill'")).rows[0].steps;
+      assert.equal(steps, 4200);
+    });
+
+    await t.test('only a manual source may claim an estimate or carry a console reading', async () => {
+      const refused = async (work: Promise<unknown>) => assert.rejects(work, (error: unknown) => {
+        assert.equal((error as { code?: string }).code, '23514');
+        return true;
+      });
+      // Marking a device measurement estimated would quietly change what the number means.
+      await refused(db.exec(`update public.daily_activity_snapshots set steps_estimated = true where source = 'healthkit'`));
+      await refused(db.exec(`update public.daily_activity_snapshots set distance_m = 1000 where source = 'healthkit'`));
+      await refused(db.exec(`insert into public.daily_activity_snapshots(user_id,activity_date,source,steps,observed_at,duration_seconds)
+        values ('${alice}', current_date - 1,'health-connect',500,now(),600)`));
+      // And a source nobody recognises is still refused.
+      await refused(db.exec(`insert into public.daily_activity_snapshots(user_id,activity_date,source,steps,observed_at)
+        values ('${alice}', current_date - 1,'guesswork',500,now())`));
+    });
+  } finally { await db.close(); }
+});
+
+test('the treadmill migration and schema.sql agree on the source list and the estimate rule', async () => {
+  const migration = await readFile(new URL(`../migrations/${TREADMILL_MIGRATION}`, import.meta.url), 'utf8');
+  const schema = await readFile(new URL('../schema.sql', import.meta.url), 'utf8');
+  for (const fragment of ['treadmill', 'steps_estimated', 'distance_m', 'duration_seconds', 'activity_estimates_are_manual']) {
+    assert.ok(schema.includes(fragment), `schema.sql is missing ${fragment}`);
+    assert.ok(migration.includes(fragment), `the migration is missing ${fragment}`);
+  }
+  // Both must define the nine-argument RPC, or a fresh database rejects what the app sends.
+  for (const source of [schema, migration]) {
+    assert.ok(source.includes('p_steps_estimated boolean default false'));
+    assert.ok(source.includes('save_activity_snapshot(uuid,date,text,integer,numeric,timestamptz,numeric,integer,boolean) to authenticated'));
+  }
+});

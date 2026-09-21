@@ -1,5 +1,6 @@
 import type { WorkoutRoutine } from '../workout/routines';
 import type { CustomExercise } from '../../api/customExercises';
+import type { TreadmillLedger } from '../quickActions/treadmillLog';
 import { migrateImperialSnapshot } from './imperialMigration';
 import { breadcrumb } from '../telemetry/events';
 import type { ActivitySnapshot } from '../../api/activity';
@@ -24,10 +25,12 @@ export interface AccountData {
   version: 2; routines?: WorkoutRoutine[]; days: Record<string, DailyTotals>; entries?: Record<string, FoodEntry[]>;
   /** Exercises this account created. Small, and needed offline before anything can be logged. */
   customExercises?: CustomExercise[];
+  /** Treadmill steps per day, which the device owns and each upload replaces. */
+  treadmill?: TreadmillLedger;
   lifts?: LiftHistory; volumeLog?: SessionVolumePoint[]; liftSessions?: string[]; lastRecords?: PersonalRecord[]; workout: WorkoutState | null; queue: Mutation[]; workoutReceipts: string[];
   health: { enabled: boolean; summary: HealthSummary | null; workouts: HealthWorkout[]; lastBatchAt: number | null; error: string | null; exported: string[] };
 }
-const fresh = (): AccountData => ({ version: 2, days: {}, entries: {}, customExercises: [], lifts: {}, volumeLog: [], liftSessions: [], lastRecords: [], workout: null, queue: [], workoutReceipts: [], health: { enabled: false, summary: null, workouts: [], lastBatchAt: null, error: null, exported: [] } });
+const fresh = (): AccountData => ({ version: 2, days: {}, entries: {}, customExercises: [], treadmill: {}, lifts: {}, volumeLog: [], liftSessions: [], lastRecords: [], workout: null, queue: [], workoutReceipts: [], health: { enabled: false, summary: null, workouts: [], lastBatchAt: null, error: null, exported: [] } });
 /**
  * A real UUID, not merely 36 characters of hex and hyphens. Routine and exercise IDs are written
  * to `uuid` columns, which reject anything else with a 22P02 — an error this queue classes as
@@ -101,7 +104,7 @@ export class SyncEngine {
     const raw = owner ? this.storage.get(`account:${owner}`) : null;
     const data: AccountData = raw ? migrateImperialSnapshot(JSON.parse(raw)) as AccountData : fresh();
     if (data.version !== 2 || !Array.isArray(data.queue) || !data.days || !data.health) throw new Error('Offline storage needs recovery. Local data has been preserved.');
-    data.workoutReceipts ??= []; data.entries ??= {}; data.customExercises ??= []; data.lifts ??= {}; data.volumeLog ??= []; data.liftSessions ??= []; data.lastRecords ??= [];
+    data.workoutReceipts ??= []; data.entries ??= {}; data.customExercises ??= []; data.treadmill ??= {}; data.lifts ??= {}; data.volumeLog ??= []; data.liftSessions ??= []; data.lastRecords ??= [];
     // A session in progress when the app updated was written before sets had a kind, a duration
     // or a distance. Reading it back through the normalizer is what stops a warm-up quietly
     // becoming a working set — and a set without a `kind` failing validation on the next edit.

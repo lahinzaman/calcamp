@@ -636,29 +636,50 @@ grant execute on function public.set_push_installation(uuid,uuid,jsonb) to authe
 create table public.daily_activity_snapshots (
   user_id uuid not null references public.users(id) on delete cascade,
   activity_date date not null,
-  source text not null check (source in ('healthkit','health-connect')),
+  -- healthkit and health-connect are two views of the same walking, so a reader takes the
+  -- better of them. treadmill is a session the phone never saw, so it adds to the day.
+  source text not null check (source in ('healthkit','health-connect','treadmill')),
   steps integer check (steps between 0 and 250000),
   active_energy_kcal numeric(10,3) check (active_energy_kcal between 0 and 50000),
   observed_at timestamptz not null,
-  primary key(user_id, activity_date, source)
+  -- Appended, because ADD COLUMN appends: a migrated database and a fresh one must agree.
+  distance_m numeric(12,3) check (distance_m is null or (distance_m >= 0 and distance_m <= 1000000)),
+  duration_seconds integer check (duration_seconds is null or duration_seconds between 1 and 86400),
+  -- Whether the step figure was displayed by the machine or derived from distance and stride.
+  -- An estimate must never be indistinguishable from a measurement once it is stored.
+  steps_estimated boolean not null default false,
+  primary key(user_id, activity_date, source),
+  -- Only a manual source may carry an estimate or a console reading; a health snapshot is a
+  -- measurement, and marking one estimated would quietly change what the number means.
+  constraint activity_estimates_are_manual
+    check (source = 'treadmill' or (not steps_estimated and distance_m is null and duration_seconds is null))
 );
 alter table public.daily_activity_snapshots enable row level security;
 revoke all on public.daily_activity_snapshots from public, anon, authenticated;
 grant select, insert, update, delete on public.daily_activity_snapshots to authenticated;
 grant all on public.daily_activity_snapshots to service_role;
 create policy own_activity on public.daily_activity_snapshots for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
-create or replace function public.save_activity_snapshot(p_owner uuid, p_date date, p_source text, p_steps integer, p_energy numeric, p_observed_at timestamptz)
+-- Carries what the console showed alongside the step figure. The three new parameters default,
+-- so an app build that predates them keeps calling this with six named arguments and works.
+--
+-- Replace, not accumulate. A treadmill day holds the running total the device has computed, so
+-- a retried upload writes the same total rather than adding a second session that never
+-- happened — the sync queue retries, and an accumulating write would double-count on every one.
+create or replace function public.save_activity_snapshot(
+  p_owner uuid, p_date date, p_source text, p_steps integer, p_energy numeric, p_observed_at timestamptz,
+  p_distance_m numeric default null, p_duration_seconds integer default null, p_steps_estimated boolean default false)
 returns void language plpgsql security invoker set search_path = '' as $$
 begin
   if (select auth.uid()) is null or p_owner is distinct from (select auth.uid()) then raise exception 'Authentication required' using errcode = '42501'; end if;
   if p_date is null or p_date < date '2000-01-01' or p_date > current_date + 1 or p_observed_at is null or p_observed_at > now() + interval '5 minutes' then raise exception 'Invalid observation' using errcode = '22023'; end if;
-  insert into public.daily_activity_snapshots(user_id,activity_date,source,steps,active_energy_kcal,observed_at)
-  values((select auth.uid()),p_date,p_source,p_steps,p_energy,p_observed_at)
-  on conflict(user_id,activity_date,source) do update set steps=excluded.steps,active_energy_kcal=excluded.active_energy_kcal,observed_at=excluded.observed_at
+  insert into public.daily_activity_snapshots(user_id,activity_date,source,steps,active_energy_kcal,observed_at,distance_m,duration_seconds,steps_estimated)
+  values((select auth.uid()),p_date,p_source,p_steps,p_energy,p_observed_at,p_distance_m,p_duration_seconds,coalesce(p_steps_estimated,false))
+  on conflict(user_id,activity_date,source) do update set steps=excluded.steps,active_energy_kcal=excluded.active_energy_kcal,observed_at=excluded.observed_at,
+    distance_m=excluded.distance_m,duration_seconds=excluded.duration_seconds,steps_estimated=excluded.steps_estimated
   where excluded.observed_at > public.daily_activity_snapshots.observed_at;
 end $$;
-revoke all on function public.save_activity_snapshot(uuid,date,text,integer,numeric,timestamptz) from public, anon;
-grant execute on function public.save_activity_snapshot(uuid,date,text,integer,numeric,timestamptz) to authenticated;
+revoke all on function public.save_activity_snapshot(uuid,date,text,integer,numeric,timestamptz,numeric,integer,boolean) from public, anon;
+grant execute on function public.save_activity_snapshot(uuid,date,text,integer,numeric,timestamptz,numeric,integer,boolean) to authenticated;
 
 create or replace function public.remove_invalid_push_token(p_user uuid,p_installation uuid,p_token text)
 returns void language sql security invoker set search_path = '' as $$

@@ -49,7 +49,7 @@
         "@kingstinct/react-native-healthkit",
         {
           "NSHealthShareUsageDescription": "Allow CalCamp to read steps, active energy, and recent workouts so your day reflects what you actually did.",
-          "NSHealthUpdateUsageDescription": "Allow CalCamp to save the meals you log \u2014 energy, protein, carbohydrate and fat \u2014 and your workouts, to Apple Health."
+          "NSHealthUpdateUsageDescription": "Allow CalCamp to save the meals you log — energy, protein, carbohydrate and fat — and your workouts, to Apple Health."
         }
       ],
       "react-native-health-connect",
@@ -94,6 +94,13 @@
           "recordAudioAndroid": false,
           "microphonePermission": false,
           "barcodeScannerEnabled": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow CalCamp to read a photo you already took — a nutrition label, a meal, or a treadmill console — so it can be logged without retaking it. Photos are read on this device and are not uploaded.",
+          "microphonePermission": false
         }
       ],
       "expo-live-activity"

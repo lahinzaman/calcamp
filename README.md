@@ -13,8 +13,9 @@ a small Express service for anything that needs an API key. Shipped to TestFligh
 
 **Nutrition.** Barcode scanning that resolves through FatSecret's GTIN-13 lookup, food search
 across USDA and Open Food Facts, on-device nutrition-label OCR, photo estimation, and campus
-dining menus pulled live from Rutgers Nutrislice. Macros are normalised per serving, and an
-unreported value stays unreported rather than becoming a zero.
+dining menus pulled live from Rutgers Nutrislice. Anything the camera reads can come from a
+photo taken earlier instead. Macros are normalised per serving, and an unreported value stays
+unreported rather than becoming a zero.
 
 **Training.** A 232-exercise catalogue, user-created exercises, routine templates with supersets,
 and a live session logger with rest timers, plate maths, Brzycki 1RM estimates and personal
@@ -23,7 +24,8 @@ is not three reps of anything.
 
 **Analysis.** Weight trend smoothing that separates real change from water and food, TDEE
 estimated from adherent days, weekly volume per muscle with direct and assisting work counted
-separately, and progress photos stored only on the device.
+separately, and progress photos stored only on the device. A treadmill console can be
+photographed and read, adding the steps a phone left on the rail never counted.
 
 **Platform.** Apple Health read/write, Live Activities on the Lock Screen and Dynamic Island,
 campus geofencing, offline-first sync, and 13 languages including right-to-left layouts.
@@ -50,8 +52,19 @@ acknowledgement commit in a single SQLite write so a crash cannot replay a delta
 the client must never author (Brzycki 1RM, session volume), and triggers that reject data the
 app should not have produced. A completed set is validated against its exercise's tracking type,
 so the database will refuse to record a plank as five reps
-(`validate_set_measurements`). 16 migrations, each mirrored into the bootstrap schema, with
+(`validate_set_measurements`). 17 migrations, each mirrored into the bootstrap schema, with
 tests asserting that a migrated database and a fresh one agree.
+
+### Reading a machine you cannot trust
+
+The treadmill scanner (`src/modules/quickActions/treadmill.ts`) is a small study in refusing to
+guess. A figure has to be captioned to be taken. `CAL/HR` is a rate and is never banked as a
+total. Seven-segment OCR confusions are corrected inside a number and never in a caption. The
+gap between a caption and its figure crosses one newline and only whitespace, because letting it
+cross anything means an empty field silently adopts the next field's number. Steps the console
+displayed are used as measured; steps derived from distance and a height-based stride are
+labelled an estimate all the way into the database, where a constraint stops a device
+measurement ever claiming to be one.
 
 ### Measurement honesty
 
@@ -72,7 +85,7 @@ to a user as a spinner that never stops.
 
 ### Tests that encode the bug they prevent
 
-421 tests across 79 files. They are not coverage theatre: most were written in response to a
+446 tests across 82 files. They are not coverage theatre: most were written in response to a
 specific defect and are named after the behaviour rather than the function. The Supabase schema
 is tested against a real PostgreSQL instance in-process via PGlite, including RLS enforcement
 from the perspective of two different signed-in users.
@@ -120,7 +133,7 @@ barcode scanning, a physical device — those do not exist in the simulator.
 ```bash
 npm ci
 npm run typecheck        # app and backend, both strict
-npm test                 # 421 tests, no watch mode, no network
+npm test                 # 446 tests, no watch mode, no network
 npm start -- --clear
 ```
 
@@ -157,6 +170,14 @@ Stated plainly, because a README that claims everything works is not worth readi
   data the app holds — but it does mean a reinstall loses them.
 - **Activity backup is opt-in and off by default.** Steps do not appear in Trends until it is
   enabled, which is a consent decision rather than an oversight.
+- **Treadmill steps are added on top of device steps.** If you carried a phone or watch on the
+  treadmill, those steps were already counted and reading the console will overstate the day.
+  The app says so before saving; it cannot detect it.
+- **Tap-to-focus refocuses, it does not focus on the point you touched.** expo-camera exposes
+  the focus mode and never `focusPointOfInterest`, so a tap runs a fresh autofocus pass and
+  locks it. Real point-focus needs a patched native module.
+- **Treadmill steps never reach Apple Health.** An OCR reading of a console is an estimate, and
+  Health is a record of what devices measured.
 - **Android is built and typechecked but not actively tested.** Health Connect has an adapter
   behind the same interface as HealthKit; it has had far less real use.
 - **ESLint is not configured.** Type checking and tests carry the weight.

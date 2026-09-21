@@ -17,6 +17,11 @@ mock.module('react-native', { namedExports: {
 } });
 mock.module('react-native-safe-area-context', { namedExports: {
   SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ top: 47, bottom: 34, left: 0, right: 0 }) } });
+let pickerResult: unknown = { canceled: true, assets: null };
+const pickerCalls: unknown[] = [];
+mock.module('expo-image-picker', { namedExports: {
+  launchImageLibraryAsync: async (options: unknown) => { pickerCalls.push(options); return pickerResult; },
+} });
 mock.module('expo-camera', { namedExports: {
   CameraView: React.forwardRef((props: unknown, ref) => {
     React.useImperativeHandle(ref, () => ({ takePictureAsync: async () => ({ base64: '/9j/4AECAwQ=' }) }));
@@ -90,6 +95,7 @@ const cameraProps = () => view!.root.findByType('Camera' as React.ElementType).p
   barcodeScannerSettings?: { barcodeTypes: string[] };
   onBarcodeScanned?: (result: unknown) => void;
   onCameraReady?: () => void;
+  autofocus?: 'on' | 'off';
 };
 
 const read = async (data: string) => act(async () => cameraProps().onBarcodeScanned?.({
@@ -182,4 +188,61 @@ test('a preview that scans nothing says so instead of pulsing forever', async ()
   // A scan landing afterwards clears it: the scanner was slow, not dead.
   await act(async () => cameraProps().onBarcodeScanned?.({ type: 'ean13', data: '012000161155' }));
   assert.ok(!JSON.stringify(view!.toJSON()).includes('Nothing is scanning'));
+});
+
+test('tapping the preview runs a fresh focus pass and then lets go of it', async () => {
+  await act(async () => { view = create(<CameraScanner mode="barcode" busy={false}
+    onBarcode={() => {}} onCapture={() => {}} onClose={() => {}} onManual={() => {}} />); });
+  // expo-camera exposes the focus mode and nothing else, so 'on' is focus-once-then-lock and
+  // 'off' is continuous. Continuous is what hunts on a barcode held close.
+  assert.equal(cameraProps().autofocus, 'off');
+
+  const target = view!.root.findByProps({ accessibilityLabel: 'Tap to focus' });
+  // A tap before the preview is ready cannot focus anything, and must not leave it locked.
+  await act(async () => target.props.onPress({ nativeEvent: { locationX: 100, locationY: 200 } }));
+  assert.equal(cameraProps().autofocus, 'off');
+
+  await act(async () => cameraProps().onCameraReady?.());
+  await act(async () => target.props.onPress({ nativeEvent: { locationX: 100, locationY: 200 } }));
+  // Released first, then engaged a tick later: React would collapse an off-then-on in one
+  // commit into no change at all, and the native side only acts on a change.
+  assert.equal(cameraProps().autofocus, 'off');
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 90)); });
+  assert.equal(cameraProps().autofocus, 'on', 'the pass runs and the focus is held');
+  assert.ok(JSON.stringify(view!.toJSON()).includes('76'), 'and the tap is acknowledged on screen');
+});
+
+test('a photo already taken can be used instead of a new one, except for barcodes', async () => {
+  const uris: string[] = [];
+  await act(async () => { view = create(<CameraScanner mode="label" busy={false}
+    onBarcode={() => {}} onCapture={() => {}} onCaptureUri={uri => uris.push(uri)}
+    onClose={() => {}} onManual={() => {}} />); });
+
+  pickerCalls.length = 0;
+  pickerResult = { canceled: false, assets: [{ uri: 'file:///library/label.jpg' }] };
+  await act(async () => { await view!.root.findByProps({ accessibilityLabel: 'Choose an existing photo' }).props.onPress(); });
+  assert.deepEqual(uris, ['file:///library/label.jpg'], 'it reaches the same handler the shutter feeds');
+  // Label and treadmill read text off a file, so they ask for a URI at full quality.
+  assert.deepEqual(pickerCalls[0], { mediaTypes: 'images', quality: 1, base64: false, allowsMultipleSelection: false });
+
+  // Cancelling changes nothing at all.
+  pickerResult = { canceled: true, assets: null };
+  await act(async () => { await view!.root.findByProps({ accessibilityLabel: 'Choose an existing photo' }).props.onPress(); });
+  assert.deepEqual(uris, ['file:///library/label.jpg']);
+
+  // A barcode is read from the live frame; a still of one is just a photo of a number.
+  await act(async () => { view!.update(<CameraScanner mode="barcode" busy={false}
+    onBarcode={() => {}} onCapture={() => {}} onClose={() => {}} onManual={() => {}} />); });
+  assert.equal(view!.root.findAllByProps({ accessibilityLabel: 'Choose an existing photo' }).length, 0);
+});
+
+test('a meal photo from the library arrives as base64, the way the shutter delivers it', async () => {
+  const shots: string[] = [];
+  await act(async () => { view = create(<CameraScanner mode="photo" busy={false}
+    onBarcode={() => {}} onCapture={base64 => shots.push(base64)} onClose={() => {}} onManual={() => {}} />); });
+  pickerCalls.length = 0;
+  pickerResult = { canceled: false, assets: [{ uri: 'file:///library/plate.jpg', base64: '/9j/meal' }] };
+  await act(async () => { await view!.root.findByProps({ accessibilityLabel: 'Choose an existing photo' }).props.onPress(); });
+  assert.deepEqual(shots, ['/9j/meal']);
+  assert.equal((pickerCalls[0] as { base64: boolean }).base64, true);
 });

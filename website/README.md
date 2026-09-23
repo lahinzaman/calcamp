@@ -14,9 +14,14 @@ cd website && python3 -m http.server 4173
 
 Then open <http://127.0.0.1:4173>. There is nothing to compile; a refresh is the whole loop.
 
-## Two things to keep true
+**The CSS lives inside `index.html`, deliberately.** It used to be a separate `styles.css`, and
+a cached copy of the old file — served after the class names had already changed — rendered the
+previews unstyled for long enough to be reported as a bug twice. One page does not need two
+files, and one file cannot go stale against itself. Keep it inline.
 
-**The palette is copied from the app.** `styles.css` carries the dark-mode values from
+## What to keep true
+
+**The palette is copied from the app.** The `<style>` block carries the dark-mode values from
 `src/theme/palette.ts`, so the interface panels are the colours CalCamp actually renders. If
 the app's palette changes, change it here as well — a page showing a product that no longer
 looks like that is worse than a page with no pictures.

@@ -1,0 +1,227 @@
+/*
+ * CalCamp marketing site.
+ *
+ * The palette is copied from src/theme/palette.ts (dark mode) rather than invented, so the
+ * interface previews on this page are the colours the app actually renders. If the app's
+ * palette changes, change it here too — a marketing site showing a product that no longer
+ * looks like that is worse than one with no pictures at all.
+ */
+:root {
+  --bg: #101115;
+  --surface: #1A1C23;
+  --raised: #282C37;
+  --ink: #FFFFFF;
+  --muted: #9AA2B1;
+  --border: #454B5B;
+  --accent: #35486D;
+  --protein: #91ACFF;
+  --carbs: #FFCB78;
+  --fat: #DBAEFF;
+  --brand: #A9BEFF;
+
+  --max: 1080px;
+  --radius: 20px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 17px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--protein); }
+
+.wrap { width: 100%; max-width: var(--max); margin: 0 auto; padding: 0 20px; }
+
+/* ---------------------------------------------------------------- header */
+
+header {
+  position: sticky; top: 0; z-index: 10;
+  background: rgba(16, 17, 21, .82);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+.bar { display: flex; align-items: center; gap: 12px; height: 64px; }
+.bar img { width: 30px; height: 30px; border-radius: 8px; }
+.bar strong { font-size: 19px; letter-spacing: -.01em; }
+.bar nav { margin-left: auto; display: flex; gap: 22px; }
+.bar nav a { color: var(--muted); text-decoration: none; font-size: 15px; }
+.bar nav a:hover { color: var(--ink); }
+@media (max-width: 680px) { .bar nav { display: none; } }
+
+/* ------------------------------------------------------------------ hero */
+
+.hero { padding: 84px 0 48px; text-align: center; }
+.eyebrow {
+  display: inline-block; font-size: 12px; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 22px;
+}
+h1 {
+  margin: 0 0 20px; font-size: clamp(42px, 7vw, 68px); line-height: 1.04;
+  letter-spacing: -.035em; font-weight: 700;
+}
+.lede { margin: 0 auto 32px; max-width: 620px; font-size: clamp(18px, 2.4vw, 21px); color: var(--muted); }
+
+/* Deliberately not a button. There is nothing to download yet, and a control that looks
+   pressable but is not is a small dishonesty that costs trust immediately. */
+.status {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 13px 22px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--border);
+  font-size: 15px; font-weight: 600;
+}
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--carbs); flex: none; }
+.status-note { margin-top: 14px; font-size: 14px; color: var(--muted); }
+
+/* ---------------------------------------------------------------- phones */
+
+.phones {
+  display: flex; gap: 26px; align-items: flex-start;
+  margin: 56px 0 8px; padding: 0 4px 10px;
+  overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-left: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+/* Five phones never fit, so this is a scroller by design. Centring them would clip the first
+   and last against the viewport edge, which reads as broken rather than as scrollable. */
+@media (min-width: 1180px) { .phones { justify-content: flex-start; } }
+.scroll-hint {
+  text-align: center; font-size: 13px; color: var(--muted); margin: 0 0 8px;
+}
+@media (hover: none) { .scroll-hint { display: none; } }
+.phones::-webkit-scrollbar { height: 6px; }
+.phones::-webkit-scrollbar-thumb { background: var(--raised); border-radius: 3px; }
+.phone-col { scroll-snap-align: center; flex: none; width: 260px; }
+.phone-caption { margin-top: 14px; text-align: center; font-size: 14px; color: var(--muted); }
+
+.phone {
+  width: 260px; height: 546px; border-radius: 40px; padding: 9px;
+  background: #05060A; border: 1px solid var(--border);
+  box-shadow: 0 26px 60px rgba(0, 0, 0, .55);
+}
+.screen {
+  width: 100%; height: 100%; border-radius: 32px; overflow: hidden;
+  background: var(--bg); display: flex; flex-direction: column;
+  font-size: 12px; line-height: 1.45; text-align: left;
+}
+.notch {
+  height: 26px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 16px; font-size: 10px; color: var(--muted); flex: none;
+}
+.screen-body { flex: 1; overflow: hidden; padding: 4px 14px 0; }
+.tabbar {
+  flex: none; display: flex; justify-content: space-around; align-items: center;
+  height: 46px; border-top: 1px solid var(--border); color: var(--muted); font-size: 9px;
+}
+.tabbar span.on { color: var(--ink); font-weight: 700; }
+
+/* interface primitives, mirroring the app's own card shapes */
+.s-title { font-size: 19px; font-weight: 700; letter-spacing: -.02em; margin: 6px 0 2px; }
+.s-sub { color: var(--muted); font-size: 11px; margin-bottom: 12px; }
+.card { background: var(--surface); border-radius: 14px; padding: 11px 12px; margin-bottom: 9px; }
+.card.edge { border: 1px solid var(--border); }
+.row { display: flex; align-items: center; gap: 9px; }
+.row + .row { margin-top: 9px; }
+.grow { flex: 1; min-width: 0; }
+.nowrap { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dim { color: var(--muted); }
+.b { font-weight: 700; }
+.big { font-size: 25px; font-weight: 700; letter-spacing: -.02em; }
+.tiny { font-size: 10px; }
+.pill {
+  display: inline-block; padding: 4px 10px; border-radius: 999px;
+  background: var(--raised); font-size: 10px; font-weight: 600;
+}
+.pill.key { background: var(--accent); }
+.meter { height: 6px; border-radius: 3px; background: var(--raised); overflow: hidden; margin-top: 5px; }
+.meter i { display: block; height: 100%; border-radius: 3px; }
+
+.ring { width: 96px; height: 96px; flex: none; position: relative; }
+.ring svg { transform: rotate(-90deg); }
+.ring .mid {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 1px;
+}
+
+.bars { display: flex; align-items: flex-end; gap: 5px; height: 62px; margin-top: 8px; }
+.bars i { flex: 1; border-radius: 3px 3px 0 0; background: var(--protein); opacity: .85; }
+
+.viewfinder {
+  position: relative; border-radius: 12px; height: 182px; margin-bottom: 10px;
+  background: linear-gradient(160deg, #23262F 0%, #15171D 100%);
+  border: 1px solid var(--border); overflow: hidden;
+}
+.bracket { position: absolute; width: 30px; height: 30px; border: 3px solid var(--ink); opacity: .9; }
+.bracket.tl { top: 30px; left: 26px; border-right: 0; border-bottom: 0; border-radius: 10px 0 0 0; }
+.bracket.tr { top: 30px; right: 26px; border-left: 0; border-bottom: 0; border-radius: 0 10px 0 0; }
+.bracket.bl { bottom: 30px; left: 26px; border-right: 0; border-top: 0; border-radius: 0 0 0 10px; }
+.bracket.br { bottom: 30px; right: 26px; border-left: 0; border-top: 0; border-radius: 0 0 10px 0; }
+.barcode { position: absolute; inset: 52px 44px auto; display: flex; gap: 2px; height: 46px; }
+.barcode i { background: var(--ink); border-radius: 1px; }
+.scan-note {
+  position: absolute; left: 16px; right: 16px; bottom: 12px; text-align: center;
+  font-size: 10px; font-weight: 600; color: var(--ink); background: rgba(5, 6, 10, .88);
+  padding: 6px 8px; border-radius: 999px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+
+.console {
+  border-radius: 12px; padding: 12px; margin-bottom: 10px;
+  background: #0B0D11; border: 1px solid var(--border);
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+.console div { text-align: center; }
+.console .v { font-size: 20px; font-weight: 700; color: var(--carbs); font-variant-numeric: tabular-nums; }
+.console .k { font-size: 8px; letter-spacing: .14em; color: var(--muted); text-transform: uppercase; }
+
+.setrow {
+  display: grid; grid-template-columns: 16px 1fr 1fr 1fr 22px; gap: 5px;
+  align-items: center; padding: 6px 0; font-size: 11px;
+}
+.setrow + .setrow { border-top: 1px solid var(--border); }
+.box {
+  background: var(--raised); border-radius: 6px; padding: 4px 0;
+  text-align: center; font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.tick { color: var(--protein); text-align: center; font-weight: 700; }
+
+/* --------------------------------------------------------------- content */
+
+section { padding: 72px 0; border-top: 1px solid var(--border); }
+h2 { font-size: clamp(28px, 4vw, 38px); letter-spacing: -.03em; margin: 0 0 12px; }
+.section-lede { color: var(--muted); max-width: 640px; margin: 0 0 40px; }
+
+.grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.feature {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 26px;
+}
+.feature h3 { margin: 0 0 8px; font-size: 19px; letter-spacing: -.015em; }
+.feature p { margin: 0; color: var(--muted); font-size: 15px; }
+.feature .tag {
+  display: inline-block; margin-bottom: 14px; font-size: 11px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--brand);
+}
+
+.notes { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.note { border-left: 2px solid var(--border); padding: 4px 0 4px 18px; }
+.note b { display: block; margin-bottom: 4px; }
+.note span { color: var(--muted); font-size: 15px; }
+
+footer { padding: 46px 0 64px; border-top: 1px solid var(--border); color: var(--muted); font-size: 14px; }
+footer .links { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 18px; }
+footer a { color: var(--muted); }
+footer a:hover { color: var(--ink); }
+.disclaimer { font-size: 13px; opacity: .8; max-width: 640px; }

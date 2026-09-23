@@ -111,6 +111,7 @@ src/
   types/        Shared contracts
 backend/        Express proxy — hides FatSecret and OpenAI keys from the client
 supabase/       Schema, migrations, and isolated PostgreSQL tests
+website/        The marketing page at calcamp.vercel.app — static HTML, no build step
 ```
 
 **Native code is never written by hand.** `ios/` and `android/` are gitignored; everything
@@ -178,6 +179,7 @@ build that depends on them, or the client writes columns the server does not hav
 | JS-only changes | Existing binary | `eas update` — the runtime version uses a fingerprint policy, so an update only reaches a build whose native surface matches |
 | Backend  | Render        | Push to `main` |
 | Database | Supabase      | `npx supabase db push` |
+| Marketing page | Vercel  | Push to `main`; `vercel.json` serves `website/` with no build |
 
 ---
 

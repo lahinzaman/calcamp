@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CalCamp — nutrition and training, honestly measured</title>
+<meta name="description" content="An iOS app for people who lift and track what they eat. Barcode scanning, campus dining, hypertrophy programming and weight-trend analysis. Coming soon.">
+<meta name="theme-color" content="#101115">
+<link rel="icon" href="favicon.png">
+<link rel="stylesheet" href="styles.css">
+
+<meta property="og:title" content="CalCamp — nutrition and training, honestly measured">
+<meta property="og:description" content="Nutrition logging, hypertrophy programming and weight-trend analysis in one iOS app. Coming soon.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://calcamp.vercel.app/">
+<meta property="og:image" content="https://calcamp.vercel.app/mark.svg">
+<meta name="twitter:card" content="summary">
+</head>
+<body>
+
+<header>
+  <div class="wrap bar">
+    <img src="mark.svg" alt="">
+    <strong>CalCamp</strong>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#preview">Preview</a>
+      <a href="#principles">How it counts</a>
+      <a href="https://github.com/lahinzaman/rulocked">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<div class="wrap hero">
+  <span class="eyebrow">Nutrition · Training · You</span>
+  <h1>A clearer picture of your&nbsp;everyday progress.</h1>
+  <p class="lede">
+    Log what you eat, run the split you actually train, and watch the weight trend that
+    filters out water and food. One iOS app, built for people who want the numbers to
+    mean something.
+  </p>
+
+  <div class="status"><span class="dot"></span> Coming soon to the App Store</div>
+  <p class="status-note">Not yet available for download. In TestFlight now, finishing up.</p>
+</div>
+
+<!-- Interface previews. Rendered in HTML from the app's own palette and copy, and labelled
+     as previews in the footer rather than passed off as captured screenshots. -->
+<div id="preview" class="wrap">
+  <p class="scroll-hint">Scroll across to see more →</p>
+  <div class="phones">
+
+    <div class="phone-col">
+      <div class="phone"><div class="screen">
+        <div class="notch"><span>9:41</span><span>●●● ⌁</span></div>
+        <div class="screen-body">
+          <div class="s-title">Today</div>
+          <div class="s-sub">Thursday, 17 September</div>
+          <div class="card">
+            <div class="row">
+              <div class="ring">
+                <svg width="96" height="96" viewBox="0 0 96 96">
+                  <circle cx="48" cy="48" r="40" fill="none" stroke="#282C37" stroke-width="9"/>
+                  <circle cx="48" cy="48" r="40" fill="none" stroke="#91ACFF" stroke-width="9"
+                          stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="74"/>
+                </svg>
+                <div class="mid">
+                  <span class="big">1,780</span>
+                  <span class="tiny dim">of 2,420 kcal</span>
+                </div>
+              </div>
+              <div class="grow">
+                <div class="tiny dim">Protein</div>
+                <div class="meter"><i style="width:78%;background:#91ACFF"></i></div>
+                <div class="tiny dim" style="margin-top:7px">Carbs</div>
+                <div class="meter"><i style="width:61%;background:#FFCB78"></i></div>
+                <div class="tiny dim" style="margin-top:7px">Fat</div>
+                <div class="meter"><i style="width:44%;background:#DBAEFF"></i></div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="row"><span class="grow b nowrap">Grilled chicken, 6 oz</span><span class="dim">282</span></div>
+            <div class="row"><span class="grow nowrap dim">Busch Dining Hall · lunch</span><span class="pill">Campus</span></div>
+          </div>
+          <div class="card">
+            <div class="row"><span class="grow b nowrap">Greek yoghurt</span><span class="dim">140</span></div>
+            <div class="row"><span class="grow nowrap dim">Scanned · 0 12000 16115 5</span><span class="pill">Barcode</span></div>
+          </div>
+        </div>
+        <div class="tabbar"><span class="on">Today</span><span>Food</span><span>Train</span><span>Trends</span><span>You</span></div>
+      </div></div>
+      <p class="phone-caption">Your day, and where every number came from</p>
+    </div>
+
+    <div class="phone-col">
+      <div class="phone"><div class="screen">
+        <div class="notch"><span>9:41</span><span>●●● ⌁</span></div>
+        <div class="screen-body">
+          <div class="s-title">Scan a barcode</div>
+          <div class="s-sub">Point at the package</div>
+          <div class="viewfinder">
+            <span class="bracket tl"></span><span class="bracket tr"></span>
+            <span class="bracket bl"></span><span class="bracket br"></span>
+            <div class="barcode">
+              <i style="width:3px"></i><i style="width:1px"></i><i style="width:4px"></i><i style="width:2px"></i>
+              <i style="width:1px"></i><i style="width:5px"></i><i style="width:2px"></i><i style="width:3px"></i>
+              <i style="width:1px"></i><i style="width:2px"></i><i style="width:4px"></i><i style="width:1px"></i>
+              <i style="width:3px"></i><i style="width:2px"></i><i style="width:5px"></i><i style="width:1px"></i>
+              <i style="width:2px"></i><i style="width:3px"></i><i style="width:1px"></i><i style="width:4px"></i>
+            </div>
+            <div class="scan-note">Check digit valid</div>
+          </div>
+          <div class="card edge">
+            <div class="b">Chobani Greek Yoghurt, plain</div>
+            <div class="tiny dim" style="margin-bottom:8px">FatSecret · per 170 g container</div>
+            <div class="row">
+              <div class="grow"><div class="b">140</div><div class="tiny dim">kcal</div></div>
+              <div class="grow"><div class="b" style="color:#91ACFF">16 g</div><div class="tiny dim">protein</div></div>
+              <div class="grow"><div class="b" style="color:#FFCB78">9 g</div><div class="tiny dim">carbs</div></div>
+              <div class="grow"><div class="b" style="color:#DBAEFF">4 g</div><div class="tiny dim">fat</div></div>
+            </div>
+          </div>
+          <div class="pill key">Add to lunch</div>
+        </div>
+        <div class="tabbar"><span>Today</span><span class="on">Food</span><span>Train</span><span>Trends</span><span>You</span></div>
+      </div></div>
+      <p class="phone-caption">Scans are checked before they are believed</p>
+    </div>
+
+    <div class="phone-col">
+      <div class="phone"><div class="screen">
+        <div class="notch"><span>9:41</span><span>●●● ⌁</span></div>
+        <div class="screen-body">
+          <div class="s-title">Push A</div>
+          <div class="s-sub">32:15 elapsed · 8,420 lbs moved</div>
+          <div class="card">
+            <div class="row" style="margin-bottom:6px">
+              <span class="grow b nowrap">Bench Press</span><span class="pill key">A</span>
+            </div>
+            <div class="setrow"><span class="dim">#</span><span class="tiny dim">lbs</span><span class="tiny dim">Reps</span><span class="tiny dim">RPE</span><span></span></div>
+            <div class="setrow"><span class="dim">W</span><span class="box">95</span><span class="box">10</span><span class="box">—</span><span class="tick">✓</span></div>
+            <div class="setrow"><span class="dim">1</span><span class="box">155</span><span class="box">8</span><span class="box">7</span><span class="tick">✓</span></div>
+            <div class="setrow"><span class="dim">2</span><span class="box">155</span><span class="box">7</span><span class="box">8</span><span class="tick">✓</span></div>
+            <div class="setrow"><span class="dim">3</span><span class="box">155</span><span class="box">—</span><span class="box">—</span><span class="dim">○</span></div>
+            <div class="tiny dim" style="margin-top:7px">Estimated 1RM · 193.4 lbs</div>
+          </div>
+          <div class="card edge">
+            <div class="row"><span class="grow tiny dim">Superset with Cable Fly</span><span class="pill">Rest 1:45</span></div>
+          </div>
+        </div>
+        <div class="tabbar"><span>Today</span><span>Food</span><span class="on">Train</span><span>Trends</span><span>You</span></div>
+      </div></div>
+      <p class="phone-caption">Supersets, RPE and a rest timer that waits for the round</p>
+    </div>
+
+    <div class="phone-col">
+      <div class="phone"><div class="screen">
+        <div class="notch"><span>9:41</span><span>●●● ⌁</span></div>
+        <div class="screen-body">
+          <div class="s-title">Trends</div>
+          <div class="s-sub">Last 28 days</div>
+          <div class="card">
+            <div class="tiny dim">Weight trend</div>
+            <div class="row" style="align-items:baseline">
+              <span class="big grow">178.4</span><span class="tiny dim">lbs · −2.1 this month</span>
+            </div>
+            <svg width="100%" height="64" viewBox="0 0 220 64" preserveAspectRatio="none" style="margin-top:6px">
+              <polyline fill="none" stroke="#454B5B" stroke-width="1" stroke-dasharray="3 5" points="0,32 220,32"/>
+              <polyline fill="none" stroke="#91ACFF" stroke-width="2.5" stroke-linecap="round"
+                points="4,14 34,18 64,17 94,24 124,29 154,34 184,38 214,44"/>
+              <circle cx="16" cy="11" r="1.8" fill="#9AA2B1"/><circle cx="52" cy="24" r="1.8" fill="#9AA2B1"/>
+              <circle cx="88" cy="16" r="1.8" fill="#9AA2B1"/><circle cx="124" cy="35" r="1.8" fill="#9AA2B1"/>
+              <circle cx="160" cy="28" r="1.8" fill="#9AA2B1"/><circle cx="196" cy="47" r="1.8" fill="#9AA2B1"/>
+              <circle cx="214" cy="44" r="4.5" fill="#91ACFF"/>
+            </svg>
+            <div class="tiny dim">Dots are weigh-ins; the line filters out water and food.</div>
+          </div>
+          <div class="card">
+            <div class="tiny dim">Steps</div>
+            <div class="big">9,240</div>
+            <div class="tiny dim">Average per day across 26 days</div>
+            <div class="bars">
+              <i style="height:54%"></i><i style="height:72%"></i><i style="height:41%"></i><i style="height:88%"></i>
+              <i style="height:63%"></i><i style="height:95%"></i><i style="height:58%"></i><i style="height:77%"></i>
+              <i style="height:46%"></i><i style="height:84%"></i>
+            </div>
+          </div>
+        </div>
+        <div class="tabbar"><span>Today</span><span>Food</span><span>Train</span><span class="on">Trends</span><span>You</span></div>
+      </div></div>
+      <p class="phone-caption">A trend line that starts working within a week</p>
+    </div>
+
+    <div class="phone-col">
+      <div class="phone"><div class="screen">
+        <div class="notch"><span>9:41</span><span>●●● ⌁</span></div>
+        <div class="screen-body">
+          <div class="s-title">Treadmill session</div>
+          <div class="s-sub">Read from the console</div>
+          <div class="console">
+            <div><div class="v">32:15</div><div class="k">Time</div></div>
+            <div><div class="v">2.15</div><div class="k">Miles</div></div>
+            <div><div class="v">248</div><div class="k">Calories</div></div>
+            <div><div class="v">2.5</div><div class="k">Incline</div></div>
+          </div>
+          <div class="card edge">
+            <div class="row"><span class="grow b">4,378 steps</span><span class="pill">Estimated</span></div>
+            <div class="tiny dim" style="margin-top:6px">
+              From 2.15 miles at a stride worked out from your height. The console did not
+              display a step count — correct it if you know better.
+            </div>
+          </div>
+          <div class="card">
+            <div class="tiny dim">
+              Added on top of what your phone counted. Treadmill steps stay in CalCamp and are
+              never written to Apple Health.
+            </div>
+          </div>
+        </div>
+        <div class="tabbar"><span>Today</span><span>Food</span><span>Train</span><span>Trends</span><span class="on">You</span></div>
+      </div></div>
+      <p class="phone-caption">Photograph the console; it reads what it can and says what it guessed</p>
+    </div>
+
+  </div>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <h2>What it does</h2>
+    <p class="section-lede">
+      Everything a training log and a food diary are supposed to do, plus the parts that
+      usually get left to guesswork.
+    </p>
+
+    <div class="grid">
+      <div class="feature">
+        <span class="tag">Nutrition</span>
+        <h3>Log food without fighting it</h3>
+        <p>
+          Scan a barcode, photograph a nutrition label, describe a meal in words, or pick it off
+          your campus dining hall's live menu. Portions rescale properly, and a value the source
+          never reported stays blank instead of quietly becoming zero.
+        </p>
+      </div>
+      <div class="feature">
+        <span class="tag">Training</span>
+        <h3>The split you actually run</h3>
+        <p>
+          Build routines with supersets, rest and rep ranges saved in, then log the session as it
+          happens — swap an exercise when the rack is busy, add one that was never in the plan,
+          and fix any of it afterwards. 230+ exercises, or add your own.
+        </p>
+      </div>
+      <div class="feature">
+        <span class="tag">Volume</span>
+        <h3>Hard sets, counted honestly</h3>
+        <p>
+          Weekly volume per muscle, where assisting work is credited separately from direct work
+          so a pressing-heavy week does not read as triceps overtraining. Warm-ups are logged and
+          never counted. Drop sets and sets to failure are.
+        </p>
+      </div>
+      <div class="feature">
+        <span class="tag">Progress</span>
+        <h3>Signal, not scale noise</h3>
+        <p>
+          A smoothed weight trend that separates real change from water and food, energy
+          expenditure estimated from your own adherent days, and progress photos that stay on
+          your phone and are never uploaded anywhere.
+        </p>
+      </div>
+      <div class="feature">
+        <span class="tag">Beyond weights</span>
+        <h3>Planks, carries and treadmills</h3>
+        <p>
+          Sets can be weight and reps, bodyweight reps, a duration or a distance — because a
+          plank is not three reps of anything. Photograph a treadmill console and it reads the
+          display, adding the steps a phone left on the rail never counted.
+        </p>
+      </div>
+      <div class="feature">
+        <span class="tag">Platform</span>
+        <h3>Built for the phone in your pocket</h3>
+        <p>
+          Apple Health in both directions, your day on the Lock Screen and Dynamic Island, and a
+          diary that works with no signal in a basement gym and syncs when it can. Thirteen
+          languages, right-to-left included.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="principles">
+  <div class="wrap">
+    <h2>How it counts</h2>
+    <p class="section-lede">
+      Most of the decisions in this app are about refusing to make a number up. A few of them,
+      plainly:
+    </p>
+
+    <div class="notes">
+      <div class="note">
+        <b>Missing is not zero</b>
+        <span>A micronutrient the database never reported shows as unreported, not as none.</span>
+      </div>
+      <div class="note">
+        <b>An estimate says so</b>
+        <span>Steps worked out from stride length are labelled an estimate everywhere they appear,
+        including in the database.</span>
+      </div>
+      <div class="note">
+        <b>Body mass is not load</b>
+        <span>An unweighted pull-up moves no external weight, so it adds none to your volume. The
+        plates on the belt do.</span>
+      </div>
+      <div class="note">
+        <b>A scan is verified</b>
+        <span>Two camera frames have to agree, and the barcode's own check digit has to pass,
+        before anything is looked up.</span>
+      </div>
+      <div class="note">
+        <b>Your photos stay put</b>
+        <span>Progress photos never leave the device. That is a deliberate limit, not a feature
+        gap.</span>
+      </div>
+      <div class="note">
+        <b>Nothing invented into Health</b>
+        <span>Apple Health records what devices measured. CalCamp never writes an estimate into
+        it.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap" style="text-align:center">
+    <h2>Coming soon</h2>
+    <p class="section-lede" style="margin: 0 auto 30px">
+      CalCamp is in TestFlight while the last pieces are finished. There is nothing to download
+      yet — this page will be the first place that changes.
+    </p>
+    <div class="status"><span class="dot"></span> Coming soon to the App Store</div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="links">
+      <a href="#features">Features</a>
+      <a href="#preview">Preview</a>
+      <a href="#principles">How it counts</a>
+      <a href="https://github.com/lahinzaman/rulocked">Source on GitHub</a>
+    </div>
+    <p class="disclaimer">
+      The interface panels above are previews built from the app's own design system and
+      wording, not captured screenshots, and the figures in them are illustrative. CalCamp is
+      not a medical device and does not give medical advice.
+    </p>
+    <p>© 2026 Lahin Zaman · Built with Expo and Supabase · MIT licensed</p>
+  </div>
+</footer>
+
+</body>
+</html>

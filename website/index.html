@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CalCamp — nutrition and training, honestly measured</title>
-<meta name="description" content="An iOS app for people who lift and track what they eat. Barcode scanning, campus dining, hypertrophy programming and weight-trend analysis. Coming soon.">
+<title>CalCamp — track dining hall food, lifts and progress</title>
+<meta name="description" content="The calorie tracker built for college. Log your dining hall meals by name, scan a barcode, run your lifting split, and see progress that actually means something. Coming soon to iPhone.">
 <meta name="theme-color" content="#101115">
 <link rel="icon" href="favicon.png">
 <link rel="stylesheet" href="styles.css">
 
-<meta property="og:title" content="CalCamp — nutrition and training, honestly measured">
-<meta property="og:description" content="Nutrition logging, hypertrophy programming and weight-trend analysis in one iOS app. Coming soon.">
+<meta property="og:title" content="CalCamp — track dining hall food, lifts and progress">
+<meta property="og:description" content="The calorie tracker built for college. Your dining hall's menu is already in it. Coming soon to iPhone.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://calcamp.vercel.app/">
 <meta property="og:image" content="https://calcamp.vercel.app/mark.svg">
@@ -23,9 +23,10 @@
     <img src="mark.svg" alt="">
     <strong>CalCamp</strong>
     <nav>
-      <a href="#features">Features</a>
+      <a href="#campus">Dining halls</a>
       <a href="#preview">Preview</a>
-      <a href="#principles">How it counts</a>
+      <a href="#features">Features</a>
+      <a href="#trust">Why trust it</a>
       <a href="https://github.com/lahinzaman/calcamp">Source</a>
     </nav>
   </div>
@@ -34,315 +35,562 @@
 <main>
 
 <div class="wrap hero">
-  <span class="eyebrow">Nutrition · Training · You</span>
-  <h1>A clearer picture of your&nbsp;everyday progress.</h1>
+  <span class="eyebrow">Built for college</span>
+  <h1>Your dining hall is already&nbsp;in&nbsp;it.</h1>
   <p class="lede">
-    Log what you eat, run the split you actually train, and watch the weight trend that
-    filters out water and food. One iOS app, built for people who want the numbers to
-    mean something.
+    Most calorie apps make you guess what was on your tray. CalCamp already knows — it pulls your
+    university's dining hall menu, so lunch is two taps instead of a search for something that
+    vaguely resembles it. Then it tracks your lifts and shows you what is actually changing.
   </p>
 
   <div class="status"><span class="dot"></span> Coming soon to the App Store</div>
-  <p class="status-note">Not yet available for download. In TestFlight now, finishing up.</p>
+  <p class="status-note">Not out yet — this page will be the first place that changes.</p>
 </div>
 
-<!-- Interface previews. Rendered in HTML from the app's own palette and copy, and labelled
-     as previews in the footer rather than passed off as captured screenshots. -->
-<div id="preview" class="wrap">
-  <p class="scroll-hint">Scroll across to see more →</p>
-  <div class="phones">
+<!-- Interface previews. Each screen is authored at a real iPhone's 393x852 and scaled down as
+     a whole, so every size inside it is the size it really is on a phone. -->
+<section class="flush" id="preview">
+  <div class="wrap">
+    <div class="rail-head">
+      <h2>A look inside</h2>
+      <p class="scroll-hint">Scroll across &rarr;</p>
+    </div>
 
-    <div class="phone-col">
-      <div class="phone"><div class="screen">
-        <div class="notch"><span>9:41</span><span>●●● ⌁</span></div>
-        <div class="screen-body">
-          <div class="s-title">Today</div>
-          <div class="s-sub">Thursday, 17 September</div>
-          <div class="card">
-            <div class="row">
-              <div class="ring">
-                <svg width="96" height="96" viewBox="0 0 96 96">
-                  <circle cx="48" cy="48" r="40" fill="none" stroke="#282C37" stroke-width="9"/>
-                  <circle cx="48" cy="48" r="40" fill="none" stroke="#91ACFF" stroke-width="9"
-                          stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="74"/>
-                </svg>
-                <div class="mid">
-                  <span class="big">1,780</span>
-                  <span class="tiny dim">of 2,420 kcal</span>
+    <div class="phones">
+
+      <div class="phone-col">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>9:41</span><span class="icons"><i></i><i></i><i class="bat"></i></span></div>
+          <div class="viewport">
+            <div class="title">Today</div>
+            <div class="subtitle">Thursday, 17 September</div>
+            <div class="card">
+              <div class="row">
+                <div class="ring">
+                  <svg width="132" height="132" viewBox="0 0 132 132">
+                    <circle cx="66" cy="66" r="57" fill="none" stroke="#282C37" stroke-width="12"/>
+                    <circle cx="66" cy="66" r="57" fill="none" stroke="#91ACFF" stroke-width="12"
+                            stroke-linecap="round" stroke-dasharray="358" stroke-dashoffset="98"/>
+                  </svg>
+                  <div class="mid">
+                    <span class="num">1,780</span>
+                    <span class="cap">of 2,420 kcal</span>
+                  </div>
+                </div>
+                <div class="grow">
+                  <div class="cap dim">Protein &middot; 128 g</div>
+                  <div class="meter"><i style="width:78%;background:#91ACFF"></i></div>
+                  <div class="cap dim" style="margin-top:12px">Carbs &middot; 194 g</div>
+                  <div class="meter"><i style="width:61%;background:#FFCB78"></i></div>
+                  <div class="cap dim" style="margin-top:12px">Fat &middot; 52 g</div>
+                  <div class="meter"><i style="width:44%;background:#DBAEFF"></i></div>
                 </div>
               </div>
-              <div class="grow">
-                <div class="tiny dim">Protein</div>
-                <div class="meter"><i style="width:78%;background:#91ACFF"></i></div>
-                <div class="tiny dim" style="margin-top:7px">Carbs</div>
-                <div class="meter"><i style="width:61%;background:#FFCB78"></i></div>
-                <div class="tiny dim" style="margin-top:7px">Fat</div>
-                <div class="meter"><i style="width:44%;background:#DBAEFF"></i></div>
+            </div>
+
+            <div class="eyebrow-s">Today's meals</div>
+            <div class="card">
+              <div class="row">
+                <div class="grow">
+                  <div class="b clip">Grilled chicken breast</div>
+                  <div class="cap dim clip">Busch Dining Hall &middot; lunch</div>
+                </div>
+                <span class="chip">282</span>
+              </div>
+            </div>
+            <div class="card">
+              <div class="row">
+                <div class="grow">
+                  <div class="b clip">Greek yoghurt, plain</div>
+                  <div class="cap dim clip">Scanned &middot; Chobani</div>
+                </div>
+                <span class="chip">140</span>
+              </div>
+            </div>
+            <div class="card">
+              <div class="row">
+                <div class="grow">
+                  <div class="b clip">Brown rice</div>
+                  <div class="cap dim clip">Livingston Dining &middot; dinner</div>
+                </div>
+                <span class="chip">216</span>
+              </div>
+            </div>
+            <div class="card">
+              <div class="row">
+                <div class="grow">
+                  <div class="b clip">Scrambled eggs</div>
+                  <div class="cap dim clip">Busch Dining Hall &middot; breakfast</div>
+                </div>
+                <span class="chip">198</span>
+              </div>
+            </div>
+            <div class="card">
+              <div class="row">
+                <div class="grow">
+                  <div class="b clip">Protein shake</div>
+                  <div class="cap dim clip">Saved &middot; one tap</div>
+                </div>
+                <span class="chip">164</span>
               </div>
             </div>
           </div>
-          <div class="card">
-            <div class="row"><span class="grow b nowrap">Grilled chicken, 6 oz</span><span class="dim">282</span></div>
-            <div class="row"><span class="grow nowrap dim">Busch Dining Hall · lunch</span><span class="pill">Campus</span></div>
+          <div class="tabbar">
+            <span class="tab on"><u></u>Today</span><span class="tab"><u></u>Food</span>
+            <span class="tab"><u></u>Train</span><span class="tab"><u></u>Trends</span>
+            <span class="tab"><u></u>You</span>
           </div>
-          <div class="card">
-            <div class="row"><span class="grow b nowrap">Greek yoghurt</span><span class="dim">140</span></div>
-            <div class="row"><span class="grow nowrap dim">Scanned · 0 12000 16115 5</span><span class="pill">Barcode</span></div>
-          </div>
-        </div>
-        <div class="tabbar"><span class="on">Today</span><span>Food</span><span>Train</span><span>Trends</span><span>You</span></div>
-      </div></div>
-      <p class="phone-caption">Your day, and where every number came from</p>
-    </div>
+          <div class="homebar"><i></i></div>
+        </div></div>
+        <p class="phone-caption"><b>Your whole day in one place</b>Calories, protein, and where each meal came from.</p>
+      </div>
 
-    <div class="phone-col">
-      <div class="phone"><div class="screen">
-        <div class="notch"><span>9:41</span><span>●●● ⌁</span></div>
-        <div class="screen-body">
-          <div class="s-title">Scan a barcode</div>
-          <div class="s-sub">Point at the package</div>
-          <div class="viewfinder">
-            <span class="bracket tl"></span><span class="bracket tr"></span>
-            <span class="bracket bl"></span><span class="bracket br"></span>
-            <div class="barcode">
-              <i style="width:3px"></i><i style="width:1px"></i><i style="width:4px"></i><i style="width:2px"></i>
-              <i style="width:1px"></i><i style="width:5px"></i><i style="width:2px"></i><i style="width:3px"></i>
-              <i style="width:1px"></i><i style="width:2px"></i><i style="width:4px"></i><i style="width:1px"></i>
-              <i style="width:3px"></i><i style="width:2px"></i><i style="width:5px"></i><i style="width:1px"></i>
-              <i style="width:2px"></i><i style="width:3px"></i><i style="width:1px"></i><i style="width:4px"></i>
+      <div class="phone-col">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>9:41</span><span class="icons"><i></i><i></i><i class="bat"></i></span></div>
+          <div class="viewport">
+            <div class="title">Busch Dining</div>
+            <div class="subtitle">Today's menu &middot; lunch</div>
+            <div class="row" style="gap:8px;margin-bottom:16px">
+              <span class="chip ghost">Breakfast</span>
+              <span class="chip key">Lunch</span>
+              <span class="chip ghost">Dinner</span>
             </div>
-            <div class="scan-note">Check digit valid</div>
-          </div>
-          <div class="card edge">
-            <div class="b">Chobani Greek Yoghurt, plain</div>
-            <div class="tiny dim" style="margin-bottom:8px">FatSecret · per 170 g container</div>
-            <div class="row">
-              <div class="grow"><div class="b">140</div><div class="tiny dim">kcal</div></div>
-              <div class="grow"><div class="b" style="color:#91ACFF">16 g</div><div class="tiny dim">protein</div></div>
-              <div class="grow"><div class="b" style="color:#FFCB78">9 g</div><div class="tiny dim">carbs</div></div>
-              <div class="grow"><div class="b" style="color:#DBAEFF">4 g</div><div class="tiny dim">fat</div></div>
-            </div>
-          </div>
-          <div class="pill key">Add to lunch</div>
-        </div>
-        <div class="tabbar"><span>Today</span><span class="on">Food</span><span>Train</span><span>Trends</span><span>You</span></div>
-      </div></div>
-      <p class="phone-caption">Scans are checked before they are believed</p>
-    </div>
 
-    <div class="phone-col">
-      <div class="phone"><div class="screen">
-        <div class="notch"><span>9:41</span><span>●●● ⌁</span></div>
-        <div class="screen-body">
-          <div class="s-title">Push A</div>
-          <div class="s-sub">32:15 elapsed · 8,420 lbs moved</div>
-          <div class="card">
-            <div class="row" style="margin-bottom:6px">
-              <span class="grow b nowrap">Bench Press</span><span class="pill key">A</span>
+            <div class="eyebrow-s">Entrees</div>
+            <div class="card">
+              <div class="row">
+                <div class="grow">
+                  <div class="b clip">Grilled chicken breast</div>
+                  <div class="cap dim">282 kcal &middot; 53 g protein</div>
+                </div>
+                <span class="chip key">Add</span>
+              </div>
             </div>
-            <div class="setrow"><span class="dim">#</span><span class="tiny dim">lbs</span><span class="tiny dim">Reps</span><span class="tiny dim">RPE</span><span></span></div>
-            <div class="setrow"><span class="dim">W</span><span class="box">95</span><span class="box">10</span><span class="box">—</span><span class="tick">✓</span></div>
-            <div class="setrow"><span class="dim">1</span><span class="box">155</span><span class="box">8</span><span class="box">7</span><span class="tick">✓</span></div>
-            <div class="setrow"><span class="dim">2</span><span class="box">155</span><span class="box">7</span><span class="box">8</span><span class="tick">✓</span></div>
-            <div class="setrow"><span class="dim">3</span><span class="box">155</span><span class="box">—</span><span class="box">—</span><span class="dim">○</span></div>
-            <div class="tiny dim" style="margin-top:7px">Estimated 1RM · 193.4 lbs</div>
-          </div>
-          <div class="card edge">
-            <div class="row"><span class="grow tiny dim">Superset with Cable Fly</span><span class="pill">Rest 1:45</span></div>
-          </div>
-        </div>
-        <div class="tabbar"><span>Today</span><span>Food</span><span class="on">Train</span><span>Trends</span><span>You</span></div>
-      </div></div>
-      <p class="phone-caption">Supersets, RPE and a rest timer that waits for the round</p>
-    </div>
+            <div class="card">
+              <div class="row">
+                <div class="grow">
+                  <div class="b clip">Baked ziti</div>
+                  <div class="cap dim">418 kcal &middot; 19 g protein</div>
+                </div>
+                <span class="chip">Add</span>
+              </div>
+            </div>
 
-    <div class="phone-col">
-      <div class="phone"><div class="screen">
-        <div class="notch"><span>9:41</span><span>●●● ⌁</span></div>
-        <div class="screen-body">
-          <div class="s-title">Trends</div>
-          <div class="s-sub">Last 28 days</div>
-          <div class="card">
-            <div class="tiny dim">Weight trend</div>
-            <div class="row" style="align-items:baseline">
-              <span class="big grow">178.4</span><span class="tiny dim">lbs · −2.1 this month</span>
+            <div class="eyebrow-s" style="margin-top:18px">Sides</div>
+            <div class="card">
+              <div class="row">
+                <div class="grow">
+                  <div class="b clip">Steamed broccoli</div>
+                  <div class="cap dim">54 kcal &middot; 4 g protein</div>
+                </div>
+                <span class="chip">Add</span>
+              </div>
             </div>
-            <svg width="100%" height="64" viewBox="0 0 220 64" preserveAspectRatio="none" style="margin-top:6px">
-              <polyline fill="none" stroke="#454B5B" stroke-width="1" stroke-dasharray="3 5" points="0,32 220,32"/>
-              <polyline fill="none" stroke="#91ACFF" stroke-width="2.5" stroke-linecap="round"
-                points="4,14 34,18 64,17 94,24 124,29 154,34 184,38 214,44"/>
-              <circle cx="16" cy="11" r="1.8" fill="#9AA2B1"/><circle cx="52" cy="24" r="1.8" fill="#9AA2B1"/>
-              <circle cx="88" cy="16" r="1.8" fill="#9AA2B1"/><circle cx="124" cy="35" r="1.8" fill="#9AA2B1"/>
-              <circle cx="160" cy="28" r="1.8" fill="#9AA2B1"/><circle cx="196" cy="47" r="1.8" fill="#9AA2B1"/>
-              <circle cx="214" cy="44" r="4.5" fill="#91ACFF"/>
-            </svg>
-            <div class="tiny dim">Dots are weigh-ins; the line filters out water and food.</div>
-          </div>
-          <div class="card">
-            <div class="tiny dim">Steps</div>
-            <div class="big">9,240</div>
-            <div class="tiny dim">Average per day across 26 days</div>
-            <div class="bars">
-              <i style="height:54%"></i><i style="height:72%"></i><i style="height:41%"></i><i style="height:88%"></i>
-              <i style="height:63%"></i><i style="height:95%"></i><i style="height:58%"></i><i style="height:77%"></i>
-              <i style="height:46%"></i><i style="height:84%"></i>
+            <div class="card">
+              <div class="row">
+                <div class="grow">
+                  <div class="b clip">Brown rice</div>
+                  <div class="cap dim">216 kcal &middot; 5 g protein</div>
+                </div>
+                <span class="chip">Add</span>
+              </div>
             </div>
-          </div>
-        </div>
-        <div class="tabbar"><span>Today</span><span>Food</span><span>Train</span><span class="on">Trends</span><span>You</span></div>
-      </div></div>
-      <p class="phone-caption">A trend line that starts working within a week</p>
-    </div>
+            <div class="card">
+              <div class="row">
+                <div class="grow">
+                  <div class="b clip">Roasted sweet potato</div>
+                  <div class="cap dim">142 kcal &middot; 2 g protein</div>
+                </div>
+                <span class="chip">Add</span>
+              </div>
+            </div>
 
-    <div class="phone-col">
-      <div class="phone"><div class="screen">
-        <div class="notch"><span>9:41</span><span>●●● ⌁</span></div>
-        <div class="screen-body">
-          <div class="s-title">Treadmill session</div>
-          <div class="s-sub">Read from the console</div>
-          <div class="console">
-            <div><div class="v">32:15</div><div class="k">Time</div></div>
-            <div><div class="v">2.15</div><div class="k">Miles</div></div>
-            <div><div class="v">248</div><div class="k">Calories</div></div>
-            <div><div class="v">2.5</div><div class="k">Incline</div></div>
-          </div>
-          <div class="card edge">
-            <div class="row"><span class="grow b">4,378 steps</span><span class="pill">Estimated</span></div>
-            <div class="tiny dim" style="margin-top:6px">
-              From 2.15 miles at a stride worked out from your height. The console did not
-              display a step count — correct it if you know better.
+            <div class="eyebrow-s" style="margin-top:18px">Desserts</div>
+            <div class="card">
+              <div class="row">
+                <div class="grow">
+                  <div class="b clip">Chocolate chip cookie</div>
+                  <div class="cap dim">221 kcal &middot; 3 g protein</div>
+                </div>
+                <span class="chip">Add</span>
+              </div>
             </div>
           </div>
-          <div class="card">
-            <div class="tiny dim">
-              Added on top of what your phone counted. Treadmill steps stay in CalCamp and are
-              never written to Apple Health.
-            </div>
+          <div class="tabbar">
+            <span class="tab"><u></u>Today</span><span class="tab on"><u></u>Food</span>
+            <span class="tab"><u></u>Train</span><span class="tab"><u></u>Trends</span>
+            <span class="tab"><u></u>You</span>
           </div>
-        </div>
-        <div class="tabbar"><span>Today</span><span>Food</span><span>Train</span><span>Trends</span><span class="on">You</span></div>
-      </div></div>
-      <p class="phone-caption">Photograph the console; it reads what it can and says what it guessed</p>
-    </div>
+          <div class="homebar"><i></i></div>
+        </div></div>
+        <p class="phone-caption"><b>Today's actual menu</b>Pick the food off the line by name. No guessing at portions.</p>
+      </div>
 
+      <div class="phone-col">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>9:41</span><span class="icons"><i></i><i></i><i class="bat"></i></span></div>
+          <div class="viewport">
+            <div class="title">Scan</div>
+            <div class="subtitle">Point at the barcode</div>
+            <div class="scan">
+              <span class="br tl"></span><span class="br tr"></span>
+              <span class="br bl"></span><span class="br br2"></span>
+              <div class="code">
+                <i style="width:4px"></i><i style="width:2px"></i><i style="width:6px"></i><i style="width:3px"></i>
+                <i style="width:2px"></i><i style="width:7px"></i><i style="width:3px"></i><i style="width:4px"></i>
+                <i style="width:2px"></i><i style="width:3px"></i><i style="width:6px"></i><i style="width:2px"></i>
+                <i style="width:4px"></i><i style="width:3px"></i><i style="width:7px"></i><i style="width:2px"></i>
+                <i style="width:3px"></i><i style="width:4px"></i><i style="width:2px"></i><i style="width:5px"></i>
+              </div>
+              <div class="scan-note">Found it &middot; Chobani Greek Yoghurt</div>
+            </div>
+            <div class="card edge">
+              <div class="b">Chobani Greek Yoghurt, plain</div>
+              <div class="cap dim" style="margin-bottom:14px">Per 170 g container</div>
+              <div class="split">
+                <div><div class="b">140</div><div class="cap dim">kcal</div></div>
+                <div><div class="b" style="color:#91ACFF">16 g</div><div class="cap dim">protein</div></div>
+                <div><div class="b" style="color:#FFCB78">9 g</div><div class="cap dim">carbs</div></div>
+                <div><div class="b" style="color:#DBAEFF">4 g</div><div class="cap dim">fat</div></div>
+              </div>
+            </div>
+            <div class="row" style="gap:8px;margin-bottom:18px">
+              <span class="chip key">Add to lunch</span>
+              <span class="chip ghost">Change portion</span>
+            </div>
+
+            <div class="eyebrow-s">Scanned recently</div>
+            <div class="card">
+              <div class="row">
+                <div class="grow">
+                  <div class="b clip">Quest protein bar</div>
+                  <div class="cap dim">190 kcal &middot; 21 g protein</div>
+                </div>
+                <span class="chip">Add</span>
+              </div>
+            </div>
+            <div class="card">
+              <div class="row">
+                <div class="grow">
+                  <div class="b clip">Oatly barista oat milk</div>
+                  <div class="cap dim">120 kcal &middot; 3 g protein</div>
+                </div>
+                <span class="chip">Add</span>
+              </div>
+            </div>
+          </div>
+          <div class="tabbar">
+            <span class="tab"><u></u>Today</span><span class="tab on"><u></u>Food</span>
+            <span class="tab"><u></u>Train</span><span class="tab"><u></u>Trends</span>
+            <span class="tab"><u></u>You</span>
+          </div>
+          <div class="homebar"><i></i></div>
+        </div></div>
+        <p class="phone-caption"><b>Anything with a barcode</b>Dorm snacks, protein bars, the whole convenience store.</p>
+      </div>
+
+      <div class="phone-col">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>9:41</span><span class="icons"><i></i><i></i><i class="bat"></i></span></div>
+          <div class="viewport">
+            <div class="title">Push A</div>
+            <div class="subtitle">32:15 elapsed &middot; 8,420 lbs moved</div>
+            <div class="card">
+              <div class="row" style="margin-bottom:8px">
+                <span class="grow b clip">Bench Press</span>
+                <span class="chip key">Superset A</span>
+              </div>
+              <div class="sets">
+                <div class="set"><span class="h">#</span><span class="h">lbs</span><span class="h">Reps</span><span class="h">RPE</span><span class="h"></span></div>
+                <div class="set"><span class="idx">W</span><span class="box">95</span><span class="box">10</span><span class="box">&mdash;</span><span class="ok">&check;</span></div>
+                <div class="set"><span class="idx">1</span><span class="box">155</span><span class="box">8</span><span class="box">7</span><span class="ok">&check;</span></div>
+                <div class="set"><span class="idx">2</span><span class="box">155</span><span class="box">7</span><span class="box">8</span><span class="ok">&check;</span></div>
+                <div class="set"><span class="idx">3</span><span class="box">155</span><span class="box">&mdash;</span><span class="box">&mdash;</span><span class="todo">&cir;</span></div>
+              </div>
+              <div class="cap dim" style="margin-top:12px">Estimated 1RM &middot; 193 lbs &middot; best yet</div>
+            </div>
+            <div class="card edge">
+              <div class="row" style="margin-bottom:8px">
+                <span class="grow b clip">Cable Fly</span>
+                <span class="chip key">Superset A</span>
+              </div>
+              <div class="sets">
+                <div class="set"><span class="idx">1</span><span class="box">40</span><span class="box">12</span><span class="box">7</span><span class="ok">&check;</span></div>
+                <div class="set"><span class="idx">2</span><span class="box">40</span><span class="box">&mdash;</span><span class="box">&mdash;</span><span class="todo">&cir;</span></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="row">
+                <span class="grow sm dim clip">Rest before the next round</span>
+                <span class="chip key">1:45</span>
+              </div>
+            </div>
+          </div>
+          <div class="tabbar">
+            <span class="tab"><u></u>Today</span><span class="tab"><u></u>Food</span>
+            <span class="tab on"><u></u>Train</span><span class="tab"><u></u>Trends</span>
+            <span class="tab"><u></u>You</span>
+          </div>
+          <div class="homebar"><i></i></div>
+        </div></div>
+        <p class="phone-caption"><b>Your split, logged as you lift</b>Rest timer, supersets, and your best sets remembered.</p>
+      </div>
+
+      <div class="phone-col">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>9:41</span><span class="icons"><i></i><i></i><i class="bat"></i></span></div>
+          <div class="viewport">
+            <div class="title">Trends</div>
+            <div class="subtitle">Last 28 days</div>
+            <div class="card">
+              <div class="cap dim">Weight</div>
+              <div class="row" style="align-items:baseline;gap:8px">
+                <span class="num">178.4</span>
+                <span class="sm dim">lbs &middot; down 2.1 this month</span>
+              </div>
+              <svg width="100%" height="96" viewBox="0 0 320 96" preserveAspectRatio="none" style="margin-top:10px">
+                <line x1="0" y1="48" x2="320" y2="48" stroke="#454B5B" stroke-width="1" stroke-dasharray="4 7"/>
+                <polyline fill="none" stroke="#91ACFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"
+                  points="6,20 50,26 94,25 138,36 182,44 226,52 270,58 314,66"/>
+                <circle cx="24" cy="15" r="2.6" fill="#9AA2B1"/><circle cx="76" cy="34" r="2.6" fill="#9AA2B1"/>
+                <circle cx="128" cy="22" r="2.6" fill="#9AA2B1"/><circle cx="180" cy="53" r="2.6" fill="#9AA2B1"/>
+                <circle cx="232" cy="42" r="2.6" fill="#9AA2B1"/><circle cx="284" cy="71" r="2.6" fill="#9AA2B1"/>
+                <circle cx="314" cy="66" r="6" fill="#91ACFF"/>
+              </svg>
+              <div class="cap dim" style="margin-top:10px">Dots are weigh-ins. The line ignores water and food.</div>
+            </div>
+            <div class="card">
+              <div class="cap dim">Steps</div>
+              <div class="num">9,240</div>
+              <div class="cap dim">Average per day</div>
+              <div class="bars">
+                <i style="height:54%"></i><i style="height:72%"></i><i style="height:41%"></i>
+                <i style="height:88%"></i><i style="height:63%"></i><i class="hi" style="height:96%"></i>
+                <i style="height:58%"></i><i style="height:77%"></i><i style="height:46%"></i>
+                <i style="height:84%"></i>
+              </div>
+            </div>
+            <div class="card">
+              <div class="cap dim">Protein, daily average</div>
+              <div class="row" style="align-items:baseline;gap:8px">
+                <span class="num">131</span>
+                <span class="sm dim">g &middot; target 140 g</span>
+              </div>
+              <div class="meter"><i style="width:94%;background:#91ACFF"></i></div>
+              <div class="cap dim" style="margin-top:10px">Across 26 days with a full food log.</div>
+            </div>
+          </div>
+          <div class="tabbar">
+            <span class="tab"><u></u>Today</span><span class="tab"><u></u>Food</span>
+            <span class="tab"><u></u>Train</span><span class="tab on"><u></u>Trends</span>
+            <span class="tab"><u></u>You</span>
+          </div>
+          <div class="homebar"><i></i></div>
+        </div></div>
+        <p class="phone-caption"><b>Progress you can actually see</b>A weight line that ignores the day-to-day noise.</p>
+      </div>
+
+    </div>
   </div>
-</div>
+</section>
+
+<section id="campus">
+  <div class="wrap campus">
+    <div>
+      <h2>Eating on a meal plan, tracked properly</h2>
+      <p class="section-lede" style="margin-bottom:0">
+        Tracking calories at university is annoying for one specific reason: you did not cook the
+        food and there is no package to read. So everyone ends up searching "chicken" and picking
+        whichever result feels about right.
+      </p>
+      <ul>
+        <li><span class="tickmark">&check;</span><span><b>Today's real menu, by dining hall.</b> Pull up what is on the line right now and tap the thing you actually took.</span></li>
+        <li><span class="tickmark">&check;</span><span><b>Every meal period.</b> Breakfast, lunch, dinner and late-night takeout, each with their own menu.</span></li>
+        <li><span class="tickmark">&check;</span><span><b>Nutrition from the hall itself.</b> Calories and macros as your university publishes them, not a stranger's guess.</span></li>
+        <li><span class="tickmark">&check;</span><span><b>Find what fits what is left.</b> Short on protein with 500 calories to spend? It will tell you what on the menu works.</span></li>
+        <li><span class="tickmark">&check;</span><span><b>Off campus too.</b> Scan a barcode, photograph a nutrition label, or just describe what you ate.</span></li>
+      </ul>
+      <p class="sm dim" style="margin-top:24px">
+        Launching with Rutgers&ndash;New Brunswick dining halls, with more universities to follow.
+      </p>
+    </div>
+    <div class="campus-visual">
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="icons"><i></i><i></i><i class="bat"></i></span></div>
+        <div class="viewport">
+          <div class="title">What fits?</div>
+          <div class="subtitle">512 kcal and 41 g protein left today</div>
+          <div class="card edge">
+            <div class="row">
+              <div class="grow">
+                <div class="b clip">Grilled chicken breast</div>
+                <div class="cap dim">282 kcal &middot; 53 g protein</div>
+              </div>
+              <span class="chip key">Best</span>
+            </div>
+            <div class="meter"><i style="width:96%;background:#91ACFF"></i></div>
+            <div class="cap dim" style="margin-top:10px">Covers your protein with room to spare.</div>
+          </div>
+          <div class="card">
+            <div class="row">
+              <div class="grow">
+                <div class="b clip">Turkey chili</div>
+                <div class="cap dim">318 kcal &middot; 28 g protein</div>
+              </div>
+              <span class="chip">Good</span>
+            </div>
+            <div class="meter"><i style="width:68%;background:#91ACFF"></i></div>
+          </div>
+          <div class="card">
+            <div class="row">
+              <div class="grow">
+                <div class="b clip">Cheese pizza, 2 slices</div>
+                <div class="cap dim">544 kcal &middot; 22 g protein</div>
+              </div>
+              <span class="chip ghost">Over</span>
+            </div>
+            <div class="meter"><i style="width:38%;background:#FFCB78"></i></div>
+            <div class="cap dim" style="margin-top:10px">Puts you over for the day. Still your call.</div>
+          </div>
+          <div class="card">
+            <div class="row">
+              <div class="grow">
+                <div class="b clip">Tofu stir fry</div>
+                <div class="cap dim">264 kcal &middot; 19 g protein</div>
+              </div>
+              <span class="chip">Good</span>
+            </div>
+            <div class="meter"><i style="width:56%;background:#91ACFF"></i></div>
+          </div>
+          <div class="card">
+            <div class="row">
+              <div class="grow">
+                <div class="b clip">Caesar salad, grilled chicken</div>
+                <div class="cap dim">386 kcal &middot; 34 g protein</div>
+              </div>
+              <span class="chip">Good</span>
+            </div>
+            <div class="meter"><i style="width:74%;background:#91ACFF"></i></div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <span class="tab"><u></u>Today</span><span class="tab on"><u></u>Food</span>
+          <span class="tab"><u></u>Train</span><span class="tab"><u></u>Trends</span>
+          <span class="tab"><u></u>You</span>
+        </div>
+        <div class="homebar"><i></i></div>
+      </div></div>
+    </div>
+  </div>
+</section>
 
 <section id="features">
   <div class="wrap">
-    <h2>What it does</h2>
+    <h2>Everything else it does</h2>
     <p class="section-lede">
-      Everything a training log and a food diary are supposed to do, plus the parts that
-      usually get left to guesswork.
+      A food diary and a training log that work the way you actually eat and train.
     </p>
 
     <div class="grid">
       <div class="feature">
-        <span class="tag">Nutrition</span>
-        <h3>Log food without fighting it</h3>
+        <span class="tag">Food</span>
+        <h3>Log a meal in seconds</h3>
         <p>
-          Scan a barcode, photograph a nutrition label, describe a meal in words, or pick it off
-          your campus dining hall's live menu. Portions rescale properly, and a value the source
-          never reported stays blank instead of quietly becoming zero.
+          Scan a barcode, snap the nutrition label, pick it off the dining hall menu, or type what
+          you ate in plain English. Your usual meals come back as one tap next time.
         </p>
       </div>
       <div class="feature">
         <span class="tag">Training</span>
-        <h3>The split you actually run</h3>
+        <h3>The gym, handled</h3>
         <p>
-          Build routines with supersets, rest and rep ranges saved in, then log the session as it
-          happens — swap an exercise when the rack is busy, add one that was never in the plan,
-          and fix any of it afterwards. 230+ exercises, or add your own.
-        </p>
-      </div>
-      <div class="feature">
-        <span class="tag">Volume</span>
-        <h3>Hard sets, counted honestly</h3>
-        <p>
-          Weekly volume per muscle, where assisting work is credited separately from direct work
-          so a pressing-heavy week does not read as triceps overtraining. Warm-ups are logged and
-          never counted. Drop sets and sets to failure are.
+          Build your split once, then log it as you lift. Rest timer, supersets, plate maths, and
+          what you lifted last time so you know what to beat.
         </p>
       </div>
       <div class="feature">
         <span class="tag">Progress</span>
-        <h3>Signal, not scale noise</h3>
+        <h3>See past the daily noise</h3>
         <p>
-          A smoothed weight trend that separates real change from water and food, energy
-          expenditure estimated from your own adherent days, and progress photos that stay on
-          your phone and are never uploaded anywhere.
+          The scale jumps for water and salt, not fat. CalCamp draws the line underneath it, so
+          you can tell a real change from a bad Tuesday.
         </p>
       </div>
       <div class="feature">
-        <span class="tag">Beyond weights</span>
-        <h3>Planks, carries and treadmills</h3>
+        <span class="tag">Targets</span>
+        <h3>Numbers that fit you</h3>
         <p>
-          Sets can be weight and reps, bodyweight reps, a duration or a distance — because a
-          plank is not three reps of anything. Photograph a treadmill console and it reads the
-          display, adding the steps a phone left on the rail never counted.
+          Your calorie and protein targets come from your own weigh-ins and what you actually
+          ate, and they adjust as you go. Not a generic calculator.
         </p>
       </div>
       <div class="feature">
-        <span class="tag">Platform</span>
-        <h3>Built for the phone in your pocket</h3>
+        <span class="tag">Cardio</span>
+        <h3>Treadmills and walks count</h3>
         <p>
-          Apple Health in both directions, your day on the Lock Screen and Dynamic Island, and a
-          diary that works with no signal in a basement gym and syncs when it can. Thirteen
-          languages, right-to-left included.
+          Photograph the treadmill console and it reads the display. Steps, workouts and active
+          calories sync with Apple Health both ways.
+        </p>
+      </div>
+      <div class="feature">
+        <span class="tag">Everyday</span>
+        <h3>Made for a real day</h3>
+        <p>
+          Your calories live on the Lock Screen. It works with no signal in a basement gym and
+          catches up later. Thirteen languages.
         </p>
       </div>
     </div>
   </div>
 </section>
 
-<section id="principles">
+<section id="trust">
   <div class="wrap">
-    <h2>How it counts</h2>
+    <h2>Why you can trust the numbers</h2>
     <p class="section-lede">
-      Most of the decisions in this app are about refusing to make a number up. A few of them,
-      plainly:
+      A tracker is only worth the effort if the figures are honest. A few rules CalCamp sticks to:
     </p>
 
     <div class="notes">
       <div class="note">
-        <b>Missing is not zero</b>
-        <span>A micronutrient the database never reported shows as unreported, not as none.</span>
+        <b>It never makes a number up</b>
+        <span>If the dining hall did not publish the sodium, you see a dash &mdash; not a zero that
+        quietly drags your day's total down.</span>
       </div>
       <div class="note">
-        <b>An estimate says so</b>
-        <span>Steps worked out from stride length are labelled an estimate everywhere they appear,
-        including in the database.</span>
+        <b>A guess is labelled a guess</b>
+        <span>When steps are worked out from your stride instead of counted, it says so, and you
+        can correct it.</span>
       </div>
       <div class="note">
-        <b>Body mass is not load</b>
-        <span>An unweighted pull-up moves no external weight, so it adds none to your volume. The
-        plates on the belt do.</span>
+        <b>Warm-ups are not working sets</b>
+        <span>Your training volume counts the sets that actually cost you something.</span>
       </div>
       <div class="note">
-        <b>A scan is verified</b>
-        <span>Two camera frames have to agree, and the barcode's own check digit has to pass,
-        before anything is looked up.</span>
+        <b>Scans get double-checked</b>
+        <span>A barcode has to read the same twice and pass its own checksum before anything
+        reaches your day.</span>
       </div>
       <div class="note">
-        <b>Your photos stay put</b>
-        <span>Progress photos never leave the device. That is a deliberate limit, not a feature
-        gap.</span>
+        <b>Your photos never leave your phone</b>
+        <span>Progress photos are stored on the device and are never uploaded anywhere.</span>
       </div>
       <div class="note">
-        <b>Nothing invented into Health</b>
-        <span>Apple Health records what devices measured. CalCamp never writes an estimate into
-        it.</span>
+        <b>You can read the code</b>
+        <span>CalCamp is open source. If you want to know exactly what it does with your data,
+        you can go and look.</span>
       </div>
     </div>
   </div>
 </section>
 
-<section>
-  <div class="wrap" style="text-align:center">
+<section class="center">
+  <div class="wrap">
     <h2>Coming soon</h2>
-    <p class="section-lede" style="margin: 0 auto 30px">
-      CalCamp is in TestFlight while the last pieces are finished. There is nothing to download
-      yet — this page will be the first place that changes.
+    <p class="section-lede">
+      CalCamp is in testing while the last pieces are finished. There is nothing to download yet
+      &mdash; this page will be the first place that changes.
     </p>
     <div class="status"><span class="dot"></span> Coming soon to the App Store</div>
   </div>
@@ -353,17 +601,19 @@
 <footer>
   <div class="wrap">
     <div class="links">
-      <a href="#features">Features</a>
+      <a href="#campus">Dining halls</a>
       <a href="#preview">Preview</a>
-      <a href="#principles">How it counts</a>
+      <a href="#features">Features</a>
+      <a href="#trust">Why trust it</a>
       <a href="https://github.com/lahinzaman/calcamp">Source on GitHub</a>
     </div>
     <p class="disclaimer">
-      The interface panels above are previews built from the app's own design system and
-      wording, not captured screenshots, and the figures in them are illustrative. CalCamp is
-      not a medical device and does not give medical advice.
+      The app screens on this page are previews built from CalCamp's own design and wording, not
+      captured screenshots, and the figures in them are examples. Menu items and nutrition come
+      from each university's published dining data. CalCamp is not a medical device and does not
+      give medical advice.
     </p>
-    <p>© 2026 Lahin Zaman · Built with Expo and Supabase · MIT licensed</p>
+    <p>&copy; 2026 Lahin Zaman &middot; Open source, MIT licensed</p>
   </div>
 </footer>
 

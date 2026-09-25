@@ -12,6 +12,7 @@ import { haptic } from '../../theme/haptics';
 import { t as translate } from '../../i18n';
 import { breadcrumb } from '../telemetry/events';
 import { normalizeBarcode } from './gtin';
+import { pickMealPictureSize } from './pictureSize';
 
 export type ScannerMode = 'photo' | 'barcode' | 'label' | 'treadmill';
 /**
@@ -96,6 +97,9 @@ function Reticle({ scanning }: { scanning: boolean }) {
       .map(([key, corner]) => <View key={key} style={[styles.corner, corner]} />)}
   </Animated.View>;
 }
+
+/** The server refuses an image over 6 MB, which is 8 million characters of base64. */
+const MAX_PHOTO_BASE64 = 8_000_000;
 
 export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, onClose, onManual, notice,
   angles = 0, maxAngles = 1, onDone, scanTimeoutMs = SCAN_TIMEOUT_MS }: {
@@ -228,10 +232,26 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, 
       if (!asset.uri) throw new Error();
       haptic('medium');
       if (wantsUri) onCaptureUri?.(asset.uri);
-      else if (asset.base64) onCapture(asset.base64);
+      else if (asset.base64 && asset.base64.length > MAX_PHOTO_BASE64) {
+        setError('That photo is too large to send. Take the meal with the camera instead — it saves a smaller copy.');
+      } else if (asset.base64) onCapture(asset.base64);
       else throw new Error();
     } catch { setError('That photo could not be opened. Try another, or enter this by hand.'); }
     finally { locked.current = false; }
+  };
+
+  /**
+   * A meal photo is sent to the server, and a full-sensor frame is 12 to 48 megapixels: several
+   * megabytes each, over the upload limit on newer phones, and four of them is most of a minute on
+   * a campus connection. The model reads at about 2,000 pixels anyway, so meals are taken at the
+   * largest size the camera offers under that. Labels keep full resolution — small print needs it.
+   */
+  const [mealSize, setMealSize] = useState<string | null>(null);
+  const choosePictureSize = async () => {
+    try {
+      const sizes = await camera.current?.getAvailablePictureSizesAsync() ?? [];
+      setMealSize(pickMealPictureSize(sizes) ?? '');
+    } catch { setMealSize(''); }
   };
 
   const capture = async () => {
@@ -269,7 +289,8 @@ export function CameraScanner({ mode, busy, onBarcode, onCapture, onCaptureUri, 
 
   return <View style={styles.root}>
     {foreground && <CameraView ref={camera} style={StyleSheet.absoluteFill} facing="back" enableTorch={torch}
-      onCameraReady={() => setReady(true)} onMountError={() => setError('The camera could not start. Enter this item by hand.')}
+      pictureSize={mode === 'photo' && mealSize ? mealSize : undefined}
+      onCameraReady={() => { setReady(true); if (mode === 'photo' && mealSize === null) void choosePictureSize(); }} onMountError={() => setError('The camera could not start. Enter this item by hand.')}
       barcodeScannerSettings={ready ? READY_SCAN_SETTINGS : INITIAL_SCAN_SETTINGS}
       autofocus={focusLocked ? 'on' : 'off'}
       onBarcodeScanned={mode === 'barcode' ? scanned : undefined} />}

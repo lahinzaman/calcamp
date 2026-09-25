@@ -250,6 +250,24 @@ test('vision HTTP adapter sends authenticated base64 JSON using the server contr
   } finally { globalThis.fetch = originalFetch; }
 });
 
+test('a failed recognition says what the server said, not one sentence for every failure', async () => {
+  const { createVisionProxyAnalyzer } = require('../vision/useFoodVision') as typeof import('../vision/useFoodVision');
+  const originalFetch = globalThis.fetch;
+  const image = { base64: '/9j/4AECAwQ=', mimeType: 'image/jpeg' } as const;
+  const answer = (status: number, body: unknown) => { globalThis.fetch = async () => Response.json(body, { status }); };
+  const run = () => createVisionProxyAnalyzer('https://api.example/api/vision', async () => 'user-session')([image], null, new AbortController().signal);
+  try {
+    answer(503, { error: { code: 'NOT_CONFIGURED', message: 'This feature is not configured correctly on the server yet.' } });
+    await assert.rejects(run(), /not configured correctly on the server yet\. \(NOT_CONFIGURED\)/);
+    answer(401, { error: { code: 'UNAUTHORIZED', message: 'Your session is invalid or expired.' } });
+    await assert.rejects(run(), /Sign out and back in.*\(UNAUTHORIZED\)/);
+    answer(429, { error: { code: 'RATE_LIMITED', message: 'Too many requests right now. Try again shortly.' } });
+    await assert.rejects(run(), /Too many requests.*\(RATE_LIMITED\)/);
+    globalThis.fetch = async () => new Response('<html>Bad gateway</html>', { status: 502 });
+    await assert.rejects(run(), /Food recognition is unavailable.*\(HTTP 502\)/);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test('late native permission results cannot initialize a reset health session', async () => {
   const { createHealthStore } = require('../health/useHealthSync') as typeof import('../health/useHealthSync');
   let resolve!: () => void;

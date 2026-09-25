@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 
 import { BarcodeUnknown, lookupBarcode, parseUsdaBranded } from '../quickActions/barcode';
+import { pickMealPictureSize } from '../quickActions/pictureSize';
 
 /**
  * The lookup this replaced asked FatSecret, whose barcode method is a paid Premier feature the
@@ -64,4 +65,11 @@ test('a code whose check digit is wrong is refused before anything is asked', as
   const asked = serve({ off: [200, LAYS] });
   await assert.rejects(lookupBarcode('028400090859', new AbortController().signal), /did not read as a food barcode/);
   assert.equal(asked.length, 0);
+});
+
+test('meal photos are taken near 2,000 pixels, not at full sensor size', () => {
+  assert.equal(pickMealPictureSize(['3840x2160', '1920x1080', '1280x720', '640x480', 'Photo', 'High']), '1920x1080');
+  assert.equal(pickMealPictureSize(['4032x3024', '2048x1536', '1600x1200']), '2048x1536');
+  assert.equal(pickMealPictureSize(['Photo', 'High', 'Medium']), 'High');
+  assert.equal(pickMealPictureSize(['4032x3024']), null, 'nothing smaller: leave the camera on its default');
 });

@@ -109,7 +109,18 @@ export function createVisionProxyAnalyzer(endpoint: string, accessToken?: () => 
       body: JSON.stringify({ images: encoded, note }),
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, signal });
     onStage?.(0.8);
-    if (!response.ok) throw new FoodVisionError('REQUEST_FAILED', 'Food recognition is unavailable. Enter your meal manually.');
+    if (!response.ok) {
+      // The server says why — an expired session, a photo too large, a key the provider refused.
+      // Replacing that with one generic sentence is how every failure here looked identical and
+      // none of them could be told apart, by the person or by us.
+      const failure = await response.json().catch(() => null) as { error?: { code?: unknown; message?: unknown } } | null;
+      const code = typeof failure?.error?.code === 'string' ? failure.error.code : `HTTP ${response.status}`;
+      const message = response.status === 401 ? 'Your session has expired. Sign out and back in, then try again.'
+        : response.status === 413 ? 'Those photos are too large to send together. Retake with fewer angles.'
+        : typeof failure?.error?.message === 'string' && failure.error.message.trim() ? failure.error.message.trim()
+        : 'Food recognition is unavailable. Enter your meal manually.';
+      throw new FoodVisionError('REQUEST_FAILED', `${message} (${code})`);
+    }
     const body = await response.json();
     onStage?.(0.9);
     return body;
@@ -141,8 +152,9 @@ export function useFoodVision(options: { analyzer?: FoodVisionAnalyzer; endpoint
       if (list.length > MAX_ANGLES) throw new FoodVisionError('INVALID_IMAGE', `Send at most ${MAX_ANGLES} photos.`);
       // A meal described in words is a complete request; a photograph is one way of describing one.
       if (!list.length && !described) throw new FoodVisionError('INVALID_IMAGE', 'Take a photo or describe the meal.');
-      // More angles is more upload and more to read, so the deadline scales with them.
-      const timeoutMs = options.timeoutMs ?? Math.min(60_000, 25_000 + list.length * 8_000);
+      // The server allows the model 45 seconds and the upload comes on top of that. A deadline
+      // shorter than the server's own abandoned requests that were about to succeed.
+      const timeoutMs = options.timeoutMs ?? 60_000;
       if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 60_000) throw new FoodVisionError('NOT_CONFIGURED', 'Invalid vision timeout.');
       const analyzer = options.analyzer ?? ((options.endpoint ?? process.env.EXPO_PUBLIC_VISION_PROXY_URL) ? createVisionProxyAnalyzer((options.endpoint ?? process.env.EXPO_PUBLIC_VISION_PROXY_URL)!, options.accessToken) : null);
       if (!analyzer) throw new FoodVisionError('NOT_CONFIGURED', 'Connect a food recognition provider or enter your meal manually.');

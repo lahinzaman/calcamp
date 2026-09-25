@@ -78,3 +78,67 @@ test('an absurd reading is refused rather than logged', () => {
   assert.equal('caloriesKcal' in reading.macros, false, 'a misread digit run cannot become a real entry');
   assert.equal(reading.complete, false);
 });
+
+/**
+ * Real photographs of real US labels (Open Food Facts, CC BY-SA), put through on-device text
+ * recognition and kept in ML Kit's own result shape — lines, word boxes and corner points. The
+ * expected values were read off each photograph by eye, not taken from any database: several
+ * photos show an older label than the one a database now lists.
+ */
+import fixtures from './support/labelOcr.json';
+import type { OcrResult } from '../quickActions/nutritionLabel';
+
+const photo = (code: keyof typeof fixtures) => parseNutritionLabel(fixtures[code] as OcrResult);
+
+test('real labels read whole where the photograph shows every macro', () => {
+  const cases: [keyof typeof fixtures, string, number, number, number, number, string][] = [
+    ['028400090858', "Lay's", 160, 2, 15, 10, '1 package'],
+    ['016000275287', 'Cheerios, pre-2020 label', 100, 3, 20, 2, '1 cup (28g)'],
+    ['030000010204', 'Quaker oats', 150, 5, 27, 3, '1/2 cup dry (40g)'],
+    ['038000138416', 'Pringles, bilingual rows', 150, 1, 16, 9, '(1 oz/28g) (About 15 Crisps/Aprox. 15 Crujientes)'],
+    ['070470003023', 'Yoplait, hand-held and tilted', 150, 6, 28, 2, '1 container'],
+    ['049000000443', 'Coca-Cola, kJ and kcal', 250, 0, 63, 0, '591 ml. (20 oz)'],
+  ];
+  for (const [code, name, caloriesKcal, proteinG, carbsG, fatG, serving] of cases) {
+    const reading = photo(code);
+    assert.deepEqual(reading.macros, { caloriesKcal, proteinG, carbsG, fatG }, name);
+    assert.equal(reading.complete, true, name);
+    assert.equal(reading.servingLabel, serving, name);
+  }
+});
+
+test('a two-column label reads the per-serving column, never the per-container one', () => {
+  // OCR lost the soup's per-serving "6g" of protein. The "12g" per can beside it is the number a
+  // flat reading used to log — twice the real figure, with nothing on screen to say so.
+  const soup = photo('041196910759');
+  assert.deepEqual(soup.macros, { caloriesKcal: 100, carbsG: 17, fatG: 1.5 });
+  assert.deepEqual(missingMacros(soup), ['protein']);
+  assert.equal(soup.micros.sodium_mg, 670, 'not the 1400mg per can');
+  assert.equal(soup.servingLabel, '1 cup (249g)');
+  const macaroni = photo('021000658831');
+  assert.equal(macaroni.macros.caloriesKcal, 250, 'dry mix, not the 350 as prepared');
+  assert.equal(macaroni.macros.carbsG, 49);
+  assert.equal(macaroni.micros.cholesterol_mg, undefined, 'its 5mg was not read; the prepared 10mg must not stand in');
+});
+
+test('a lost decimal point is caught by the percentage printed beside it', () => {
+  // The photo says "2.7mg 15%"; OCR read "27mg". 27mg of iron would be 150% of the Daily Value.
+  assert.equal(photo('021000658831').micros.iron_mg, 2.7);
+});
+
+test('footnotes and glare leave a macro missing rather than wrong', () => {
+  // Glare covers "Calories 160"; what remains is "Calories from Fat 60" and the footnote's
+  // "Calories: 2,000 2,500". Neither is this cookie's calories.
+  const oreo = photo('044000032029');
+  assert.deepEqual(oreo.macros, { proteinG: 1, carbsG: 25, fatG: 7 });
+  // Cheerios' footnote says "26g total carbohydrate (7g sugars)"; its panel says 20g.
+  assert.equal(photo('016000275287').macros.carbsG, 20);
+  // A crumpled wrapper: "Calories 230," is legible, the rest is not.
+  assert.deepEqual(photo('040000424314').macros, { caloriesKcal: 230 });
+});
+
+test('a word is never read as a number', () => {
+  const reading = parseNutritionLabel('Calories\n2,000 calories a day is used for general nutrition advice.\nProtein is 3g');
+  assert.equal('caloriesKcal' in reading.macros, false, '"is" once read as 5 calories');
+  assert.equal(reading.macros.proteinG, 3);
+});

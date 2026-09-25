@@ -11,7 +11,7 @@ import { validateOnboarding } from '../../types/profile';
 import { useOnboardingStore } from '../../store/onboardingStore';
 import { EXERCISE_CATALOG } from '../workout/catalog';
 import { validateRoutine } from '../workout/routines';
-import { parseBarcodeFood } from '../quickActions/barcode';
+import { parseOpenFoodFacts } from '../quickActions/barcode';
 import { servingLabel } from '../dining/serving';
 
 test('Imperial snapshot migration converts old drafts and pending workouts once while preserving retry payloads', async()=>{
@@ -72,13 +72,14 @@ test('all 101 presets have distinct IDs and motion help; routine creation surviv
   const storage=memoryStorage();let sends=0;const first=new SyncEngine(storage,async()=>{sends++;});first.activate('alice');first.setOnline(false);first.queue({kind:'routine',data:routine},'routine:id',{routines:[routine]});
   const next=new SyncEngine(storage,async()=>{sends++;});next.activate('alice');assert.deepEqual(next.data.routines,[routine]);assert.equal(sends,0);await next.drain();assert.equal(sends,1);assert.equal(next.data.queue.length,0);next.activate('bob');assert.equal(next.data.routines,undefined);
 });
-test('barcode normalization rejects unknown macros and displays Imperial food portions',()=>{
-  assert.throws(()=>parseBarcodeFood({itemName:'Food',servings:[]}));
-  const food=parseBarcodeFood({itemName:'Food',brandName:'Brand',defaultServingId:'2',servings:[
-    {servingId:'1',description:'100 g',metricAmount:100,metricUnit:'g',isDefault:false,macros:{caloriesKcal:100,proteinG:3,carbsG:20,fatG:1}},
-    {servingId:'2',description:'1 bar',metricAmount:45,metricUnit:'g',isDefault:true,macros:{caloriesKcal:190,proteinG:5,carbsG:24,fatG:8}}]});
-  assert.equal(food.servings.length,2);assert.equal(food.selected,1,'the serving the package leads with');
-  assert.equal(food.servings[food.selected].macros.proteinG,5);
+test('a scanned package offers its own serving first, and refuses a partial panel',()=>{
+  assert.equal(parseOpenFoodFacts({status:0}),null,'not listed is a miss, not an error');
+  assert.throws(()=>parseOpenFoodFacts({status:1,product:{product_name:'Food',nutriments:{'energy-kcal_100g':100}}}),/without a complete nutrition panel/);
+  const food=parseOpenFoodFacts({status:1,product:{product_name:'Bar',brands:'Brand, Parent Co',serving_size:'1 bar (45 g)',serving_quantity:45,
+    nutriments:{'energy-kcal_100g':420,proteins_100g:11,carbohydrates_100g:53,fat_100g:18,'energy-kcal_serving':190,proteins_serving:5,carbohydrates_serving:24,fat_serving:8}}})!;
+  assert.equal(food.brand,'Brand');assert.equal(food.selected,0);
+  assert.deepEqual(food.servings.map(s=>s.description),['1 bar (45 g)','100 g']);
+  assert.equal(food.servings[0].macros.proteinG,5,'the package\'s own per-serving figures, not a rescaling');
   assert.equal(servingLabel({amount:100,unit:'g',label:'100 g'}),'3.53 oz');assert.equal(servingLabel({amount:1,unit:'cup',label:'1 cup'}),'1 cup');
 });
 
